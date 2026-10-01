@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build release archive
+        env:
+          GRANNY_VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/build-release.sh
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            "dist/release/granny-${{ steps.version.outputs.version }}.zip" \
+            "dist/release/granny-${{ steps.version.outputs.version }}.zip.sha256" \
+            --title "granny v${{ steps.version.outputs.version }}" \
+            --generate-notes
+
+      - name: Update the Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "TAP_GITHUB_TOKEN is not set; skipping tap update."
+            echo "The cask in packaging/homebrew/Casks/granny.rb still points at the old version."
+            exit 0
+          fi
+          SHA="$(cat "dist/release/granny-$VERSION.zip.sha256")"
+          sed -i '' -E \
+            -e "s/^  version \".*\"$/  version \"$VERSION\"/" \
+            -e "s/^  sha256 \".*\"$/  sha256 \"$SHA\"/" \
+            packaging/homebrew/Casks/granny.rb
+
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/HappyVoxel/homebrew-tap.git" tap-repo
+          mkdir -p tap-repo/Casks
+          cp packaging/homebrew/Casks/granny.rb tap-repo/Casks/granny.rb
+          cd tap-repo
+          git config user.name "happyvoxel-bot"
+          git config user.email "bot@happyvoxel.com"
+          git add Casks/granny.rb
+          git commit -m "granny $VERSION"
+          git push

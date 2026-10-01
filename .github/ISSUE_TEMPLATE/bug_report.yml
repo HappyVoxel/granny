@@ -1,0 +1,52 @@
+name: Bug report
+description: Something granny did wrong (or failed to do)
+labels: [bug]
+body:
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.0"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: granny version
+      placeholder: "0.1.0 (menu -> Settings, or the release tag)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What granny did, and where (browser, tab janitor, app killer, block, notifications).
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or config
+      description: Trace output (`GRANNY_TRACE_DEBUG=1`), notification settings, Focus mode, Private Relay state. Redact API keys.
+    validations:
+      required: false

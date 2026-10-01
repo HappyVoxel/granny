@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Unit tests
+        working-directory: GrannyAgent
+        run: swift test
+
+      - name: E2E suites (no sudo, no network)
+        run: |
+          scripts/proto.sh self-test
+          bash tests/e2e.sh
+          bash tests/e2e-helper.sh
+          bash tests/e2e-agent.sh
+          bash tests/e2e-extension.sh

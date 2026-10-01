@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a change to how granny watches the door
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is annoying, missing, or wrong today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like granny to do
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which layer would this touch?
+      options:
+        - Rules (hard list, patterns, surfaces)
+        - Classifier (Laya / Jev)
+        - Model fallback / intake (DeepSeek)
+        - Browser extension
+        - Tab janitor / app killer
+        - Notifications / UI
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
