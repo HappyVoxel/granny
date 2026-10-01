@@ -15,7 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Notifier.shared.start()
         buildMainMenu()
         context.scheduler.onGreetingNeeded = { [weak self] in
-            self?.presentGreeting()
+            guard let self, !NSApp.isHidden else { return }
+            self.presentGreeting()
         }
         context.start()
         setupStatusItem()
@@ -305,8 +306,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         newWindow.contentView = NSHostingView(rootView: view)
         newWindow.setContentSize(newWindow.contentView?.fittingSize ?? NSSize(width: 560, height: 420))
         newWindow.center()
-        newWindow.level = .floating
-        newWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // A summoned window belongs to the space the user is on and stays
+        // there: floating/all-spaces made granny ride along every Space and
+        // stay above whatever app the user switched to. `.moveToActiveSpace`
+        // brings her to the current Space when summoned from another one,
+        // and `.canJoinAllApplications` keeps Stage Manager from replacing
+        // the current app's window set - granny opens beside Terminal, not
+        // in place of it. (Implying full-screen auxiliary, it is exclusive
+        // with .fullScreenAuxiliary.)
+        newWindow.level = .normal
+        newWindow.collectionBehavior = [.moveToActiveSpace, .canJoinAllApplications]
         newWindow.isReleasedWhenClosed = false
         newWindow.makeKeyAndOrderFront(nil)
         newWindow.orderFrontRegardless()

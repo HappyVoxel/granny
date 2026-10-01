@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-01
+
+### Fixed
+
+- A due greeting no longer forces granny's window on screen while the app
+  is hidden; the Dock icon and the menu are the explicit ways back
+- Summoned windows stay in the Space where they were opened instead of
+  floating above every app on every Space
+
 ## [0.1.0] - 2026-10-01
 
 The first working cut: strict enough to use, honest about its limits.
@@ -73,3 +82,4 @@ The first working cut: strict enough to use, honest about its limits.
   cards keep a stable hairline outline while scrolling
 
 [0.1.0]: https://github.com/HappyVoxel/granny/releases/tag/v0.1.0
+[0.1.1]: https://github.com/HappyVoxel/granny/releases/tag/v0.1.1
