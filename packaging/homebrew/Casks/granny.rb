@@ -7,7 +7,7 @@ cask "granny" do
   desc "A strict macOS task enforcer: work first, play after"
   homepage "https://github.com/HappyVoxel/granny-agent"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "granny.app"
 
