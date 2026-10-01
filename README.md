@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HappyVoxel/granny-agent/releases">Download</a> ·
+  <a href="https://github.com/HappyVoxel/granny/releases">Download</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
   <a href="docs/INSTALL.md">Install guide</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/HappyVoxel/granny-agent/releases/latest"><img src="https://img.shields.io/github/v/release/HappyVoxel/granny-agent" alt="Release"></a>
+  <a href="https://github.com/HappyVoxel/granny/releases/latest"><img src="https://img.shields.io/github/v/release/HappyVoxel/granny" alt="Release"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black" alt="macOS 14+">
 </p>
@@ -106,7 +106,7 @@ brew tap happyvoxel/tap
 brew install --cask granny
 ```
 
-Or download from [GitHub Releases](https://github.com/HappyVoxel/granny-agent/releases).
+Or download from [GitHub Releases](https://github.com/HappyVoxel/granny/releases).
 The full walkthrough - helper install, browser extension, API keys - is in
 [docs/INSTALL.md](docs/INSTALL.md).
 

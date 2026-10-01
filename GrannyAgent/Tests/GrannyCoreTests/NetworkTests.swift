@@ -333,7 +333,7 @@ final class NetworkTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "granny-agent")
             return response(request.url!, status: 200, json: [
                 "tag_name": "v9.9.9",
-                "html_url": "https://github.com/HappyVoxel/granny-agent/releases/tag/v9.9.9",
+                "html_url": "https://github.com/HappyVoxel/granny/releases/tag/v9.9.9",
             ])
         }
         let newer = await UpdateChecker.check(currentVersion: "0.1.0", session: mockSession())
@@ -342,7 +342,7 @@ final class NetworkTests: XCTestCase {
         MockURLProtocol.handler = { [self] request in
             response(request.url!, status: 200, json: [
                 "tag_name": "v0.1.0",
-                "html_url": "https://github.com/HappyVoxel/granny-agent/releases/tag/v0.1.0",
+                "html_url": "https://github.com/HappyVoxel/granny/releases/tag/v0.1.0",
             ])
         }
         let same = await UpdateChecker.check(currentVersion: "0.1.0", session: mockSession())

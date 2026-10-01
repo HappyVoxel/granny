@@ -9,7 +9,7 @@ style checks.
 Fork the repo on GitHub, then:
 
 ```bash
-git clone https://github.com/<your-fork>/granny-agent.git && cd granny-agent
+git clone https://github.com/<your-fork>/granny.git && cd granny
 scripts/build-app.sh        # builds dist/granny.app
 (cd GrannyAgent && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test)
 ```
@@ -138,7 +138,7 @@ the rules - and the janitor never closes a tab on a classifier verdict.
 
 ## Reporting Bugs
 
-Open a [GitHub issue](https://github.com/HappyVoxel/granny-agent/issues) with:
+Open a [GitHub issue](https://github.com/HappyVoxel/granny/issues) with:
 
 - macOS version
 - granny version (menu -> Settings, or the release tag)

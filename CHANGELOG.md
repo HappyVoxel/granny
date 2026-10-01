@@ -72,4 +72,4 @@ The first working cut: strict enough to use, honest about its limits.
   watchlist headers); the whole watchlist header toggles now, and glass
   cards keep a stable hairline outline while scrolling
 
-[0.1.0]: https://github.com/HappyVoxel/granny-agent/releases/tag/v0.1.0
+[0.1.0]: https://github.com/HappyVoxel/granny/releases/tag/v0.1.0

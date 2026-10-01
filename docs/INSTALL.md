@@ -50,8 +50,8 @@ After install:
 ## From source (full setup, Safari included)
 
 ```bash
-git clone https://github.com/HappyVoxel/granny-agent.git
-cd granny-agent
+git clone https://github.com/HappyVoxel/granny.git
+cd granny
 ./scripts/install.sh              # build + app + helper + extensions
 ./scripts/install.sh --dry-run    # show what it would do
 ```

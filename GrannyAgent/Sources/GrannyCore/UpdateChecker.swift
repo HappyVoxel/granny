@@ -15,7 +15,7 @@ public struct ReleaseInfo: Equatable, Sendable {
 /// `brew upgrade --cask granny`. Sparkle is the full auto-update route when
 /// the project wants it.
 public enum UpdateChecker {
-    public static let repository = "HappyVoxel/granny-agent"
+    public static let repository = "HappyVoxel/granny"
 
     public static func latestRelease(from data: Data) -> ReleaseInfo? {
         guard let root = JSON.dict(from: data),

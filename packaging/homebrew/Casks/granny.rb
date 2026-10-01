@@ -1,11 +1,11 @@
 cask "granny" do
   version "0.1.0"
-  sha256 "bdeec04fa3502e1ed9357f0fcb2ac8db3cc3d390424a16e28db78dcfadafa2dc"
+  sha256 "e9e0e1968c22b323fbd46d5d45364c18d4556b1f3f0bfd15b7dff6b029cac199"
 
-  url "https://github.com/HappyVoxel/granny-agent/releases/download/v#{version}/granny-#{version}.zip"
+  url "https://github.com/HappyVoxel/granny/releases/download/v#{version}/granny-#{version}.zip"
   name "granny"
   desc "A strict macOS task enforcer: work first, play after"
-  homepage "https://github.com/HappyVoxel/granny-agent"
+  homepage "https://github.com/HappyVoxel/granny"
 
   depends_on macos: :sonoma
 

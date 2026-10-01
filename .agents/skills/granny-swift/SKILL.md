@@ -1,6 +1,6 @@
 ---
 name: granny-swift
-description: Review Swift/SwiftUI changes in granny-agent for repo conventions, testability, and the decision-tier invariants. Use when reading, writing, or reviewing Swift code in this repository.
+description: Review Swift/SwiftUI changes in granny for repo conventions, testability, and the decision-tier invariants. Use when reading, writing, or reviewing Swift code in this repository.
 ---
 
 Review Swift and SwiftUI code for correctness, repo conventions, and the

@@ -4,13 +4,13 @@ import XCTest
 final class UpdateCheckerTests: XCTestCase {
     func testParsesRelease() {
         let data = Data(#"""
-        {"tag_name":"v0.2.0","html_url":"https://github.com/HappyVoxel/granny-agent/releases/tag/v0.2.0"}
+        {"tag_name":"v0.2.0","html_url":"https://github.com/HappyVoxel/granny/releases/tag/v0.2.0"}
         """#.utf8)
         let release = UpdateChecker.latestRelease(from: data)
         XCTAssertEqual(release?.version, "0.2.0")
         XCTAssertEqual(
             release?.url.absoluteString,
-            "https://github.com/HappyVoxel/granny-agent/releases/tag/v0.2.0")
+            "https://github.com/HappyVoxel/granny/releases/tag/v0.2.0")
     }
 
     func testRejectsGarbage() {
