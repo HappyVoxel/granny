@@ -60,7 +60,7 @@ docs: explain the safari janitor
 
 ## Branch Naming
 
-Branch off `main`:
+Branch off `master`:
 
 - `feat/brew-cask`
 - `fix/janitor-youtube`
@@ -85,11 +85,13 @@ Releases are automated. Push a tag and the `Release` workflow does the rest:
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-The workflow builds `dist/release/granny-<version>.zip` + its sha256, creates
-the GitHub release with generated notes, and updates
-`HappyVoxel/homebrew-tap` - the tap step needs a `TAP_GITHUB_TOKEN` secret
-(a PAT with `repo` scope); without it the workflow publishes the release and
-prints a warning, and the cask must be updated by hand.
+The workflow runs the full test set first, then syncs the version literals
+(scripts, manifests, cask) and commits them to `master`, builds
+`dist/release/granny-<version>.zip` + its sha256, creates the GitHub release
+with generated notes, and updates `HappyVoxel/homebrew-tap` - the tap step
+needs a `TAP_GITHUB_TOKEN` secret (fine-grained, Contents: read and write on
+the tap repo); without it the workflow publishes the release and prints a
+warning, and the cask must be updated by hand.
 
 The cask source of truth is `packaging/homebrew/Casks/granny.rb` in this
 repo; the workflow copies it into the tap. Keep the version and sha256 fields

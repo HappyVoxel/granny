@@ -13,7 +13,29 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Unit tests
+        working-directory: GrannyAgent
+        run: swift test
+
+      - name: E2E suites (no sudo, no network)
+        run: |
+          scripts/proto.sh self-test
+          bash tests/e2e.sh
+          bash tests/e2e-helper.sh
+          bash tests/e2e-agent.sh
+          bash tests/e2e-extension.sh
+          bash tests/e2e-safari.sh
+
   release:
+    needs: test
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +52,32 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Sync version literals
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          sed -i '' -E "s/(GRANNY_VERSION:-)[0-9][0-9.]*/\1$VERSION/" \
+            scripts/build-app.sh scripts/build-release.sh
+          sed -i '' -E "s/(\"version\": \")[0-9][0-9.]*/\1$VERSION/" \
+            extension/chrome/manifest.json extension/safari/manifest.json
+          sed -i '' -E "s/(\"name\": \"granny-agent\", \"version\": \")[0-9][0-9.]*/\1$VERSION/" \
+            GrannyAgent/Sources/GrannyCore/TraceClient.swift
+          sed -i '' -E "s/^  version \".*\"$/  version \"$VERSION\"/" \
+            packaging/homebrew/Casks/granny.rb
+
+          git config user.name "Binh Duc Nguyen"
+          git config user.email "114677249+tripplen23@users.noreply.github.com"
+          git add scripts/build-app.sh scripts/build-release.sh \
+            extension/chrome/manifest.json extension/safari/manifest.json \
+            GrannyAgent/Sources/GrannyCore/TraceClient.swift \
+            packaging/homebrew/Casks/granny.rb
+          if git diff --cached --quiet; then
+            echo "version literals already at $VERSION"
+          else
+            git commit -m "chore: release $VERSION"
+            git push origin HEAD:master
+          fi
 
       - name: Build release archive
         env:

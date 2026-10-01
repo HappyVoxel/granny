@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${GRANNY_VERSION:-0.1.0}"
+VERSION="${GRANNY_VERSION:-0.1.1}"
 OUT="dist/release"
 
 bash scripts/build-app.sh
