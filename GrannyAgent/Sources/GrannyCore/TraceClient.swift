@@ -112,7 +112,7 @@ public final class TraceClient: @unchecked Sendable {
                     ],
                     "scopeSpans": [
                         [
-                            "scope": ["name": "granny-agent", "version": "0.1.1"],
+                            "scope": ["name": "granny-agent", "version": "0.1.2"],
                             "spans": [otlpSpan],
                         ],
                     ],

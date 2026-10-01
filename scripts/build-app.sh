@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-VERSION="${GRANNY_VERSION:-0.1.1}"
+VERSION="${GRANNY_VERSION:-0.1.2}"
 
 # SwiftPM records the deployment target as the SDK version in the Mach-O,
 # which keeps macOS 26+ on the legacy design. Re-stamp the real SDK version
