@@ -3,6 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+# Releases pass GRANNY_VERSION; the literal stays in sync with the cask and
+# the extension manifests (tests/e2e-extension.sh checks that).
 VERSION="${GRANNY_VERSION:-0.1.2}"
 
 # SwiftPM records the deployment target as the SDK version in the Mach-O,

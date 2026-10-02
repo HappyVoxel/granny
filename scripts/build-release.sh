@@ -8,6 +8,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Same literal as build-app.sh; CI overrides it with the resolved release
+# version.
 VERSION="${GRANNY_VERSION:-0.1.2}"
 OUT="dist/release"
 

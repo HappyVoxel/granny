@@ -131,11 +131,18 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   from Apple Events". Failures and the discovery list land in
   `<state dir>/janitor.log` (the login agent has no console). The app is
   ad-hoc signed, so every rebuild resets Automation grants and re-prompts.
-- Releases are automated in `.github/workflows/release.yml`: a `v*` tag
-  builds `scripts/build-release.sh`'s archive, publishes the GitHub release,
-  and updates the Homebrew tap when `TAP_GITHUB_TOKEN` is set. The cask lives
-  in `packaging/homebrew/Casks/granny.rb` (source of truth) and is copied
-  into `HappyVoxel/homebrew-tap` by that workflow.
+- Releases are automated in `.github/workflows/release.yml`: every push to
+  master runs the suites, then `scripts/next-version.sh` resolves the next
+  version from Conventional Commits since the last tag (pre-1.0: patch per
+  releasable merge, minor for breaking; docs/chore/ci merge releases
+  nothing), builds `scripts/build-release.sh`'s archive, publishes the GitHub
+  release and updates the Homebrew tap when `TAP_GITHUB_TOKEN` is set. The
+  cask lives in `packaging/homebrew/Casks/granny.rb` and is copied into
+  `HappyVoxel/homebrew-tap` by that workflow. The workflow never pushes to
+  master - the ruleset wants a pull request for that and GitHub Actions
+  cannot be a bypass actor on a repository ruleset - so the version
+  literals stay at the last released value; `tests/e2e-extension.sh` fails
+  when the cask, the manifests and the two build scripts disagree.
 - The app checks GitHub Releases once a day (`GrannyCore/UpdateChecker.swift`,
   `repository` constant - update it if the repo moves) and nags with
   `brew upgrade --cask granny`. `checkForUpdates` in the config turns it off.
