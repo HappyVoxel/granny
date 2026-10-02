@@ -1,9 +1,12 @@
 name: CI
 
+# The macOS suite is expensive; PRs are covered by the Woodpecker pipeline
+# (.woodpecker/checks.yaml, portable checks) and contributors run the macOS
+# suites locally. Master pushes and releases stay fully gated.
 on:
   push:
     branches: [master]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
