@@ -8,7 +8,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${GRANNY_VERSION:-0.1.2}"
+# Same resolution as build-app.sh: CI passes GRANNY_VERSION, a local run
+# reports the latest tag.
+VERSION="${GRANNY_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || true)}"
+VERSION="${VERSION#v}"
+[ -n "$VERSION" ] || VERSION="0.0.0"
 OUT="dist/release"
 
 bash scripts/build-app.sh
