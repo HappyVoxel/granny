@@ -48,6 +48,23 @@ final class GrannyLinesTests: XCTestCase {
         XCTAssertTrue(GrannyLines.statusWorking.contains("mummo".capitalized) || GrannyLines.statusWorking.contains("Mummo"))
     }
 
+    func testCarryOverJoinsWithSemicolonsAndAgreesInNumber() {
+        GrannyLines.language = "en"
+        let one = GrannyLines.carryOver(tasks: ["Apply 1 job"])
+        XCTAssertTrue(one.contains("is still open"))
+        XCTAssertTrue(one.contains("that frog"))
+
+        let two = GrannyLines.carryOver(tasks: ["Apply 1 job", "Ship the pipeline"])
+        XCTAssertTrue(two.contains("Apply 1 job; Ship the pipeline"))
+        XCTAssertTrue(two.contains("are still open"))
+        XCTAssertTrue(two.contains("those frogs"))
+
+        GrannyLines.language = "vi"
+        let vietnamese = GrannyLines.carryOver(tasks: ["Apply 1 job", "Ship the pipeline"])
+        XCTAssertTrue(vietnamese.contains("Apply 1 job; Ship the pipeline"))
+        XCTAssertTrue(vietnamese.contains("mấy con ếch"))
+    }
+
     func testUnknownLanguageFallsBackToEnglish() {
         GrannyLines.language = "de"
         XCTAssertEqual(GrannyLines.language, "en")

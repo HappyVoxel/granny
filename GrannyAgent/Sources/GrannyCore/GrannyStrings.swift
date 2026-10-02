@@ -94,8 +94,8 @@ public protocol GrannyStrings: Sendable {
     var addTaskConfirm: String { get }
     var cancelButton: String { get }
     var taskAdded: String { get }
-    /// Yesterday's unfinished work, named in the morning greeting.
-    func carryOver(tasks: String) -> String
+    /// Yesterday's unfinished work.
+    func carryOver(tasks: [String]) -> String
     var carriedBadge: String { get }
 
     // Status line
@@ -174,6 +174,7 @@ public protocol GrannyStrings: Sendable {
     var surfacesCaption: String { get }
     var surfacesPlaceholder: String { get }
     var surfacesEditHelp: String { get }
+    var dropTaskHelp: String { get }
     var settingsSave: String { get }
     var keyCheckValid: String { get }
     var keyCheckInvalid: String { get }
@@ -266,8 +267,12 @@ public struct EnglishStrings: GrannyStrings {
     public var addTaskConfirm: String { "Add" }
     public var cancelButton: String { "Cancel" }
     public var taskAdded: String { "Granny added it, dear." }
-    public func carryOver(tasks: String) -> String {
-        "Yesterday's \"\(tasks)\" is still open, dear. Eat that frog first, then write today's list."
+    public func carryOver(tasks: [String]) -> String {
+        let list = tasks.joined(separator: "; ")
+        if tasks.count == 1 {
+            return "Yesterday's \"\(list)\" is still open, dear. Remember to eat that frog."
+        }
+        return "Yesterday's \"\(list)\" are still open, dear. Remember to eat those frogs."
     }
     public var carriedBadge: String { "Left over from yesterday - eat the frog first" }
 
@@ -353,6 +358,7 @@ public struct EnglishStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "e.g. threads.com/feed*" }
     public var surfacesEditHelp: String { "Edit allowed URLs" }
+    public var dropTaskHelp: String { "Drop this task from the book" }
     public var settingsSave: String { "Save" }
     public var keyCheckValid: String { "Key works." }
     public var keyCheckInvalid: String { "Granny can't use this key." }
@@ -443,8 +449,12 @@ public struct VietnameseStrings: GrannyStrings {
     public var addTaskConfirm: String { "Thêm" }
     public var cancelButton: String { "Huỷ" }
     public var taskAdded: String { "Ngoại ghi thêm rồi nhé." }
-    public func carryOver(tasks: String) -> String {
-        "Hôm qua cháu còn \"\(tasks)\" chưa xong đấy. Ăn con ếch đó trước đi, rồi ghi sổ hôm nay nhé."
+    public func carryOver(tasks: [String]) -> String {
+        let list = tasks.joined(separator: "; ")
+        if tasks.count == 1 {
+            return "Hôm qua cháu còn \"\(list)\" chưa xong đấy. Nhớ ăn con ếch đó nhé."
+        }
+        return "Hôm qua cháu còn \"\(list)\" chưa xong đấy. Nhớ ăn mấy con ếch đó nhé."
     }
     public var carriedBadge: String { "Còn lại từ hôm qua - ăn con ếch trước nhé" }
 
@@ -530,6 +540,7 @@ public struct VietnameseStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "ví dụ: threads.com/feed*" }
     public var surfacesEditHelp: String { "Sửa URL được phép" }
+    public var dropTaskHelp: String { "Bỏ việc này khỏi sổ" }
     public var settingsSave: String { "Lưu" }
     public var keyCheckValid: String { "Key dùng được." }
     public var keyCheckInvalid: String { "Ngoại không dùng được key này." }
@@ -620,8 +631,12 @@ public struct FinnishStrings: GrannyStrings {
     public var addTaskConfirm: String { "Lisää" }
     public var cancelButton: String { "Peruuta" }
     public var taskAdded: String { "Mummo lisäsi sen, kulta." }
-    public func carryOver(tasks: String) -> String {
-        "Eilen \"\(tasks)\" jäi vielä kesken, kulta. Syö se sammakko ensin, kirjoita sitten tämän päivän lista."
+    public func carryOver(tasks: [String]) -> String {
+        let list = tasks.joined(separator: "; ")
+        if tasks.count == 1 {
+            return "Eilen \"\(list)\" jäi vielä kesken, kulta. Muista syödä se sammakko."
+        }
+        return "Eilen \"\(list)\" jäivät vielä kesken, kulta. Muista syödä ne sammakot."
     }
     public var carriedBadge: String { "Eilen kesken jäänyt - syö sammakko ensin" }
 
@@ -709,6 +724,7 @@ public struct FinnishStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "esim. threads.com/feed*" }
     public var surfacesEditHelp: String { "Muokkaa sallittuja osoitteita" }
+    public var dropTaskHelp: String { "Poista tämä tehtävä kirjasta" }
     public var settingsSave: String { "Tallenna" }
     public var keyCheckValid: String { "Avain toimii." }
     public var keyCheckInvalid: String { "Mummo ei voi käyttää tätä avainta." }

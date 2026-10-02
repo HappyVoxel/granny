@@ -56,7 +56,7 @@ final class Scheduler {
         // dialog or a failed apply must land on the next tick, gated by the
         // retry throttle inside.
         applyBlocks(phase)
-        if phase == .awaitingTasks, !store.state.greeted {
+        if phase == .awaitingTasks {
             onGreetingNeeded?()
         }
         if phase == .night,
