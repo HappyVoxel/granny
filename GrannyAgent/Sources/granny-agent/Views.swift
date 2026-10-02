@@ -279,11 +279,33 @@ final class GrannyViewModel: ObservableObject {
     @Published var tasks: [TaskItem] = []
     @Published var phase: Phase = .awaitingTasks
     @Published var dayOff = false
+    @Published var streak = 0
 
     func refresh(from context: GrannyContext) {
         tasks = context.store.state.tasks
         phase = context.phase()
         dayOff = context.store.state.dayOff
+        streak = displayStreak(state: context.store.state)
+    }
+}
+
+/// The flame that turns a habit into a game: consecutive clean days, shown
+/// from two days on.
+struct StreakBadge: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("🔥").font(.system(size: 13))
+            Text("\(count)")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(GrannyTheme.gold)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(GrannyTheme.gold.opacity(0.12)))
+        .overlay(Capsule().strokeBorder(GrannyTheme.gold.opacity(0.35)))
+        .help(GrannyLines.streakHelp)
     }
 }
 
@@ -292,6 +314,7 @@ final class GrannyViewModel: ObservableObject {
 struct GreetingView: View {
     var needsSetup: Bool
     var carried: [String] = []
+    var streak: Int = 0
     var onOpenSettings: () -> Void
     var onSave: (String) -> Void
     var onDayOff: () -> Void
@@ -299,32 +322,39 @@ struct GreetingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(GrannyLines.notebookLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .serif))
-                    .tracking(3)
-                    .foregroundStyle(GrannyTheme.gold)
-                Text(GrannyLines.greeting)
-                    .font(.system(size: 25, weight: .semibold, design: .serif))
-                    .foregroundStyle(GrannyTheme.text)
-                Text(GrannyLines.greetHint)
-                    .font(.system(size: 12, design: .serif))
-                    .italic()
-                    .foregroundStyle(GrannyTheme.text.opacity(0.55))
-                if !carried.isEmpty {
-                    HStack(alignment: .top, spacing: 7) {
-                        Text("🐸").font(.system(size: 14))
-                        Text(GrannyLines.carryOver(tasks: carried))
-                            .font(.system(size: 12, design: .serif))
-                            .foregroundStyle(GrannyTheme.gold)
-                            .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(GrannyLines.notebookLabel)
+                        .font(.system(size: 11, weight: .semibold, design: .serif))
+                        .tracking(3)
+                        .foregroundStyle(GrannyTheme.gold)
+                    Text(GrannyLines.greeting)
+                        .font(.system(size: 25, weight: .semibold, design: .serif))
+                        .foregroundStyle(GrannyTheme.text)
+                    Text(GrannyLines.greetHint)
+                        .font(.system(size: 12, design: .serif))
+                        .italic()
+                        .foregroundStyle(GrannyTheme.text.opacity(0.55))
+                    if !carried.isEmpty {
+                        HStack(alignment: .top, spacing: 7) {
+                            Text("🐸").font(.system(size: 14))
+                            Text(GrannyLines.carryOver(tasks: carried))
+                                .font(.system(size: 12, design: .serif))
+                                .foregroundStyle(GrannyTheme.gold)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 2)
                     }
-                    .padding(.top, 2)
+                    Rectangle()
+                        .fill(GrannyTheme.gold.opacity(0.45))
+                        .frame(height: 1)
+                        .padding(.top, 4)
                 }
-                Rectangle()
-                    .fill(GrannyTheme.gold.opacity(0.45))
-                    .frame(height: 1)
-                    .padding(.top, 4)
+                Spacer()
+                if streak >= 2 {
+                    StreakBadge(count: streak)
+                        .padding(.top, 2)
+                }
             }
 
             if needsSetup {
@@ -425,6 +455,9 @@ struct TaskListView: View {
                         .foregroundStyle(GrannyTheme.text)
                 }
                 Spacer()
+                if viewModel.streak >= 2 {
+                    StreakBadge(count: viewModel.streak)
+                }
                 settingsButton
             }
 

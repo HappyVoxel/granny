@@ -37,6 +37,13 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+/// What a rollover did to the streak, when it is worth telling the user
+/// about (a displayed streak - two days or more - grew or died).
+public enum StreakEvent: Equatable, Sendable {
+    case kept(Int)
+    case lost(Int)
+}
+
 public struct DayState: Codable, Sendable {
     public var date: String
     public var dayOff: Bool
@@ -45,19 +52,29 @@ public struct DayState: Codable, Sendable {
     /// Unfinished tasks from yesterday, waiting for the morning intake to
     /// merge them into the new notebook.
     public var carried: [TaskItem]
+    /// Clean days banked by rollover: a day counts once it ends with tasks
+    /// all done; a day off freezes the chain without breaking it.
+    public var streak: Int
+    /// Last calendar day in the current chain (clean or frozen). Lets the
+    /// next rollover tell a continued chain from a fresh start.
+    public var streakDay: String?
 
     public init(
         date: String,
         dayOff: Bool = false,
         greeted: Bool = false,
         tasks: [TaskItem] = [],
-        carried: [TaskItem] = []
+        carried: [TaskItem] = [],
+        streak: Int = 0,
+        streakDay: String? = nil
     ) {
         self.date = date
         self.dayOff = dayOff
         self.greeted = greeted
         self.tasks = tasks
         self.carried = carried
+        self.streak = streak
+        self.streakDay = streakDay
     }
 
     public static func fresh(date: String) -> DayState {
@@ -68,7 +85,8 @@ public struct DayState: Codable, Sendable {
         !tasks.isEmpty && tasks.allSatisfy { $0.done }
     }
 
-    // Old state files have no `carried` key; default it instead of resetting.
+    // Old state files have no `carried` or streak keys; default them instead
+    // of resetting.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         date = try c.decode(String.self, forKey: .date)
@@ -76,7 +94,24 @@ public struct DayState: Codable, Sendable {
         greeted = try c.decodeIfPresent(Bool.self, forKey: .greeted) ?? false
         tasks = try c.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? []
         carried = try c.decodeIfPresent([TaskItem].self, forKey: .carried) ?? []
+        streak = try c.decodeIfPresent(Int.self, forKey: .streak) ?? 0
+        streakDay = try c.decodeIfPresent(String.self, forKey: .streakDay)
     }
+}
+
+/// The streak as the UI should show it: days banked by rollover, plus today
+/// the moment it is clean. A frozen (day off) day neither adds nor subtracts.
+public func displayStreak(
+    state: DayState,
+    now: Date = Date(),
+    calendar: Calendar = .current
+) -> Int {
+    let yesterday = dayString(
+        calendar.date(byAdding: .day, value: -1, to: now) ?? now, calendar: calendar)
+    if !state.dayOff, state.allDone, state.streakDay == yesterday {
+        return state.streak + 1
+    }
+    return state.streak
 }
 
 public final class StateStore {
@@ -96,23 +131,48 @@ public final class StateStore {
         rolloverIfNeeded()
     }
 
+    /// Rolls the day over and banks yesterday's streak. The chain grows on a
+    /// day that ended with all tasks done, survives a day off unchanged, and
+    /// dies on unfinished tasks or a day granny never saw. Returns an event
+    /// only when a displayed streak (two days or more) changed.
     @discardableResult
-    public func rolloverIfNeeded(now: Date = Date()) -> Bool {
+    public func rolloverIfNeeded(now: Date = Date()) -> StreakEvent? {
         let today = dayString(now, calendar: calendar)
-        if state.date != today {
-            // Yesterday's carried frogs that the intake never merged must
-            // ride along, not be overwritten by the next rollover.
-            let unfinished = state.carried + state.tasks.filter { !$0.done }
-            state = .fresh(date: today)
-            state.carried = unfinished.map { task in
-                var carried = task
-                carried.carriedOver = true
-                return carried
-            }
-            save()
-            return true
+        guard state.date != today else { return nil }
+        let old = state
+        let yesterday = dayString(
+            calendar.date(byAdding: .day, value: -1, to: now) ?? now, calendar: calendar)
+        let twoDaysAgo = dayString(
+            calendar.date(byAdding: .day, value: -2, to: now) ?? now, calendar: calendar)
+
+        // Yesterday's carried frogs that the intake never merged must ride
+        // along, not be overwritten by the next rollover.
+        let unfinished = old.carried + old.tasks.filter { !$0.done }
+        state = .fresh(date: today)
+        state.carried = unfinished.map { task in
+            var carried = task
+            carried.carriedOver = true
+            return carried
         }
-        return false
+
+        var event: StreakEvent?
+        if old.date != yesterday {
+            // A calendar day passed without granny: the chain is dead.
+            if old.streak >= 2 { event = .lost(old.streak) }
+        } else if old.dayOff {
+            // Day off freezes the chain: no day added, none lost.
+            state.streak = old.streak
+            state.streakDay = old.date
+        } else if old.allDone {
+            let next = old.streakDay == twoDaysAgo ? old.streak + 1 : 1
+            state.streak = next
+            state.streakDay = old.date
+            if next >= 2 { event = .kept(next) }
+        } else if old.streak >= 2 {
+            event = .lost(old.streak)
+        }
+        save()
+        return event
     }
 
     public func save() {

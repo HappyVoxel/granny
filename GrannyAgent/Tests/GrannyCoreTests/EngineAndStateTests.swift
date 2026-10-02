@@ -53,6 +53,120 @@ final class EngineAndStateTests: XCTestCase {
         XCTAssertEqual(state.tasks.map(\.title), ["legacy"])
         XCTAssertFalse(state.tasks[0].carriedOver)
         XCTAssertTrue(state.carried.isEmpty)
+        XCTAssertEqual(state.streak, 0)
+        XCTAssertNil(state.streakDay)
+    }
+
+    // MARK: - Streak
+
+    private func day(_ offset: Int, from now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)) -> String {
+        dayString(calendar.date(byAdding: .day, value: offset, to: now) ?? now, calendar: calendar)
+    }
+
+    func testStreakGrowsOnConsecutiveCleanDays() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-1, calendar: calendar)
+            state.tasks = [TaskItem(title: "done", done: true)]
+            state.streak = 1
+            state.streakDay = self.day(-2, calendar: calendar)
+        }
+
+        let event = store.rolloverIfNeeded(now: Date())
+        XCTAssertEqual(event, .kept(2))
+        XCTAssertEqual(store.state.streak, 2)
+        XCTAssertEqual(store.state.streakDay, day(-1, calendar: calendar))
+    }
+
+    func testFirstCleanDayStaysQuiet() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-1, calendar: calendar)
+            state.tasks = [TaskItem(title: "done", done: true)]
+        }
+
+        let event = store.rolloverIfNeeded(now: Date())
+        XCTAssertNil(event)
+        XCTAssertEqual(store.state.streak, 1)
+    }
+
+    func testStreakBreaksOnUnfinishedFrogs() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-1, calendar: calendar)
+            state.tasks = [TaskItem(title: "frog")]
+            state.streak = 3
+            state.streakDay = self.day(-2, calendar: calendar)
+        }
+
+        let event = store.rolloverIfNeeded(now: Date())
+        XCTAssertEqual(event, .lost(3))
+        XCTAssertEqual(store.state.streak, 0)
+        XCTAssertNil(store.state.streakDay)
+        XCTAssertEqual(store.state.carried.map(\.title), ["frog"])
+    }
+
+    func testDayOffFreezesTheStreak() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-1, calendar: calendar)
+            state.dayOff = true
+            state.streak = 4
+            state.streakDay = self.day(-2, calendar: calendar)
+        }
+
+        let event = store.rolloverIfNeeded(now: Date())
+        XCTAssertNil(event)
+        XCTAssertEqual(store.state.streak, 4)
+        XCTAssertEqual(store.state.streakDay, day(-1, calendar: calendar))
+    }
+
+    func testMissedDaysBreakTheStreak() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-3, calendar: calendar)
+            state.tasks = [TaskItem(title: "done", done: true)]
+            state.streak = 5
+            state.streakDay = self.day(-4, calendar: calendar)
+        }
+
+        let event = store.rolloverIfNeeded(now: Date())
+        XCTAssertEqual(event, .lost(5))
+        XCTAssertEqual(store.state.streak, 0)
+        XCTAssertNil(store.state.streakDay)
+    }
+
+    func testDisplayStreakCountsTodayWhenClean() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+        var state = DayState(
+            date: dayString(now, calendar: calendar),
+            tasks: [TaskItem(title: "done", done: true)],
+            streak: 1,
+            streakDay: day(-1, calendar: calendar))
+        XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 2)
+
+        state.tasks = [TaskItem(title: "frog")]
+        XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 1)
+
+        state.dayOff = true
+        state.tasks = [TaskItem(title: "done", done: true)]
+        XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 1)
     }
 
     func testAllDoneFlag() {

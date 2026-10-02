@@ -92,6 +92,9 @@ public enum GrannyLines {
     public static var taskAdded: String { strings.taskAdded }
     public static func carryOver(tasks: [String]) -> String { strings.carryOver(tasks: tasks) }
     public static var carriedBadge: String { strings.carriedBadge }
+    public static var streakHelp: String { strings.streakHelp }
+    public static func streakUp(count: Int) -> String { strings.streakUp(count: count) }
+    public static func streakLost(days: Int) -> String { strings.streakLost(days: days) }
 
     // Status line
     public static var statusAwaiting: String { strings.statusAwaiting }
