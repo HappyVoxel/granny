@@ -17,6 +17,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         context.scheduler.onGreetingNeeded = { [weak self] in
             self?.remindIntake()
         }
+        context.scheduler.onStreakEvent = { [weak self] event in
+            guard let self else { return }
+            // The task list can be open across midnight; refresh the badge
+            // before the notification lands.
+            self.context.viewModel.refresh(from: self.context)
+            switch event {
+            case .kept(let count):
+                postNotification(body: GrannyLines.streakUp(count: count))
+            case .lost(let days):
+                postNotification(body: GrannyLines.streakLost(days: days))
+            }
+        }
         context.start()
         setupStatusItem()
         observeWake()
@@ -101,9 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let (state, phase) = context.snapshot()
-        let status = NSMenuItem(
-            title: "\(GrannyLines.statusPrefix): \(phase.rawValue)\(state.dayOff ? " \(GrannyLines.dayOffTag)" : "")",
-            action: nil, keyEquivalent: "")
+        let streak = displayStreak(state: state)
+        let title = "\(GrannyLines.statusPrefix): \(phase.rawValue)\(state.dayOff ? " \(GrannyLines.dayOffTag)" : "")\(streak >= 2 ? " · 🔥 \(streak)" : "")"
+        let status = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
         menu.addItem(.separator())
@@ -283,6 +295,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let view = GreetingView(
             needsSetup: context.needsSetupKey,
             carried: context.store.state.carried.map(\.title),
+            streak: displayStreak(state: context.store.state),
             onOpenSettings: { [weak self] in
                 self?.window?.orderOut(nil)
                 self?.showSettings()

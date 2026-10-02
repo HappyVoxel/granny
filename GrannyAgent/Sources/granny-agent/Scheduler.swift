@@ -10,6 +10,8 @@ final class Scheduler {
     let speaker: Speaker
 
     var onGreetingNeeded: (() -> Void)?
+    /// Fires when a rollover grew or killed a displayed streak.
+    var onStreakEvent: ((StreakEvent) -> Void)?
 
     /// Tick cadence, and how long a failed apply/clear waits before the
     /// next attempt (a cancelled authorization dialog must not re-prompt
@@ -46,7 +48,11 @@ final class Scheduler {
 
     /// Runs on the main thread: from the timer, menu actions, and wake events.
     func tick() {
-        store.rolloverIfNeeded()
+        // The init rollover already ran when the app launched after
+        // midnight; its event waits in the store until this first drain.
+        if let event = store.rolloverIfNeeded() ?? store.drainPendingStreakEvent() {
+            onStreakEvent?(event)
+        }
         let phase = computePhase(config: config, state: store.state)
         if phase != lastPhase {
             lastPhase = phase

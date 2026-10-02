@@ -25,7 +25,9 @@ keeps a log and comments on your day offs.
    return; after 23:00 granny also nags about sleep.
 6. 07:00 next day resets to step 1. Unfinished tasks carry into the new
    day: the greeting names them and nudges to eat the frog first, and the
-   intake writes them into the new notebook with a frog mark.
+   intake writes them into the new notebook with a frog mark. A day that
+   ends with no frogs banked grows the **streak** (shown from two clean
+   days); a day off freezes it, a frog or a day granny never saw breaks it.
 
 **Day off**: a button on the greeting screen and in the menubar. Granny asks
 one confirming question, then no blocks and no tasks for the day; the day is
@@ -138,9 +140,9 @@ common case and would drown the signal.
   key, model slug, wake/bedtime hours, language, speech, optional Laya
   URL/key, optional Langfuse keys, the local API token and port. Missing
   fields fall back to defaults, so old config files never break.
-- State (the day's tasks, day-off flag, greeted flag) lives at
-  `~/Library/Application Support/granny/state.json` and rolls over at
-  midnight.
+- State (the day's tasks, day-off flag, greeted flag, and the streak with
+  its last chain day) lives at `~/Library/Application Support/granny/state.json`
+  and rolls over at midnight.
 - The HTTP decision endpoint binds 127.0.0.1 only and requires the token
   header; the extension's options page holds the same port and token.
 
@@ -193,5 +195,11 @@ common case and would drown the signal.
   `LEGACY_API_UNAVAILABLE_FOR_NEW_ORGANIZATION`). TraceClient posts OTLP
   JSON to `/api/public/otel/v1/traces` with
   `x-langfuse-ingestion-version: 4`; reads for evaluation go through
-  `GET /api/public/v2/observations?...&fields=core,basic,io,model,trace_context`
-  (the `langfuse-cli` wraps this).
+   `GET /api/public/v2/observations?...&fields=core,basic,io,model,trace_context`
+   (the `langfuse-cli` wraps this).
+- **Streak**: a day banks only when it ends with tasks all done and no frog
+   carried; day off freezes the chain, a day granny never saw breaks it, and
+   the flame shows from two clean days on (Duolingo's first-day flame felt
+   like noise next to the frog reminder). Counting happens at rollover, so
+   the badge can include today the moment its tasks are done; notifications
+   fire only for displayed streaks, growing or dying.

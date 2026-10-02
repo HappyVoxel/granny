@@ -98,6 +98,11 @@ public protocol GrannyStrings: Sendable {
     func carryOver(tasks: [String]) -> String
     var carriedBadge: String { get }
 
+    // Streak
+    var streakHelp: String { get }
+    func streakUp(count: Int) -> String
+    func streakLost(days: Int) -> String
+
     // Status line
     var statusAwaiting: String { get }
     var statusWorking: String { get }
@@ -275,6 +280,13 @@ public struct EnglishStrings: GrannyStrings {
         return "Yesterday's \"\(list)\" are still open, dear. Remember to eat those frogs."
     }
     public var carriedBadge: String { "Left over from yesterday - eat the frog first" }
+    public var streakHelp: String { "Clean days in a row - no frogs left behind" }
+    public func streakUp(count: Int) -> String {
+        "🔥 \(count) clean days in a row, dear. Keep it going."
+    }
+    public func streakLost(days: Int) -> String {
+        "The streak stopped at \(days), dear. Start a new one today."
+    }
 
     public var statusAwaiting: String { "Today's list isn't written yet." }
     public var statusWorking: String { "Working. Granny lets you play when it's all done." }
@@ -457,6 +469,13 @@ public struct VietnameseStrings: GrannyStrings {
         return "Hôm qua cháu còn \"\(list)\" chưa xong đấy. Nhớ ăn mấy con ếch đó nhé."
     }
     public var carriedBadge: String { "Còn lại từ hôm qua - ăn con ếch trước nhé" }
+    public var streakHelp: String { "Số ngày liên tiếp xong hết việc - không con ếch nào bị bỏ lại" }
+    public func streakUp(count: Int) -> String {
+        "🔥 \(count) ngày liên tiếp sạch sổ rồi cháu. Giữ phong độ nhé."
+    }
+    public func streakLost(days: Int) -> String {
+        "Streak đứt ở \(days) ngày rồi cháu. Hôm nay làm lại từ đầu nhé."
+    }
 
     public var statusAwaiting: String { "Chưa nhập danh sách hôm nay." }
     public var statusWorking: String { "Đang làm việc. Xong hết ngoại mới cho chơi." }
@@ -639,6 +658,13 @@ public struct FinnishStrings: GrannyStrings {
         return "Eilen \"\(list)\" jäivät vielä kesken, kulta. Muista syödä ne sammakot."
     }
     public var carriedBadge: String { "Eilen kesken jäänyt - syö sammakko ensin" }
+    public var streakHelp: String { "Peräkkäiset puhtaat päivät - ei sammakoita jäänyt" }
+    public func streakUp(count: Int) -> String {
+        "🔥 \(count) puhdasta päivää putkeen, kulta. Jatka samaan malliin."
+    }
+    public func streakLost(days: Int) -> String {
+        "Putki katkesi \(days) päivän kohdalla, kulta. Aloita uusi tänään."
+    }
 
     public var statusAwaiting: String { "Tämän päivän listaa ei ole vielä kirjoitettu." }
     public var statusWorking: String { "Työ kesken. Mummo päästää leikkimään, kun kaikki on valmista." }
