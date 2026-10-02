@@ -3,11 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
-# Releases pass GRANNY_VERSION; a local build reports the latest tag so the
-# update checker never nags a source checkout about its own release.
-VERSION="${GRANNY_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || true)}"
-VERSION="${VERSION#v}"
-[ -n "$VERSION" ] || VERSION="0.0.0"
+# Releases pass GRANNY_VERSION; the literal stays in sync with the cask and
+# the extension manifests (tests/e2e-extension.sh checks that).
+VERSION="${GRANNY_VERSION:-0.1.2}"
 
 # SwiftPM records the deployment target as the SDK version in the Mach-O,
 # which keeps macOS 26+ on the legacy design. Re-stamp the real SDK version
