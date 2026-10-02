@@ -84,12 +84,15 @@ loud, slow and annoying instead of pretending to be security.
 - App killer: entertainment apps are closed on launch and swept every 5 s
 - Rewards: blocks lift when the list is done, return at bedtime, reset at
   wake; day off is one confirming question away
+- Streak: a day banks when it ends with no frogs left behind; the flame
+  shows from two clean days, a day off freezes it, unfinished frogs break it
 - Langfuse tracing over OTLP: every classifier verdict and enforcement action
 - Update nag: checks GitHub Releases daily and points at
   `brew upgrade --cask granny`
 - Settings watchlists: add or remove the apps granny closes, blocked sites
   and allowed sites right in Settings - no hand-editing the config file
-- Each task's allowed URLs are editable from the task list (pencil icon)
+- Each task's allowed URLs are editable from the task list (pencil icon),
+  and any task can be dropped from the book (trash icon)
 - BYOK settings: OpenRouter key, optional Laya/Jev classifier, optional
   Langfuse keys, language (English / Tiếng Việt / Suomi)
 
