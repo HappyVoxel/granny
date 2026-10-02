@@ -314,7 +314,7 @@ struct GreetingView: View {
                 if !carried.isEmpty {
                     HStack(alignment: .top, spacing: 7) {
                         Text("🐸").font(.system(size: 14))
-                        Text(GrannyLines.carryOver(tasks: carried.joined(separator: ", ")))
+                        Text(GrannyLines.carryOver(tasks: carried))
                             .font(.system(size: 12, design: .serif))
                             .foregroundStyle(GrannyTheme.gold)
                             .fixedSize(horizontal: false, vertical: true)

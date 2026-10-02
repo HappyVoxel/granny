@@ -90,7 +90,7 @@ public enum GrannyLines {
     public static var addTaskConfirm: String { strings.addTaskConfirm }
     public static var cancelButton: String { strings.cancelButton }
     public static var taskAdded: String { strings.taskAdded }
-    public static func carryOver(tasks: String) -> String { strings.carryOver(tasks: tasks) }
+    public static func carryOver(tasks: [String]) -> String { strings.carryOver(tasks: tasks) }
     public static var carriedBadge: String { strings.carriedBadge }
 
     // Status line
