@@ -189,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         show(view, title: GrannyLines.settingsTitle, styleMask: [.titled, .closable, .resizable, .miniaturizable])
         window?.setContentSize(NSSize(width: 520, height: 580))
         window?.minSize = NSSize(width: 480, height: 400)
+        windowKind = .settings
     }
 
     private func offerRelaunch() {
@@ -228,6 +229,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Windows
 
+    private enum WindowKind {
+        case greeting
+        case tasks
+        case settings
+    }
+
+    /// What the current window holds. The intake lock needs it: a visible
+    /// window is only proof of the notebook when it *is* the notebook.
+    private var windowKind: WindowKind?
+
     /// How long the yellow button buys before the intake reminder returns.
     private static let intakeSnooze: TimeInterval = 5 * 60
     /// Set when the user minimizes the intake notebook; the reminder stays
@@ -235,9 +246,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var intakeSnoozeUntil: Date?
 
     /// Keeps the intake notebook on screen while the day's list is still
-    /// unwritten. An open window is left alone - re-presenting every tick
-    /// would wipe half-typed lines and steal focus. The yellow button parks
-    /// the reminder for `intakeSnooze`; a closed window comes straight back.
+    /// unwritten. The notebook itself is left alone - re-presenting every
+    /// tick would wipe half-typed lines and steal focus - while a closed
+    /// window, an empty Today list (the last task was dropped, or the day
+    /// rolled over), comes back as the notebook. Settings counts as open:
+    /// it was reached from the greeting, and the notebook returns when it
+    /// closes. The yellow button parks the reminder for `intakeSnooze`.
     private func remindIntake() {
         guard let window else {
             presentGreeting(force: true)
@@ -258,6 +272,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         intakeSnoozeUntil = nil
+        if windowKind != .greeting, windowKind != .settings {
+            presentGreeting(force: true)
+        }
     }
 
     private func presentGreeting(force: Bool = false) {
@@ -283,9 +300,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         show(view, title: GrannyLines.windowTitle, styleMask: [.titled, .miniaturizable, .resizable])
         window?.setContentSize(NSSize(width: 530, height: context.needsSetupKey ? 540 : 480))
         window?.minSize = NSSize(width: 520, height: 420)
-        window?.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
+        windowKind = .greeting
+        // AppKit makes the Stage Manager behaviors mutually exclusive, so
+        // the green button's standard expand glyph (only full-screen-capable
+        // windows get it) has a price: during the intake lock, when the
+        // notebook *is* the point, it opts into full screen and may take the
+        // stage. Outside the lock it keeps .canJoinAllApplications, like the
+        // task list and settings, and never displaces the current app set.
         if context.phase() == .awaitingTasks {
             window?.level = .floating
+            window?.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
+        } else {
+            window?.collectionBehavior = [.moveToActiveSpace, .canJoinAllApplications]
         }
     }
 
@@ -307,6 +333,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         show(view, title: GrannyLines.tasksTitle, styleMask: [.titled, .closable, .miniaturizable, .resizable])
         window?.setContentSize(NSSize(width: 530, height: 500))
         window?.minSize = NSSize(width: 520, height: 420)
+        windowKind = .tasks
     }
 
     private func presentChallenge(_ question: String) {
