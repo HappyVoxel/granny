@@ -15,8 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Notifier.shared.start()
         buildMainMenu()
         context.scheduler.onGreetingNeeded = { [weak self] in
-            guard let self, !NSApp.isHidden else { return }
-            self.presentGreeting()
+            self?.remindIntake()
         }
         context.start()
         setupStatusItem()
@@ -77,6 +76,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         presentInitialWindow()
         return true
+    }
+
+    /// The morning intake is a lock: while the day's list is unwritten
+    /// granny may not be hidden, so Cmd+H is undone on the spot (the same
+    /// notebook, not a fresh one - half-typed lines survive).
+    func applicationDidHide(_ notification: Notification) {
+        guard context.phase() == .awaitingTasks else { return }
+        NSApp.unhide(nil)
+        window?.deminiaturize(nil)
+        window?.makeKeyAndOrderFront(nil)
+        window?.orderFrontRegardless()
     }
 
     private func setupStatusItem() {
@@ -218,6 +228,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Windows
 
+    /// How long the yellow button buys before the intake reminder returns.
+    private static let intakeSnooze: TimeInterval = 5 * 60
+    /// Set when the user minimizes the intake notebook; the reminder stays
+    /// parked until it expires.
+    private var intakeSnoozeUntil: Date?
+
+    /// Keeps the intake notebook on screen while the day's list is still
+    /// unwritten. An open window is left alone - re-presenting every tick
+    /// would wipe half-typed lines and steal focus. The yellow button parks
+    /// the reminder for `intakeSnooze`; a closed window comes straight back.
+    private func remindIntake() {
+        guard let window else {
+            presentGreeting(force: true)
+            return
+        }
+        if window.isMiniaturized {
+            let deadline = intakeSnoozeUntil ?? Date().addingTimeInterval(Self.intakeSnooze)
+            intakeSnoozeUntil = deadline
+            guard Date() >= deadline else { return }
+            intakeSnoozeUntil = nil
+            window.deminiaturize(nil)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        guard window.isVisible else {
+            intakeSnoozeUntil = nil
+            presentGreeting(force: true)
+            return
+        }
+        intakeSnoozeUntil = nil
+    }
+
     private func presentGreeting(force: Bool = false) {
         guard force || !context.store.state.greeted else { return }
         context.markGreeted()
@@ -241,6 +283,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         show(view, title: GrannyLines.windowTitle, styleMask: [.titled, .miniaturizable, .resizable])
         window?.setContentSize(NSSize(width: 530, height: context.needsSetupKey ? 540 : 480))
         window?.minSize = NSSize(width: 520, height: 420)
+        window?.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
+        if context.phase() == .awaitingTasks {
+            window?.level = .floating
+        }
     }
 
     private func presentTasks() {
