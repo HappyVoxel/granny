@@ -403,6 +403,7 @@ struct TaskListView: View {
     var onMarkAllDone: () -> Void
     var onAdd: (String) -> Void
     var onUpdateSurfaces: (String, [String]) -> Void
+    var onRemove: (String) -> Void
     var onOpenSettings: () -> Void
 
     @State private var adding = false
@@ -477,6 +478,16 @@ struct TaskListView: View {
                     }
                     .buttonStyle(.plain)
                     .help(GrannyLines.surfacesEditHelp)
+                    .pointingHandOnHover()
+                    Button {
+                        onRemove(task.id)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(GrannyTheme.text.opacity(0.35))
+                    }
+                    .buttonStyle(.plain)
+                    .help(GrannyLines.dropTaskHelp)
                     .pointingHandOnHover()
                 }
                 .padding(.vertical, 3)

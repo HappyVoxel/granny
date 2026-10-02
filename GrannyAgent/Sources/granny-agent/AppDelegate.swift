@@ -299,6 +299,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onUpdateSurfaces: { [weak self] id, surfaces in
                 self?.context.setSurfaces(taskID: id, surfaces: surfaces)
             },
+            onRemove: { [weak self] id in self?.context.removeTask(taskID: id) },
             onOpenSettings: { [weak self] in
                 self?.window?.orderOut(nil)
                 self?.showSettings()

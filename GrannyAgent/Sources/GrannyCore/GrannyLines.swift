@@ -169,6 +169,7 @@ public enum GrannyLines {
     public static var surfacesCaption: String { strings.surfacesCaption }
     public static var surfacesPlaceholder: String { strings.surfacesPlaceholder }
     public static var surfacesEditHelp: String { strings.surfacesEditHelp }
+    public static var dropTaskHelp: String { strings.dropTaskHelp }
     public static var settingsSave: String { strings.settingsSave }
     public static var keyCheckValid: String { strings.keyCheckValid }
     public static var keyCheckInvalid: String { strings.keyCheckInvalid }

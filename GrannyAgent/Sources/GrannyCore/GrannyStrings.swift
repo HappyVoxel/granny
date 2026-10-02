@@ -174,6 +174,7 @@ public protocol GrannyStrings: Sendable {
     var surfacesCaption: String { get }
     var surfacesPlaceholder: String { get }
     var surfacesEditHelp: String { get }
+    var dropTaskHelp: String { get }
     var settingsSave: String { get }
     var keyCheckValid: String { get }
     var keyCheckInvalid: String { get }
@@ -353,6 +354,7 @@ public struct EnglishStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "e.g. threads.com/feed*" }
     public var surfacesEditHelp: String { "Edit allowed URLs" }
+    public var dropTaskHelp: String { "Drop this task from the book" }
     public var settingsSave: String { "Save" }
     public var keyCheckValid: String { "Key works." }
     public var keyCheckInvalid: String { "Granny can't use this key." }
@@ -530,6 +532,7 @@ public struct VietnameseStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "ví dụ: threads.com/feed*" }
     public var surfacesEditHelp: String { "Sửa URL được phép" }
+    public var dropTaskHelp: String { "Bỏ việc này khỏi sổ" }
     public var settingsSave: String { "Lưu" }
     public var keyCheckValid: String { "Key dùng được." }
     public var keyCheckInvalid: String { "Ngoại không dùng được key này." }
@@ -709,6 +712,7 @@ public struct FinnishStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "esim. threads.com/feed*" }
     public var surfacesEditHelp: String { "Muokkaa sallittuja osoitteita" }
+    public var dropTaskHelp: String { "Poista tämä tehtävä kirjasta" }
     public var settingsSave: String { "Tallenna" }
     public var keyCheckValid: String { "Avain toimii." }
     public var keyCheckInvalid: String { "Mummo ei voi käyttää tätä avainta." }

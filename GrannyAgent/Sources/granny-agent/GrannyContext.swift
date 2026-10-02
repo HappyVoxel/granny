@@ -171,6 +171,17 @@ final class GrannyContext {
         }
     }
 
+    /// Drops a task from the book for good, carried frogs included - "this
+    /// frog is not coming back". The next tick recomputes the phase, so
+    /// removing the last open task can flip the day to rewarded.
+    func removeTask(taskID: String) {
+        mutate { state in
+            state.tasks.removeAll { $0.id == taskID }
+            state.carried.removeAll { $0.id == taskID }
+        }
+        scheduler.tick()
+    }
+
     /// Rewrites a task's allowed surfaces. The rules consult these before
     /// the block lists, so this is how a wrong machine-generated surface
     /// (a moved domain, a missed path) gets fixed without re-adding the task.
