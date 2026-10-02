@@ -1,0 +1,22 @@
+# Portable checks on the shared Woodpecker (https://ci.opscom.io), which runs
+# Linux containers. Everything that needs macOS - `swift test`, the helper and
+# agent e2e suites, and the Safari packaging suite - stays on GitHub Actions;
+# the release workflow gates on that full macOS suite before publishing.
+when:
+  - event: pull_request
+  - event: push
+    branch: master
+  - event: manual
+
+steps:
+  - name: extension and drift checks
+    image: node:24-bookworm
+    commands:
+      - apt-get update -qq
+      - apt-get install -y -qq python3 zip unzip
+      - bash tests/e2e-extension.sh
+      - |
+        for f in scripts/*.sh tests/*.sh; do
+          bash -n "$f" || { echo "syntax error in $f"; exit 1; }
+        done
+        echo "shell syntax OK"
