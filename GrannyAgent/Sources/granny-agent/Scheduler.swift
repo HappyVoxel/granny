@@ -48,7 +48,9 @@ final class Scheduler {
 
     /// Runs on the main thread: from the timer, menu actions, and wake events.
     func tick() {
-        if let event = store.rolloverIfNeeded() {
+        // The init rollover already ran when the app launched after
+        // midnight; its event waits in the store until this first drain.
+        if let event = store.rolloverIfNeeded() ?? store.drainPendingStreakEvent() {
             onStreakEvent?(event)
         }
         let phase = computePhase(config: config, state: store.state)

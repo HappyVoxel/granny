@@ -116,6 +116,9 @@ public func displayStreak(
 
 public final class StateStore {
     public private(set) var state: DayState
+    /// A streak event produced before anyone could listen - the rollover the
+    /// initializer runs. The app drains it on its first tick.
+    public private(set) var pendingStreakEvent: StreakEvent?
     private let url: URL
     private let calendar: Calendar
 
@@ -128,7 +131,14 @@ public final class StateStore {
         } else {
             self.state = .fresh(date: dayString(Date(), calendar: calendar))
         }
-        rolloverIfNeeded()
+        pendingStreakEvent = rolloverIfNeeded()
+    }
+
+    /// Returns and clears the event banked by the initialization rollover; a
+    /// launch after midnight must still deliver the notification.
+    public func drainPendingStreakEvent() -> StreakEvent? {
+        defer { pendingStreakEvent = nil }
+        return pendingStreakEvent
     }
 
     /// Rolls the day over and banks yesterday's streak. The chain grows on a

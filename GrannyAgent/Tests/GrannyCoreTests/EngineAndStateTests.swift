@@ -151,6 +151,23 @@ final class EngineAndStateTests: XCTestCase {
         XCTAssertNil(store.state.streakDay)
     }
 
+    func testLaunchRolloverBanksTheStreakEvent() throws {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let calendar = Calendar(identifier: .gregorian)
+        let seeded = DayState(
+            date: day(-1, calendar: calendar),
+            tasks: [TaskItem(title: "done", done: true)],
+            streak: 1,
+            streakDay: day(-2, calendar: calendar))
+        try JSON.encode(seeded)!.write(to: url)
+
+        let store = StateStore(url: url, calendar: calendar)
+        XCTAssertEqual(store.state.streak, 2)
+        XCTAssertEqual(store.drainPendingStreakEvent(), .kept(2))
+        XCTAssertNil(store.drainPendingStreakEvent())
+    }
+
     func testDisplayStreakCountsTodayWhenClean() {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date()
