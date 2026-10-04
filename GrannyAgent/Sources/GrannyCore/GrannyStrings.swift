@@ -149,6 +149,8 @@ public protocol GrannyStrings: Sendable {
     var settingsClassifierGroup: String { get }
     var settingsLayaURL: String { get }
     var settingsLayaKey: String { get }
+    var settingsLayaModel: String { get }
+    var settingsLayaConfidence: String { get }
     var settingsJevModel: String { get }
     var settingsJevURL: String { get }
     var settingsJevKey: String { get }
@@ -348,11 +350,13 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Fast classifier (optional)" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
+    public var settingsLayaModel: String { "Laya model" }
+    public var settingsLayaConfidence: String { "Laya min confidence" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya is your self-hosted classifier and runs first. If it is missing or down, granny falls back to Jev: automatically through OpenRouter when a key is set (default model above), or through TypeSafe's own API with the Jev URL/key."
+        "Laya is your self-hosted classifier and runs first. Paste the console's endpoint as it is (or a base URL - granny appends /systemone); the optional model overrides the language-based checkpoint. A keyless host (laya.inference.zaitlabs.com) works with an empty key. If Laya is missing or down, granny falls back to Jev: automatically through OpenRouter when a key is set (default model above), or through TypeSafe's own API with the Jev URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (optional, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -563,11 +567,13 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Fast classifier (tuỳ chọn)" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
+    public var settingsLayaModel: String { "Laya model" }
+    public var settingsLayaConfidence: String { "Ngưỡng tin cậy Laya" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya là classifier tự host của bạn, chạy trước. Nếu thiếu hoặc down, ngoại rơi xuống Jev: tự động qua OpenRouter khi có key (model mặc định ở trên), hoặc qua API riêng của TypeSafe bằng Jev URL/key."
+        "Laya là classifier tự host của bạn, chạy trước. Dán endpoint từ console đúng như nó có (hoặc URL gốc - ngoại tự thêm /systemone); model để trống thì ngoại chọn checkpoint theo ngôn ngữ. Host không cần key (laya.inference.zaitlabs.com) để trống key vẫn chạy. Nếu Laya thiếu hoặc down, ngoại rơi xuống Jev: tự động qua OpenRouter khi có key (model mặc định ở trên), hoặc qua API riêng của TypeSafe bằng Jev URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (tuỳ chọn, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -778,11 +784,13 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Nopea luokittelija (valinnainen)" }
     public var settingsLayaURL: String { "Laya-URL" }
     public var settingsLayaKey: String { "Laya-avain" }
+    public var settingsLayaModel: String { "Laya-malli" }
+    public var settingsLayaConfidence: String { "Layan vähimmäisluottamus" }
     public var settingsJevModel: String { "Jev-malli" }
     public var settingsJevURL: String { "Jev-URL" }
     public var settingsJevKey: String { "Jev-avain" }
     public var settingsClassifierCaption: String {
-        "Laya on itse ylläpidetty luokittelija ja sitä kokeillaan ensin. Jos se puuttuu tai on alhaalla, mummo siirtyy Jeviin: automaattisesti OpenRouterin kautta, kun avain on asetettu (oletusmalli yllä), tai TypeSafen omaan APIin Jev-URL:n ja -avaimen kautta."
+        "Laya on itse ylläpidetty luokittelija ja sitä kokeillaan ensin. Liitä konsolin endpoint sellaisenaan (tai perus-URL - mummo lisää /systemone); tyhjä malli valitsee checkpointin kielen mukaan. Avaimeton palvelin (laya.inference.zaitlabs.com) toimii tyhjällä avaimella. Jos Laya puuttuu tai on alhaalla, mummo siirtyy Jeviin: automaattisesti OpenRouterin kautta, kun avain on asetettu (oletusmalli yllä), tai TypeSafen omaan APIin Jev-URL:n ja -avaimen kautta."
     }
     public var settingsTracingGroup: String { "Jäljitys (valinnainen, Langfuse)" }
     public var settingsHost: String { "Palvelin" }

@@ -34,18 +34,28 @@ public actor DecisionEngine {
             self.openRouter = nil
             self.jevViaOpenRouter = nil
         }
-        if let url = config.layaURL, !url.isEmpty,
-           let key = config.layaKey, !key.isEmpty {
-            self.laya = LayaClient(baseURL: url, apiKey: key, language: config.language, session: session)
+        // Keyless hosts (the free Zaitlabs deployment) are fine with an
+        // empty key; a URL is what enables the tier.
+        if let url = config.layaURL, !url.isEmpty {
+            self.laya = LayaClient(
+                baseURL: url,
+                apiKey: config.layaKey ?? "",
+                language: config.language,
+                model: config.layaModel,
+                minConfidence: config.layaMinConfidence ?? LayaClient.confidenceGate,
+                session: session)
         } else {
             self.laya = nil
         }
         // Jev is the fast-classifier fallback for users without a Laya
         // deployment: same System One wire, just another endpoint + key.
-        if let url = config.jevURL, !url.isEmpty,
-           let key = config.jevKey, !key.isEmpty {
+        if let url = config.jevURL, !url.isEmpty {
             self.jev = LayaClient(
-                baseURL: url, apiKey: key, language: config.language, source: "jev", session: session)
+                baseURL: url,
+                apiKey: config.jevKey ?? "",
+                language: config.language,
+                source: "jev",
+                session: session)
         } else {
             self.jev = nil
         }
@@ -116,7 +126,7 @@ public actor DecisionEngine {
         var modelName = "none"
         if let laya, let verdict = await laya.decide(context: context, tasks: tasks, phase: phase) {
             decision = enrich(verdict, context: context)
-            modelName = "laya/multilingual"
+            modelName = config.layaModel ?? "laya/multilingual"
         } else if let jev, let verdict = await jev.decide(context: context, tasks: tasks, phase: phase) {
             decision = enrich(verdict, context: context)
             modelName = "jev"

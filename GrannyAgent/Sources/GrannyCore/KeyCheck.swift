@@ -22,10 +22,10 @@ public enum KeyCheck {
     }
 
     /// System One (Laya, Jev): the smallest real decision request against
-    /// `<base>/systemone`; auth failures answer 401/403.
+    /// the configured endpoint (base or full `.../systemone`); auth failures
+    /// answer 401/403. An empty key is fine for keyless hosts.
     public static func systemOne(baseURL: String, key: String, session: URLSession = .shared) async -> KeyCheckResult {
-        let base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !base.isEmpty, !key.isEmpty, let url = httpURL(base + "/systemone"),
+        guard let url = LayaClient.endpointURL(from: baseURL),
               let body = LayaClient.decisionRequestBody(
                   language: "en",
                   context: PageContext(url: "https://example.com", title: "granny key check"),
@@ -36,7 +36,9 @@ public enum KeyCheck {
         request.httpMethod = "POST"
         request.httpBody = body
         request.timeoutInterval = 10
-        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        if !key.isEmpty {
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return await perform(request, session: session)
     }

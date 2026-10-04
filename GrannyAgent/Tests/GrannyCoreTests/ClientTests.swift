@@ -143,6 +143,45 @@ final class ClientTests: XCTestCase {
         XCTAssertNil(LayaClient.parseResponse(layaResponse(choice: "nonsense", confidence: 0.9)))
     }
 
+    /// The free Zaitlabs deployment answers `confidence` where the OpsCom
+    /// console answers `answer_confidence`; both gate the same way, and the
+    /// gate itself is adjustable per host.
+    func testLayaAcceptsBothConfidenceFieldNames() throws {
+        let zaitlabs = Data(#"{"answers":{"action":{"type":"choice","choice":"block","confidence":0.9}}}"#.utf8)
+        XCTAssertEqual(LayaClient.parseResponse(zaitlabs)?.action, .block)
+        let low = Data(#"{"answers":{"action":{"type":"choice","choice":"block","confidence":0.2}}}"#.utf8)
+        XCTAssertNil(LayaClient.parseResponse(low))
+        XCTAssertEqual(LayaClient.parseResponse(low, gate: 0.1)?.action, .block)
+    }
+
+    func testLayaEndpointAcceptsBaseOrFullURL() {
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://laya.example/v1")?.absoluteString,
+            "https://laya.example/v1/systemone")
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://laya.example/v1/")?.absoluteString,
+            "https://laya.example/v1/systemone")
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://console.opscom.io/v1/systemone")?.absoluteString,
+            "https://console.opscom.io/v1/systemone")
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://laya.example")?.absoluteString,
+            "https://laya.example/systemone")
+        XCTAssertNil(LayaClient.endpointURL(from: "not a url"))
+        XCTAssertNil(LayaClient.endpointURL(from: "ftp://laya.example"))
+    }
+
+    func testLayaBodyLetsAConfiguredModelWin() throws {
+        let data = try XCTUnwrap(LayaClient.decisionRequestBody(
+            language: "vi",
+            context: PageContext(url: "https://example.com"),
+            tasks: [],
+            phase: .working,
+            model: "laya/typed-decisions"))
+        let root = try XCTUnwrap(JSON.dict(from: data))
+        XCTAssertEqual(root["model"] as? String, "laya/typed-decisions")
+    }
+
     // MARK: - Trace
 
     func testTraceOTLPBodyShape() throws {
