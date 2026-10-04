@@ -31,7 +31,10 @@ keeps a log and comments on your day offs.
 
 **Day off**: a button on the greeting screen and in the menubar. Granny asks
 one confirming question, then no blocks and no tasks for the day; the day is
-logged and commented on later. Day off beats the bedtime re-block.
+logged and commented on later. Day off beats the bedtime re-block. The flag
+is not one-way: writing a task (intake or Add task) cancels it - a day off
+has no tasks by definition - and while it is on the menubar item and the
+notebook header both offer "Back to work".
 
 ## Components
 
@@ -197,6 +200,9 @@ common case and would drown the signal.
   `x-langfuse-ingestion-version: 4`; reads for evaluation go through
    `GET /api/public/v2/observations?...&fields=core,basic,io,model,trace_context`
    (the `langfuse-cli` wraps this).
+- **Day off is reversible**: writing a task cancels the day off and the
+  menubar toggles back to work. Before this, the flag was one-way: a task
+  remembered after the day-off ritual left the blocks off with open work.
 - **Streak**: a day banks only when it ends with tasks all done and no frog
    carried; day off freezes the chain, a day granny never saw breaks it, and
    the flame shows from two clean days on (Duolingo's first-day flame felt

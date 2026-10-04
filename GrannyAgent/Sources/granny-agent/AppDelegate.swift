@@ -122,7 +122,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, "\(GrannyLines.tasksTitle)…", #selector(showTasks), "t")
         add(menu, GrannyLines.menuTodayList, #selector(showGreeting), "n")
-        add(menu, GrannyLines.menuDayOff, #selector(takeDayOff), "d")
+        if state.dayOff {
+            add(menu, GrannyLines.menuBackToWork, #selector(resumeWork), "d")
+        } else {
+            add(menu, GrannyLines.menuDayOff, #selector(takeDayOff), "d")
+        }
         add(menu, GrannyLines.menuTestURL, #selector(testURL), "u")
         menu.addItem(.separator())
         add(menu, GrannyLines.menuSettings, #selector(showSettings), ",")
@@ -155,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showTasks() { presentTasks() }
     @objc private func showGreeting() { presentGreeting(force: true) }
     @objc private func takeDayOff() { confirmDayOff() }
+    @objc private func resumeWork() { context.clearDayOff() }
 
     @objc private func testURL() {
         let alert = NSAlert()
@@ -362,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.context.setSurfaces(taskID: id, surfaces: surfaces)
             },
             onRemove: { [weak self] id in self?.context.removeTask(taskID: id) },
+            onResumeWork: { [weak self] in self?.context.clearDayOff() },
             onOpenSettings: { [weak self] in
                 self?.window?.orderOut(nil)
                 self?.showSettings()

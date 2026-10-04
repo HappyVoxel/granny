@@ -58,6 +58,16 @@ final class PhaseTests: XCTestCase {
         XCTAssertFalse(phase.blocksActive)
     }
 
+    func testWritingATaskCancelsDayOff() {
+        var dayOff = state(tasks: [TaskItem(title: "a")], dayOff: true)
+        XCTAssertTrue(dayOff.cancelDayOff())
+        XCTAssertFalse(dayOff.dayOff)
+        XCTAssertFalse(dayOff.cancelDayOff(), "already working: no second flip")
+        let phase = computePhase(now: date(hour: 10), config: config, state: dayOff, calendar: calendar)
+        XCTAssertEqual(phase, .working)
+        XCTAssertTrue(phase.blocksActive)
+    }
+
     func testWakeBoundary() {
         XCTAssertEqual(computePhase(now: date(hour: 6, minute: 59), config: config, state: state(), calendar: calendar), .night)
         XCTAssertEqual(computePhase(now: date(hour: 7, minute: 0), config: config, state: state(), calendar: calendar), .awaitingTasks)

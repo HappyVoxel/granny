@@ -66,6 +66,8 @@ public enum GrannyLines {
     public static func reward(bedtime: Int) -> String { strings.reward(bedtime: bedtime) }
     public static func dayOffConfirm() -> String { strings.dayOffConfirm() }
     public static var dayOffDone: String { strings.dayOffDone }
+    public static var dayOffCancelled: String { strings.dayOffCancelled }
+    public static var backToWork: String { strings.backToWork }
 
     // Setup
     public static var setupHint: String { strings.setupHint }
@@ -83,6 +85,7 @@ public enum GrannyLines {
     // Task list
     public static var saveButton: String { strings.saveButton }
     public static var dayOffButton: String { strings.dayOffButton }
+    public static var resumeWorkButton: String { strings.resumeWorkButton }
     public static var markAllDoneButton: String { strings.markAllDoneButton }
     public static var tasksEmpty: String { strings.tasksEmpty }
     public static var addTaskButton: String { strings.addTaskButton }
@@ -106,6 +109,7 @@ public enum GrannyLines {
     // Menu
     public static var menuTodayList: String { strings.menuTodayList }
     public static var menuDayOff: String { strings.menuDayOff }
+    public static var menuBackToWork: String { strings.menuBackToWork }
     public static var menuTestURL: String { strings.menuTestURL }
     public static var menuSettings: String { strings.menuSettings }
     public static var menuInstallHelper: String { strings.menuInstallHelper }
