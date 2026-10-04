@@ -4,7 +4,7 @@ import GrannyCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let context = GrannyContext()
-    private let updater = SelfUpdater()
+    private let updater = UpdateInstaller()
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
 
@@ -253,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard confirm.runModal() == .alertFirstButtonReturn else { return }
 
         postNotification(body: GrannyLines.updateStarted(version: update.version))
-        updater.install(version: update.version) { [weak self] result in
+        updater.install(version: update.version, currentBundle: Bundle.main.bundleURL) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(.upgradedByBrew):
@@ -261,7 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case .success(.willSwap):
                 NSApp.terminate(nil)
             case .failure(let error):
-                self.showAlert(title: GrannyLines.updateFailed, body: error.localizedDescription)
+                self.showAlert(title: GrannyLines.updateFailed, body: GrannyLines.updateFailure(error))
                 NSWorkspace.shared.open(update.url)
             }
         }

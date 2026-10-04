@@ -65,6 +65,15 @@ final class GrannyLinesTests: XCTestCase {
         XCTAssertTrue(vietnamese.contains("mấy con ếch"))
     }
 
+    func testUpdateFailureSpeaksTheLanguage() {
+        GrannyLines.language = "vi"
+        XCTAssertTrue(GrannyLines.updateFailure(UpdateInstaller.UpdateError.checksum).contains("sai checksum"))
+        XCTAssertTrue(GrannyLines.updateFailure(UpdateInstaller.UpdateError.download(404)).contains("404"))
+        GrannyLines.language = "en"
+        XCTAssertTrue(GrannyLines.updateFailure(UpdateInstaller.UpdateError.notWritable).contains("Homebrew"))
+        XCTAssertTrue(GrannyLines.updateFailure(UpdateInstaller.UpdateError.brewFailed("boom")).contains("boom"))
+    }
+
     func testUnknownLanguageFallsBackToEnglish() {
         GrannyLines.language = "de"
         XCTAssertEqual(GrannyLines.language, "en")

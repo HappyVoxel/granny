@@ -196,6 +196,12 @@ public protocol GrannyStrings: Sendable {
     func updateStarted(version: String) -> String
     var updateNowButton: String { get }
     var updateFailed: String { get }
+    func updateFailedDownload(status: Int) -> String
+    var updateFailedChecksum: String { get }
+    var updateFailedUnpack: String { get }
+    var updateFailedWritable: String { get }
+    func updateFailedBrew(output: String) -> String
+    var updateFailedGeneric: String { get }
 }
 
 public extension GrannyStrings {
@@ -404,6 +410,18 @@ public struct EnglishStrings: GrannyStrings {
     }
     public var updateNowButton: String { "Update now" }
     public var updateFailed: String { "The update did not finish. Opening the release page instead." }
+    public func updateFailedDownload(status: Int) -> String {
+        "The download did not finish (HTTP \(status)), dear."
+    }
+    public var updateFailedChecksum: String {
+        "The downloaded archive failed its checksum; granny did not touch the old version."
+    }
+    public var updateFailedUnpack: String { "The downloaded archive did not contain granny.app." }
+    public var updateFailedWritable: String {
+        "This copy of granny cannot replace itself; install it with Homebrew instead."
+    }
+    public func updateFailedBrew(output: String) -> String { "brew upgrade failed: \(output)" }
+    public var updateFailedGeneric: String { "The update did not finish." }
 }
 
 // MARK: - Vietnamese
@@ -607,6 +625,18 @@ public struct VietnameseStrings: GrannyStrings {
     }
     public var updateNowButton: String { "Cập nhật ngay" }
     public var updateFailed: String { "Cập nhật chưa xong. Ngoại mở trang release cho cháu nhé." }
+    public func updateFailedDownload(status: Int) -> String {
+        "Tải bản mới không xong (HTTP \(status)) cháu ạ."
+    }
+    public var updateFailedChecksum: String {
+        "File tải về sai checksum; ngoại không đụng đến bản cũ."
+    }
+    public var updateFailedUnpack: String { "File tải về không có granny.app." }
+    public var updateFailedWritable: String {
+        "Bản granny này không tự thay được; cháu cài bằng Homebrew nhé."
+    }
+    public func updateFailedBrew(output: String) -> String { "brew upgrade lỗi: \(output)" }
+    public var updateFailedGeneric: String { "Cập nhật chưa xong." }
 }
 
 // MARK: - Finnish
@@ -812,4 +842,16 @@ public struct FinnishStrings: GrannyStrings {
     }
     public var updateNowButton: String { "Päivitä nyt" }
     public var updateFailed: String { "Päivitys ei mennyt loppuun. Avataan julkaisusivu." }
+    public func updateFailedDownload(status: Int) -> String {
+        "Lataus ei onnistunut (HTTP \(status)), kulta."
+    }
+    public var updateFailedChecksum: String {
+        "Ladatun arkiston tarkistussumma ei täsmää; mummo ei koskenut vanhaan versioon."
+    }
+    public var updateFailedUnpack: String { "Ladatussa arkistossa ei ollut granny.appia." }
+    public var updateFailedWritable: String {
+        "Tämä mummo ei pysty vaihtamaan itseään; asenna Homebrew'lla."
+    }
+    public func updateFailedBrew(output: String) -> String { "brew upgrade epäonnistui: \(output)" }
+    public var updateFailedGeneric: String { "Päivitys ei mennyt loppuun." }
 }

@@ -189,4 +189,20 @@ public enum GrannyLines {
     public static func updateStarted(version: String) -> String { strings.updateStarted(version: version) }
     public static var updateNowButton: String { strings.updateNowButton }
     public static var updateFailed: String { strings.updateFailed }
+
+    /// The failure alert speaks the user's language: map the installer's
+    /// error to its localized line.
+    public static func updateFailure(_ error: Error) -> String {
+        guard let error = error as? UpdateInstaller.UpdateError else {
+            return error.localizedDescription
+        }
+        switch error {
+        case .download(let status): return strings.updateFailedDownload(status: status)
+        case .checksum: return strings.updateFailedChecksum
+        case .unpack: return strings.updateFailedUnpack
+        case .notWritable: return strings.updateFailedWritable
+        case .brewFailed(let output): return strings.updateFailedBrew(output: output)
+        case .tool: return strings.updateFailedGeneric
+        }
+    }
 }
