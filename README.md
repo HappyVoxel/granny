@@ -87,8 +87,9 @@ loud, slow and annoying instead of pretending to be security.
 - Streak: a day banks when it ends with no frogs left behind; the flame
   shows from two clean days, a day off freezes it, unfinished frogs break it
 - Langfuse tracing over OTLP: every classifier verdict and enforcement action
-- Update nag: checks GitHub Releases daily and points at
-  `brew upgrade --cask granny`
+- Update check: once a day, and the menu's "Update available…" installs the
+  release for you - a `brew upgrade` when Homebrew owns the copy, a
+  checksum-verified in-place swap otherwise
 - Settings watchlists: add or remove the apps granny closes, blocked sites
   and allowed sites right in Settings - no hand-editing the config file
 - Each task's allowed URLs are editable from the task list (pencil icon),

@@ -70,6 +70,8 @@ public protocol GrannyStrings: Sendable {
     func reward(bedtime: Int) -> String
     func dayOffConfirm() -> String
     var dayOffDone: String { get }
+    var dayOffCancelled: String { get }
+    var backToWork: String { get }
 
     // Setup
     var setupHint: String { get }
@@ -87,6 +89,7 @@ public protocol GrannyStrings: Sendable {
     // Task list
     var saveButton: String { get }
     var dayOffButton: String { get }
+    var resumeWorkButton: String { get }
     var markAllDoneButton: String { get }
     var tasksEmpty: String { get }
     var addTaskButton: String { get }
@@ -113,6 +116,7 @@ public protocol GrannyStrings: Sendable {
     // Menu
     var menuTodayList: String { get }
     var menuDayOff: String { get }
+    var menuBackToWork: String { get }
     var menuTestURL: String { get }
     var menuSettings: String { get }
     var menuInstallHelper: String { get }
@@ -188,6 +192,16 @@ public protocol GrannyStrings: Sendable {
     var secretHide: String { get }
     func updateAvailable(version: String) -> String
     var menuUpdateAvailable: String { get }
+    func updateConfirm(version: String) -> String
+    func updateStarted(version: String) -> String
+    var updateNowButton: String { get }
+    var updateFailed: String { get }
+    func updateFailedDownload(status: Int) -> String
+    var updateFailedChecksum: String { get }
+    var updateFailedUnpack: String { get }
+    var updateFailedWritable: String { get }
+    func updateFailedBrew(output: String) -> String
+    var updateFailedGeneric: String { get }
 }
 
 public extension GrannyStrings {
@@ -250,6 +264,10 @@ public struct EnglishStrings: GrannyStrings {
     public func reward(bedtime: Int) -> String { "Good grandchild. Go play, be back before \(bedtime)." }
     public func dayOffConfirm() -> String { "Are you sure? Granny writes it down. A real day off?" }
     public var dayOffDone: String { "Granny wrote it down. Rest up, dear." }
+    public var dayOffCancelled: String {
+        "A task on a day off, dear? Then it isn't one. Granny locked the door again."
+    }
+    public var backToWork: String { "Back to work then, dear. Granny is watching the door again." }
 
     public var setupHint: String {
         "Granny has no OpenRouter key yet. Open Settings and paste one - she needs it to judge pages."
@@ -265,6 +283,7 @@ public struct EnglishStrings: GrannyStrings {
 
     public var saveButton: String { "Write it down" }
     public var dayOffButton: String { "Today is my day off" }
+    public var resumeWorkButton: String { "Back to work" }
     public var markAllDoneButton: String { "Tell granny I'm done" }
     public var tasksEmpty: String { "No tasks yet." }
     public var addTaskButton: String { "Add task" }
@@ -296,6 +315,7 @@ public struct EnglishStrings: GrannyStrings {
 
     public var menuTodayList: String { "Today's list…" }
     public var menuDayOff: String { "Day off…" }
+    public var menuBackToWork: String { "Back to work…" }
     public var menuTestURL: String { "Test a URL…" }
     public var menuSettings: String { "Settings…" }
     public var menuInstallHelper: String { "Install helper…" }
@@ -379,9 +399,29 @@ public struct EnglishStrings: GrannyStrings {
     public var secretHide: String { "Hide" }
 
     public func updateAvailable(version: String) -> String {
-        "A newer granny is out: v\(version). Update with: brew upgrade --cask granny"
+        "A newer granny is out: v\(version). The menu can update her for you."
     }
     public var menuUpdateAvailable: String { "Update available…" }
+    public func updateConfirm(version: String) -> String {
+        "Install v\(version) now? granny will close, swap herself and reopen."
+    }
+    public func updateStarted(version: String) -> String {
+        "Updating granny to v\(version)…"
+    }
+    public var updateNowButton: String { "Update now" }
+    public var updateFailed: String { "The update did not finish. Opening the release page instead." }
+    public func updateFailedDownload(status: Int) -> String {
+        "The download did not finish (HTTP \(status)), dear."
+    }
+    public var updateFailedChecksum: String {
+        "The downloaded archive failed its checksum; granny did not touch the old version."
+    }
+    public var updateFailedUnpack: String { "The downloaded archive did not contain granny.app." }
+    public var updateFailedWritable: String {
+        "This copy of granny cannot replace itself; install it with Homebrew instead."
+    }
+    public func updateFailedBrew(output: String) -> String { "brew upgrade failed: \(output)" }
+    public var updateFailedGeneric: String { "The update did not finish." }
 }
 
 // MARK: - Vietnamese
@@ -439,6 +479,10 @@ public struct VietnameseStrings: GrannyStrings {
     public func reward(bedtime: Int) -> String { "Tốt lắm cháu. Đi chơi đi, nhớ về trước \(bedtime) giờ." }
     public func dayOffConfirm() -> String { "Chắc chưa? Ngoại ghi sổ đấy. Hôm nay nghỉ thật à?" }
     public var dayOffDone: String { "Ngoại ghi sổ rồi. Nghỉ ngơi đi cháu." }
+    public var dayOffCancelled: String {
+        "Nghỉ mà vẫn ghi task à? Thôi hết nghỉ nhé, ngoại khóa cổng lại rồi."
+    }
+    public var backToWork: String { "Quay lại làm nhé cháu. Ngoại canh cổng lại rồi." }
 
     public var setupHint: String {
         "Ngoại chưa có chìa khóa OpenRouter. Mở Settings dán vào nhé — ngoại cần nó để phán trang."
@@ -454,6 +498,7 @@ public struct VietnameseStrings: GrannyStrings {
 
     public var saveButton: String { "Ngoại ghi sổ" }
     public var dayOffButton: String { "Hôm nay là day off của cháu" }
+    public var resumeWorkButton: String { "Quay lại làm việc" }
     public var markAllDoneButton: String { "Báo ngoại xong hết" }
     public var tasksEmpty: String { "Chưa có việc nào." }
     public var addTaskButton: String { "Thêm việc" }
@@ -485,6 +530,7 @@ public struct VietnameseStrings: GrannyStrings {
 
     public var menuTodayList: String { "Sổ hôm nay…" }
     public var menuDayOff: String { "Ngày nghỉ…" }
+    public var menuBackToWork: String { "Quay lại làm…" }
     public var menuTestURL: String { "Thử URL…" }
     public var menuSettings: String { "Cài đặt…" }
     public var menuInstallHelper: String { "Cài helper…" }
@@ -568,9 +614,29 @@ public struct VietnameseStrings: GrannyStrings {
     public var secretHide: String { "Ẩn" }
 
     public func updateAvailable(version: String) -> String {
-        "Ngoại có bản mới: v\(version). Cập nhật bằng: brew upgrade --cask granny"
+        "Ngoại có bản mới: v\(version). Mở menu chọn \"Có bản cập nhật…\" là ngoại tự lên đời."
     }
     public var menuUpdateAvailable: String { "Có bản cập nhật…" }
+    public func updateConfirm(version: String) -> String {
+        "Cho ngoại lên v\(version) luôn nhé? Ngoại sẽ tự đóng, thay bản mới rồi mở lại."
+    }
+    public func updateStarted(version: String) -> String {
+        "Đang cập nhật ngoại lên v\(version)…"
+    }
+    public var updateNowButton: String { "Cập nhật ngay" }
+    public var updateFailed: String { "Cập nhật chưa xong. Ngoại mở trang release cho cháu nhé." }
+    public func updateFailedDownload(status: Int) -> String {
+        "Tải bản mới không xong (HTTP \(status)) cháu ạ."
+    }
+    public var updateFailedChecksum: String {
+        "File tải về sai checksum; ngoại không đụng đến bản cũ."
+    }
+    public var updateFailedUnpack: String { "File tải về không có granny.app." }
+    public var updateFailedWritable: String {
+        "Bản granny này không tự thay được; cháu cài bằng Homebrew nhé."
+    }
+    public func updateFailedBrew(output: String) -> String { "brew upgrade lỗi: \(output)" }
+    public var updateFailedGeneric: String { "Cập nhật chưa xong." }
 }
 
 // MARK: - Finnish
@@ -628,6 +694,10 @@ public struct FinnishStrings: GrannyStrings {
     public func reward(bedtime: Int) -> String { "Hyvä kulta. Mene leikkimään, palaa ennen kello \(bedtime)." }
     public func dayOffConfirm() -> String { "Oletko varma? Mummo kirjaa sen ylös. Oikeasti vapaapäivä?" }
     public var dayOffDone: String { "Mummo kirjasi sen ylös. Lepää, kulta." }
+    public var dayOffCancelled: String {
+        "Vapaapäivälläkö tehtäviä, kulta? Ei sitten. Mummo laittoi oven taas lukkoon."
+    }
+    public var backToWork: String { "Takaisin töihin sitten, kulta. Mummo vahtii ovea taas." }
 
     public var setupHint: String {
         "Mummolla ei ole vielä OpenRouter-avainta. Avaa asetukset ja liitä se - mummo tarvitsee sitä sivujen arviointiin."
@@ -643,6 +713,7 @@ public struct FinnishStrings: GrannyStrings {
 
     public var saveButton: String { "Kirjaa ylös" }
     public var dayOffButton: String { "Tänään on vapaapäiväni" }
+    public var resumeWorkButton: String { "Takaisin töihin" }
     public var markAllDoneButton: String { "Kerro mummolle, että olen valmis" }
     public var tasksEmpty: String { "Ei tehtäviä vielä." }
     public var addTaskButton: String { "Lisää tehtävä" }
@@ -674,6 +745,7 @@ public struct FinnishStrings: GrannyStrings {
 
     public var menuTodayList: String { "Tämän päivän lista…" }
     public var menuDayOff: String { "Vapaapäivä…" }
+    public var menuBackToWork: String { "Takaisin töihin…" }
     public var menuTestURL: String { "Testaa URL…" }
     public var menuSettings: String { "Asetukset…" }
     public var menuInstallHelper: String { "Asenna helper…" }
@@ -759,7 +831,27 @@ public struct FinnishStrings: GrannyStrings {
     public var secretHide: String { "Piilota" }
 
     public func updateAvailable(version: String) -> String {
-        "Uudempi mummo on saatavilla: v\(version). Päivitä: brew upgrade --cask granny"
+        "Uudempi mummo on saatavilla: v\(version). Valikko päivittää hänet puolestasi."
     }
     public var menuUpdateAvailable: String { "Päivitys saatavilla…" }
+    public func updateConfirm(version: String) -> String {
+        "Asennetaanko v\(version) nyt? Mummo sulkeutuu, vaihtaa itsensä ja avautuu uudelleen."
+    }
+    public func updateStarted(version: String) -> String {
+        "Päivitetään mummoa versioon v\(version)…"
+    }
+    public var updateNowButton: String { "Päivitä nyt" }
+    public var updateFailed: String { "Päivitys ei mennyt loppuun. Avataan julkaisusivu." }
+    public func updateFailedDownload(status: Int) -> String {
+        "Lataus ei onnistunut (HTTP \(status)), kulta."
+    }
+    public var updateFailedChecksum: String {
+        "Ladatun arkiston tarkistussumma ei täsmää; mummo ei koskenut vanhaan versioon."
+    }
+    public var updateFailedUnpack: String { "Ladatussa arkistossa ei ollut granny.appia." }
+    public var updateFailedWritable: String {
+        "Tämä mummo ei pysty vaihtamaan itseään; asenna Homebrew'lla."
+    }
+    public func updateFailedBrew(output: String) -> String { "brew upgrade epäonnistui: \(output)" }
+    public var updateFailedGeneric: String { "Päivitys ei mennyt loppuun." }
 }

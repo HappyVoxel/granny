@@ -434,6 +434,7 @@ struct TaskListView: View {
     var onAdd: (String) -> Void
     var onUpdateSurfaces: (String, [String]) -> Void
     var onRemove: (String) -> Void
+    var onResumeWork: () -> Void
     var onOpenSettings: () -> Void
 
     @State private var adding = false
@@ -453,6 +454,14 @@ struct TaskListView: View {
                     Text(status)
                         .font(.system(size: 21, weight: .semibold, design: .serif))
                         .foregroundStyle(GrannyTheme.text)
+                    if viewModel.dayOff {
+                        Button(GrannyLines.resumeWorkButton) { onResumeWork() }
+                            .buttonStyle(.bordered)
+                            .tint(GrannyTheme.gold)
+                            .font(.system(size: 12, weight: .semibold, design: .serif))
+                            .pointingHandOnHover()
+                            .padding(.top, 2)
+                    }
                 }
                 Spacer()
                 if viewModel.streak >= 2 {

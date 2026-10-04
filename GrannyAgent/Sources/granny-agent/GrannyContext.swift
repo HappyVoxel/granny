@@ -73,13 +73,15 @@ final class GrannyContext {
     func submitTasks(_ text: String, onChallenge: @escaping (String) -> Void) {
         let naive = TaskParser.parse(text)
         guard !naive.isEmpty else { return }
+        var resumed = false
         mutate { state in
+            resumed = state.cancelDayOff()
             state.tasks = state.carried + naive
             state.carried = []
             state.greeted = true
         }
         scheduler.tick()
-        announce(GrannyLines.saved)
+        announce(resumed ? GrannyLines.dayOffCancelled : GrannyLines.saved)
 
         Task { [weak self] in
             guard let self, let intake = await self.engine.parseIntake(text: text), !intake.tasks.isEmpty else { return }
@@ -124,7 +126,10 @@ final class GrannyContext {
     func addTask(_ text: String) {
         let naive = TaskParser.parse(text)
         guard !naive.isEmpty else { return }
+        var resumed = false
         mutate { state in
+            // A task written on a day off cancels the day off.
+            resumed = state.cancelDayOff()
             // A task added straight from the menu still brings yesterday's
             // frogs into the book.
             state.tasks.append(contentsOf: state.carried)
@@ -132,7 +137,7 @@ final class GrannyContext {
             state.tasks.append(contentsOf: naive)
         }
         scheduler.tick()
-        announce(GrannyLines.taskAdded)
+        announce(resumed ? GrannyLines.dayOffCancelled : GrannyLines.taskAdded)
 
         Task { [weak self] in
             guard let self,
@@ -205,6 +210,15 @@ final class GrannyContext {
         mutate { $0.dayOff = true }
         scheduler.tick()
         announce(GrannyLines.dayOffDone)
+    }
+
+    /// The user changed their mind: cancels the day off and lets the next
+    /// scheduler tick re-apply the blocks the open work calls for.
+    func clearDayOff() {
+        guard store.state.dayOff else { return }
+        mutate { _ = $0.cancelDayOff() }
+        scheduler.tick()
+        announce(GrannyLines.backToWork)
     }
 
     /// Installs the root helper. Preferred path: the bundled installer run

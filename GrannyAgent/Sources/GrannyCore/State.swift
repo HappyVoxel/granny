@@ -85,6 +85,16 @@ public struct DayState: Codable, Sendable {
         !tasks.isEmpty && tasks.allSatisfy { $0.done }
     }
 
+    /// Writing a task cancels the day off: a day off has no tasks by
+    /// definition, so new work means the user is back on duty. Returns true
+    /// when the flag flipped, so the caller announces it once.
+    @discardableResult
+    public mutating func cancelDayOff() -> Bool {
+        guard dayOff else { return false }
+        dayOff = false
+        return true
+    }
+
     // Old state files have no `carried` or streak keys; default them instead
     // of resetting.
     public init(from decoder: Decoder) throws {
