@@ -65,6 +65,18 @@ final class KeyCheckTests: XCTestCase {
         XCTAssertEqual(result, .invalid)
     }
 
+    /// The console hands out full endpoints; the key check must not double
+    /// the `/systemone` suffix.
+    func testSystemOneFullEndpointIsUsedAsGiven() async {
+        MockURLProtocol.handler = { [self] request in
+            XCTAssertEqual(request.url?.absoluteString, "https://console.opscom.io/v1/systemone")
+            return response(request.url!, status: 200)
+        }
+        let result = await KeyCheck.systemOne(
+            baseURL: "https://console.opscom.io/v1/systemone", key: "laya-test", session: mockSession())
+        XCTAssertEqual(result, .valid)
+    }
+
     func testSystemOneGarbageURLIsInvalidWithoutARequest() async {
         let result = await KeyCheck.systemOne(
             baseURL: "not a url", key: "k", session: mockSession())

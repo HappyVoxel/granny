@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var model: String
     @State private var layaURL: String
     @State private var layaKey: String
+    @State private var layaModel: String
     @State private var jevURL: String
     @State private var jevKey: String
     @State private var jevModel: String
@@ -43,6 +44,7 @@ struct SettingsView: View {
         _model = State(initialValue: config.model)
         _layaURL = State(initialValue: config.layaURL ?? "")
         _layaKey = State(initialValue: config.layaKey ?? "")
+        _layaModel = State(initialValue: config.layaModel ?? "")
         _jevURL = State(initialValue: config.jevURL ?? "")
         _jevKey = State(initialValue: config.jevKey ?? "")
         _jevModel = State(initialValue: config.jevModel)
@@ -79,6 +81,7 @@ struct SettingsView: View {
                             GrannyLines.settingsLayaKey,
                             $layaKey,
                             validate: { key in await KeyCheck.systemOne(baseURL: layaURL, key: key) })
+                        labeledField(GrannyLines.settingsLayaModel, $layaModel)
                         labeledField(GrannyLines.settingsJevModel, $jevModel)
                         labeledField(GrannyLines.settingsJevURL, $jevURL)
                         secretField(
@@ -383,8 +386,10 @@ struct SettingsView: View {
 
         let laya = layaURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let layaSecret = layaKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let layaCheckpoint = layaModel.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.layaURL = laya.isEmpty ? nil : laya
         updated.layaKey = layaSecret.isEmpty ? nil : layaSecret
+        updated.layaModel = layaCheckpoint.isEmpty ? nil : layaCheckpoint
 
         let jev = jevURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let jevSecret = jevKey.trimmingCharacters(in: .whitespacesAndNewlines)

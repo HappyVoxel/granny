@@ -143,6 +143,34 @@ final class ClientTests: XCTestCase {
         XCTAssertNil(LayaClient.parseResponse(layaResponse(choice: "nonsense", confidence: 0.9)))
     }
 
+    func testLayaEndpointAcceptsBaseOrFullURL() {
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://laya.example/v1")?.absoluteString,
+            "https://laya.example/v1/systemone")
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://laya.example/v1/")?.absoluteString,
+            "https://laya.example/v1/systemone")
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://console.opscom.io/v1/systemone")?.absoluteString,
+            "https://console.opscom.io/v1/systemone")
+        XCTAssertEqual(
+            LayaClient.endpointURL(from: "https://laya.example")?.absoluteString,
+            "https://laya.example/systemone")
+        XCTAssertNil(LayaClient.endpointURL(from: "not a url"))
+        XCTAssertNil(LayaClient.endpointURL(from: "ftp://laya.example"))
+    }
+
+    func testLayaBodyLetsAConfiguredModelWin() throws {
+        let data = try XCTUnwrap(LayaClient.decisionRequestBody(
+            language: "vi",
+            context: PageContext(url: "https://example.com"),
+            tasks: [],
+            phase: .working,
+            model: "laya/typed-decisions"))
+        let root = try XCTUnwrap(JSON.dict(from: data))
+        XCTAssertEqual(root["model"] as? String, "laya/typed-decisions")
+    }
+
     // MARK: - Trace
 
     func testTraceOTLPBodyShape() throws {

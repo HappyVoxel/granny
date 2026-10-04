@@ -26,6 +26,9 @@ public struct GrannyConfig: Codable, Sendable {
     public var voiceIdentifier: String?
     public var layaURL: String?
     public var layaKey: String?
+    /// Optional checkpoint name for hosts that take one; empty means the
+    /// language-based default.
+    public var layaModel: String?
     /// Jev (TypeSafe's hosted classifier) speaks the same System One wire as
     /// Laya; used as the fast-classifier tier when Laya is not configured.
     public var jevURL: String?
@@ -57,6 +60,7 @@ public struct GrannyConfig: Codable, Sendable {
         voiceIdentifier: String? = nil,
         layaURL: String? = nil,
         layaKey: String? = nil,
+        layaModel: String? = nil,
         jevURL: String? = nil,
         jevKey: String? = nil,
         jevModel: String = "typesafe/jev-router",
@@ -81,6 +85,7 @@ public struct GrannyConfig: Codable, Sendable {
         self.voiceIdentifier = voiceIdentifier
         self.layaURL = layaURL
         self.layaKey = layaKey
+        self.layaModel = layaModel
         self.jevURL = jevURL
         self.jevKey = jevKey
         self.jevModel = jevModel
@@ -203,6 +208,7 @@ public struct GrannyConfig: Codable, Sendable {
         voiceIdentifier = optional(.voiceIdentifier)
         layaURL = optional(.layaURL)
         layaKey = optional(.layaKey)
+        layaModel = optional(.layaModel)
         jevURL = optional(.jevURL)
         jevKey = optional(.jevKey)
         jevModel = value(.jevModel, d.jevModel)

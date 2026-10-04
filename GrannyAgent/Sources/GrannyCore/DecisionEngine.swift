@@ -36,7 +36,12 @@ public actor DecisionEngine {
         }
         if let url = config.layaURL, !url.isEmpty,
            let key = config.layaKey, !key.isEmpty {
-            self.laya = LayaClient(baseURL: url, apiKey: key, language: config.language, session: session)
+            self.laya = LayaClient(
+                baseURL: url,
+                apiKey: key,
+                language: config.language,
+                model: config.layaModel,
+                session: session)
         } else {
             self.laya = nil
         }

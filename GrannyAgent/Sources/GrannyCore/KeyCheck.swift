@@ -22,10 +22,11 @@ public enum KeyCheck {
     }
 
     /// System One (Laya, Jev): the smallest real decision request against
-    /// `<base>/systemone`; auth failures answer 401/403.
+    /// the configured endpoint (base or full `.../systemone`); auth failures
+    /// answer 401/403.
     public static func systemOne(baseURL: String, key: String, session: URLSession = .shared) async -> KeyCheckResult {
-        let base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !base.isEmpty, !key.isEmpty, let url = httpURL(base + "/systemone"),
+        guard !key.isEmpty,
+              let url = LayaClient.endpointURL(from: baseURL),
               let body = LayaClient.decisionRequestBody(
                   language: "en",
                   context: PageContext(url: "https://example.com", title: "granny key check"),
