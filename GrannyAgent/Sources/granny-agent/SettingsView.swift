@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var layaURL: String
     @State private var layaKey: String
     @State private var layaModel: String
+    @State private var layaMinConfidence: String
     @State private var jevURL: String
     @State private var jevKey: String
     @State private var jevModel: String
@@ -45,6 +46,7 @@ struct SettingsView: View {
         _layaURL = State(initialValue: config.layaURL ?? "")
         _layaKey = State(initialValue: config.layaKey ?? "")
         _layaModel = State(initialValue: config.layaModel ?? "")
+        _layaMinConfidence = State(initialValue: config.layaMinConfidence.map { String($0) } ?? "")
         _jevURL = State(initialValue: config.jevURL ?? "")
         _jevKey = State(initialValue: config.jevKey ?? "")
         _jevModel = State(initialValue: config.jevModel)
@@ -82,6 +84,7 @@ struct SettingsView: View {
                             $layaKey,
                             validate: { key in await KeyCheck.systemOne(baseURL: layaURL, key: key) })
                         labeledField(GrannyLines.settingsLayaModel, $layaModel)
+                        labeledField(GrannyLines.settingsLayaConfidence, $layaMinConfidence)
                         labeledField(GrannyLines.settingsJevModel, $jevModel)
                         labeledField(GrannyLines.settingsJevURL, $jevURL)
                         secretField(
@@ -390,6 +393,8 @@ struct SettingsView: View {
         updated.layaURL = laya.isEmpty ? nil : laya
         updated.layaKey = layaSecret.isEmpty ? nil : layaSecret
         updated.layaModel = layaCheckpoint.isEmpty ? nil : layaCheckpoint
+        let layaGate = Double(layaMinConfidence.trimmingCharacters(in: .whitespacesAndNewlines))
+        updated.layaMinConfidence = layaGate.map { min(max($0, 0), 1) }
 
         let jev = jevURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let jevSecret = jevKey.trimmingCharacters(in: .whitespacesAndNewlines)

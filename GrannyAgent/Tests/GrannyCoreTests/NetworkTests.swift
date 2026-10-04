@@ -122,6 +122,24 @@ final class NetworkTests: XCTestCase {
         XCTAssertNil(decision)
     }
 
+    /// The free Zaitlabs deployment takes no key; the client must not send
+    /// an Authorization header on keyless hosts.
+    func testLayaKeylessHostOmitsAuthorization() async {
+        MockURLProtocol.handler = { [self] request in
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertEqual(request.url?.absoluteString, "https://laya.inference.zaitlabs.com/v1/systemone")
+            return response(request.url!, status: 200, json: [
+                "answers": ["action": ["type": "choice", "choice": "allow", "answer_confidence": 0.9]],
+            ])
+        }
+        let client = LayaClient(
+            baseURL: "https://laya.inference.zaitlabs.com/v1",
+            apiKey: "",
+            session: mockSession())
+        let decision = await client.decide(url: "https://linkedin.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertEqual(decision?.action, .allow)
+    }
+
     // MARK: - Trace over the wire
 
     func testTracePostsOTLPWithBasicAuth() async {

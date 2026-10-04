@@ -29,6 +29,10 @@ public struct GrannyConfig: Codable, Sendable {
     /// Optional checkpoint name for hosts that take one; empty means the
     /// language-based default.
     public var layaModel: String?
+    /// Confidence gate for the Laya answer (0...1); nil keeps the default.
+    /// Calibrations differ per host - the free Zaitlabs deployment answers
+    /// far lower than the OpsCom console.
+    public var layaMinConfidence: Double?
     /// Jev (TypeSafe's hosted classifier) speaks the same System One wire as
     /// Laya; used as the fast-classifier tier when Laya is not configured.
     public var jevURL: String?
@@ -61,6 +65,7 @@ public struct GrannyConfig: Codable, Sendable {
         layaURL: String? = nil,
         layaKey: String? = nil,
         layaModel: String? = nil,
+        layaMinConfidence: Double? = nil,
         jevURL: String? = nil,
         jevKey: String? = nil,
         jevModel: String = "typesafe/jev-router",
@@ -86,6 +91,7 @@ public struct GrannyConfig: Codable, Sendable {
         self.layaURL = layaURL
         self.layaKey = layaKey
         self.layaModel = layaModel
+        self.layaMinConfidence = layaMinConfidence
         self.jevURL = jevURL
         self.jevKey = jevKey
         self.jevModel = jevModel
@@ -209,6 +215,7 @@ public struct GrannyConfig: Codable, Sendable {
         layaURL = optional(.layaURL)
         layaKey = optional(.layaKey)
         layaModel = optional(.layaModel)
+        layaMinConfidence = optional(.layaMinConfidence)
         jevURL = optional(.jevURL)
         jevKey = optional(.jevKey)
         jevModel = value(.jevModel, d.jevModel)

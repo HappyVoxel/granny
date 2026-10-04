@@ -190,9 +190,10 @@ common case and would drown the signal.
   from templates. DeepSeek remains the fallback and the generation core.
   The endpoint is whatever System One host the user pastes - base URL or
   the full `/systemone` the console key page hands out - with an optional
-  model override; the 0.6 confidence gate stays, so a host whose calibration
-  runs lower (the console answers came back around 0.5) falls through to
-  Jev more often.
+  model override; a keyless host (the free Zaitlabs deployment) works with
+  an empty key. Hosts differ on the confidence field name
+  (`answer_confidence` on the console, `confidence` on Zaitlabs) and on the
+  scale, so the gate is configurable and defaults to 0.6.
 - **Jev**: TypeSafe's hosted System One service, the classifier fallback for
   when Laya is missing or down. Reachable two ways: through OpenRouter
   (`typesafe/jev-router`, needs only the OpenRouter key) or through

@@ -143,6 +143,17 @@ final class ClientTests: XCTestCase {
         XCTAssertNil(LayaClient.parseResponse(layaResponse(choice: "nonsense", confidence: 0.9)))
     }
 
+    /// The free Zaitlabs deployment answers `confidence` where the OpsCom
+    /// console answers `answer_confidence`; both gate the same way, and the
+    /// gate itself is adjustable per host.
+    func testLayaAcceptsBothConfidenceFieldNames() throws {
+        let zaitlabs = Data(#"{"answers":{"action":{"type":"choice","choice":"block","confidence":0.9}}}"#.utf8)
+        XCTAssertEqual(LayaClient.parseResponse(zaitlabs)?.action, .block)
+        let low = Data(#"{"answers":{"action":{"type":"choice","choice":"block","confidence":0.2}}}"#.utf8)
+        XCTAssertNil(LayaClient.parseResponse(low))
+        XCTAssertEqual(LayaClient.parseResponse(low, gate: 0.1)?.action, .block)
+    }
+
     func testLayaEndpointAcceptsBaseOrFullURL() {
         XCTAssertEqual(
             LayaClient.endpointURL(from: "https://laya.example/v1")?.absoluteString,

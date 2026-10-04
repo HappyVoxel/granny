@@ -143,6 +143,7 @@ public enum GrannyLines {
     public static var settingsLayaURL: String { strings.settingsLayaURL }
     public static var settingsLayaKey: String { strings.settingsLayaKey }
     public static var settingsLayaModel: String { strings.settingsLayaModel }
+    public static var settingsLayaConfidence: String { strings.settingsLayaConfidence }
     public static var settingsJevModel: String { strings.settingsJevModel }
     public static var settingsJevURL: String { strings.settingsJevURL }
     public static var settingsJevKey: String { strings.settingsJevKey }

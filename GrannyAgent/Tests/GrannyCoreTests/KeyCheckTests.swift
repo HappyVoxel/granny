@@ -77,6 +77,17 @@ final class KeyCheckTests: XCTestCase {
         XCTAssertEqual(result, .valid)
     }
 
+    /// Keyless hosts (the free Zaitlabs deployment) validate without a key.
+    func testSystemOneKeylessHostValidatesWithoutAKey() async {
+        MockURLProtocol.handler = { [self] request in
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            return response(request.url!, status: 200)
+        }
+        let result = await KeyCheck.systemOne(
+            baseURL: "https://laya.inference.zaitlabs.com/v1", key: "", session: mockSession())
+        XCTAssertEqual(result, .valid)
+    }
+
     func testSystemOneGarbageURLIsInvalidWithoutARequest() async {
         let result = await KeyCheck.systemOne(
             baseURL: "not a url", key: "k", session: mockSession())

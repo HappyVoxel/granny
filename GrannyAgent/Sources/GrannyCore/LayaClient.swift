@@ -12,6 +12,8 @@ public struct LayaClient: Sendable {
     /// Pins a checkpoint on hosts that take one (e.g. `laya/multilingual`);
     /// nil keeps the language-based default.
     let model: String?
+    /// Confidence gate for the answer; hosts calibrate differently.
+    let minConfidence: Double
     let session: URLSession
     /// Verdict label: "laya" or "jev" (same System One wire).
     let source: String
@@ -21,6 +23,7 @@ public struct LayaClient: Sendable {
         apiKey: String,
         language: String = "en",
         model: String? = nil,
+        minConfidence: Double = LayaClient.confidenceGate,
         timeout: TimeInterval = 8,
         source: String = "laya",
         session: URLSession = .shared
@@ -29,6 +32,7 @@ public struct LayaClient: Sendable {
         self.apiKey = apiKey
         self.language = language
         self.model = model
+        self.minConfidence = minConfidence
         self.timeout = timeout
         self.source = source
         self.session = session
@@ -67,12 +71,15 @@ public struct LayaClient: Sendable {
         request.httpMethod = "POST"
         request.httpBody = body
         request.timeoutInterval = timeout
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // Keyless hosts (the free Zaitlabs deployment) take no Authorization.
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            return Self.parseResponse(data, source: source)
+            return Self.parseResponse(data, source: source, gate: minConfidence)
         } catch {
             return nil
         }
@@ -122,18 +129,22 @@ public struct LayaClient: Sendable {
         return JSON.data(from: body)
     }
 
-    /// Gated on answer_confidence; below the gate the engine falls through
-    /// to the next tier.
+    /// Gated on the chosen answer's confidence; below the gate the engine
+    /// falls through to the next tier. Hosts differ on the field name: the
+    /// OpsCom console answers `answer_confidence`, the free Zaitlabs
+    /// deployment answers `confidence`.
     public static let confidenceGate = 0.6
 
-    static func parseResponse(_ data: Data, source: String = "laya") -> Decision? {
+    static func parseResponse(
+        _ data: Data, source: String = "laya", gate: Double = LayaClient.confidenceGate
+    ) -> Decision? {
         guard let root = JSON.dict(from: data),
               let answers = root["answers"] as? [String: Any],
               let action = answers["action"] as? [String: Any],
               let choice = action["choice"] as? String,
               let actionValue = DecisionAction(rawValue: choice),
-              let confidence = action["answer_confidence"] as? Double,
-              confidence >= confidenceGate
+              let confidence = (action["answer_confidence"] as? Double) ?? (action["confidence"] as? Double),
+              confidence >= gate
         else { return nil }
         return Decision(actionValue, reason: "\(source) \(choice) @ \(confidence)", source: source)
     }
