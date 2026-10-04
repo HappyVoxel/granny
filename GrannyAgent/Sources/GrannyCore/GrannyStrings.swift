@@ -261,7 +261,7 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsTitle: String { "granny Settings" }
     public var tasksTitle: String { "Today" }
     public var notebookLabel: String { "THE DAILY LIST" }
-    public var tasksNotebookLabel: String { "GRANNY'S BOOK" }
+    public var tasksNotebookLabel: String { "GRANNY'S NOTEBOOK" }
 
     public var saveButton: String { "Write it down" }
     public var dayOffButton: String { "Today is my day off" }
@@ -370,7 +370,7 @@ public struct EnglishStrings: GrannyStrings {
     }
     public var surfacesPlaceholder: String { "e.g. threads.com/feed*" }
     public var surfacesEditHelp: String { "Edit allowed URLs" }
-    public var dropTaskHelp: String { "Drop this task from the book" }
+    public var dropTaskHelp: String { "Drop this task from the notebook" }
     public var settingsSave: String { "Save" }
     public var keyCheckValid: String { "Key works." }
     public var keyCheckInvalid: String { "Granny can't use this key." }
@@ -450,7 +450,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsTitle: String { "Cài đặt ngoại" }
     public var tasksTitle: String { "Việc hôm nay" }
     public var notebookLabel: String { "SỔ HÔM NAY" }
-    public var tasksNotebookLabel: String { "SỔ CỦA NGOẠI" }
+    public var tasksNotebookLabel: String { "SỔ TAY CỦA NGOẠI" }
 
     public var saveButton: String { "Ngoại ghi sổ" }
     public var dayOffButton: String { "Hôm nay là day off của cháu" }
@@ -639,7 +639,7 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsTitle: String { "grannyn asetukset" }
     public var tasksTitle: String { "Tänään" }
     public var notebookLabel: String { "TÄMÄN PÄIVÄN LISTA" }
-    public var tasksNotebookLabel: String { "MUMMON KIRJA" }
+    public var tasksNotebookLabel: String { "MUMMON MUISTIKIRJA" }
 
     public var saveButton: String { "Kirjaa ylös" }
     public var dayOffButton: String { "Tänään on vapaapäiväni" }
