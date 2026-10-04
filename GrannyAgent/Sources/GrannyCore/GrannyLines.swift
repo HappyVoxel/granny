@@ -181,4 +181,8 @@ public enum GrannyLines {
     public static var secretHide: String { strings.secretHide }
     public static func updateAvailable(version: String) -> String { strings.updateAvailable(version: version) }
     public static var menuUpdateAvailable: String { strings.menuUpdateAvailable }
+    public static func updateConfirm(version: String) -> String { strings.updateConfirm(version: version) }
+    public static func updateStarted(version: String) -> String { strings.updateStarted(version: version) }
+    public static var updateNowButton: String { strings.updateNowButton }
+    public static var updateFailed: String { strings.updateFailed }
 }

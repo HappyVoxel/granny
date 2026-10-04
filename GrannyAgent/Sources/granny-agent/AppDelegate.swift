@@ -4,6 +4,7 @@ import GrannyCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let context = GrannyContext()
+    private let updater = SelfUpdater()
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
 
@@ -128,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add(menu, GrannyLines.menuInstallHelper, #selector(installHelper), "")
         add(menu, GrannyLines.menuOpenConfig, #selector(openConfig), "")
         if let update = context.availableUpdate {
-            add(menu, "\(GrannyLines.menuUpdateAvailable) (v\(update.version))", #selector(openUpdate), "g")
+            add(menu, "\(GrannyLines.menuUpdateAvailable) (v\(update.version))", #selector(installUpdate), "g")
         }
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: GrannyLines.menuQuit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -234,9 +235,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openConfig() { NSWorkspace.shared.open(GrannyPaths.configURL) }
 
-    @objc private func openUpdate() {
+    /// Installs the release behind the menu item: brew-managed copies are
+    /// upgraded by brew, everything else swaps its bundle from the release
+    /// zip. Either way granny comes back on the new version.
+    @objc private func installUpdate() {
         guard let update = context.availableUpdate else { return }
-        NSWorkspace.shared.open(update.url)
+        let confirm = NSAlert()
+        confirm.messageText = GrannyLines.updateAvailable(version: update.version)
+        confirm.informativeText = GrannyLines.updateConfirm(version: update.version)
+        confirm.addButton(withTitle: GrannyLines.updateNowButton)
+        confirm.addButton(withTitle: GrannyLines.cancelButton)
+        guard confirm.runModal() == .alertFirstButtonReturn else { return }
+
+        postNotification(body: GrannyLines.updateStarted(version: update.version))
+        updater.install(version: update.version) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(.upgradedByBrew):
+                self.relaunch()
+            case .success(.willSwap):
+                NSApp.terminate(nil)
+            case .failure(let error):
+                self.showAlert(title: GrannyLines.updateFailed, body: error.localizedDescription)
+                NSWorkspace.shared.open(update.url)
+            }
+        }
     }
 
     // MARK: - Windows

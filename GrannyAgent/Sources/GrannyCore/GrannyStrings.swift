@@ -188,6 +188,10 @@ public protocol GrannyStrings: Sendable {
     var secretHide: String { get }
     func updateAvailable(version: String) -> String
     var menuUpdateAvailable: String { get }
+    func updateConfirm(version: String) -> String
+    func updateStarted(version: String) -> String
+    var updateNowButton: String { get }
+    var updateFailed: String { get }
 }
 
 public extension GrannyStrings {
@@ -379,9 +383,17 @@ public struct EnglishStrings: GrannyStrings {
     public var secretHide: String { "Hide" }
 
     public func updateAvailable(version: String) -> String {
-        "A newer granny is out: v\(version). Update with: brew upgrade --cask granny"
+        "A newer granny is out: v\(version). The menu can update her for you."
     }
     public var menuUpdateAvailable: String { "Update available…" }
+    public func updateConfirm(version: String) -> String {
+        "Install v\(version) now? granny will close, swap herself and reopen."
+    }
+    public func updateStarted(version: String) -> String {
+        "Updating granny to v\(version)…"
+    }
+    public var updateNowButton: String { "Update now" }
+    public var updateFailed: String { "The update did not finish. Opening the release page instead." }
 }
 
 // MARK: - Vietnamese
@@ -568,9 +580,17 @@ public struct VietnameseStrings: GrannyStrings {
     public var secretHide: String { "Ẩn" }
 
     public func updateAvailable(version: String) -> String {
-        "Ngoại có bản mới: v\(version). Cập nhật bằng: brew upgrade --cask granny"
+        "Ngoại có bản mới: v\(version). Mở menu chọn \"Có bản cập nhật…\" là ngoại tự lên đời."
     }
     public var menuUpdateAvailable: String { "Có bản cập nhật…" }
+    public func updateConfirm(version: String) -> String {
+        "Cho ngoại lên v\(version) luôn nhé? Ngoại sẽ tự đóng, thay bản mới rồi mở lại."
+    }
+    public func updateStarted(version: String) -> String {
+        "Đang cập nhật ngoại lên v\(version)…"
+    }
+    public var updateNowButton: String { "Cập nhật ngay" }
+    public var updateFailed: String { "Cập nhật chưa xong. Ngoại mở trang release cho cháu nhé." }
 }
 
 // MARK: - Finnish
@@ -759,7 +779,15 @@ public struct FinnishStrings: GrannyStrings {
     public var secretHide: String { "Piilota" }
 
     public func updateAvailable(version: String) -> String {
-        "Uudempi mummo on saatavilla: v\(version). Päivitä: brew upgrade --cask granny"
+        "Uudempi mummo on saatavilla: v\(version). Valikko päivittää hänet puolestasi."
     }
     public var menuUpdateAvailable: String { "Päivitys saatavilla…" }
+    public func updateConfirm(version: String) -> String {
+        "Asennetaanko v\(version) nyt? Mummo sulkeutuu, vaihtaa itsensä ja avautuu uudelleen."
+    }
+    public func updateStarted(version: String) -> String {
+        "Päivitetään mummoa versioon v\(version)…"
+    }
+    public var updateNowButton: String { "Päivitä nyt" }
+    public var updateFailed: String { "Päivitys ei mennyt loppuun. Avataan julkaisusivu." }
 }

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public struct ReleaseInfo: Equatable, Sendable {
@@ -10,12 +11,29 @@ public struct ReleaseInfo: Equatable, Sendable {
     }
 }
 
-/// Checks GitHub Releases for a newer granny. The cask cannot update itself,
-/// so the app tells the user (notification + menu item) and they run
-/// `brew upgrade --cask granny`. Sparkle is the full auto-update route when
+/// Checks GitHub Releases for a newer granny. The menu item installs the
+/// release: a Homebrew install goes through `brew update && brew upgrade
+/// --cask granny`, anything else swaps the bundle from the release zip after
+/// checking its published sha256. Sparkle is the signed-appcast route when
 /// the project wants it.
 public enum UpdateChecker {
     public static let repository = "HappyVoxel/granny"
+
+    /// The release assets follow `build-release.sh`'s naming convention.
+    public static func assetURL(version: String, suffix: String = ".zip") -> URL? {
+        URL(string: "https://github.com/\(repository)/releases/download/v\(version)/granny-\(version)\(suffix)")
+    }
+
+    /// Hex SHA-256 of a file; nil when unreadable.
+    public static func sha256(ofFileAt path: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
 
     public static func latestRelease(from data: Data) -> ReleaseInfo? {
         guard let root = JSON.dict(from: data),

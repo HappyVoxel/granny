@@ -144,9 +144,12 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   literals stay at the last released value; `tests/e2e-extension.sh` fails
   when the cask, the manifests and the two build scripts disagree.
 - The app checks GitHub Releases once a day (`GrannyCore/UpdateChecker.swift`,
-  `repository` constant - update it if the repo moves) and nags with
-  `brew upgrade --cask granny`. `checkForUpdates` in the config turns it off.
-  Sparkle is the later full-auto route; the cask cannot self-update.
+  `repository` constant - update it if the repo moves) and the menu's
+  "Update available…" item installs it (`SelfUpdater.swift`): brew-managed
+  copies run `brew update && brew upgrade --cask granny`, anything else
+  downloads the release zip, verifies its published sha256, and queues a
+  shell helper that waits for granny to quit, swaps the bundle and reopens
+  it. `checkForUpdates` in the config turns the check off.
 - Appearance is configured once at startup: `GrannyLines.configure(language:)`
   and `GrannyTheme.configure(appearance:)` are set in `GrannyContext.init`
   from the config; Settings saves and offers a relaunch. Views must read

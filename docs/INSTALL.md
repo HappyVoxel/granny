@@ -83,17 +83,20 @@ the tab janitor purge a tab's service-worker cache before closing it.
 ## Updating
 
 granny checks GitHub Releases once a day and tells you (notification + a menu
-item) when a newer version exists. Update with:
+item) when a newer version exists. Choosing **Update available…** in the menu
+installs it: brew installs run `brew update && brew upgrade --cask granny`,
+other copies download the release zip, verify its sha256 and swap themselves
+in place - granny quits and reopens on the new version.
 
 ```bash
-brew upgrade --cask granny
+brew upgrade --cask granny   # the manual route, if you prefer
 ```
 
 Source builds: `git pull && ./scripts/install.sh`.
 
 Turn the check off in `~/.config/granny/config.json` with
-`"checkForUpdates": false`. Full silent auto-update (Sparkle) is a possible
-later addition; the cask alone never upgrades itself.
+`"checkForUpdates": false`. Signed-appcast auto-update (Sparkle) is a possible
+later addition.
 
 ## Troubleshooting
 
