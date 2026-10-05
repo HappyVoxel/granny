@@ -112,6 +112,11 @@ contains "$body" '"phase":"working"' "http status"
 body="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/decide?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc")"
 contains "$body" '"action":"need-context"' "http need-context"
 
+# The browser's placeholder title is not a content signal: the engine must
+# still ask for the real one instead of judging - and caching - "YouTube".
+body="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/decide?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&title=YouTube&kind=video")"
+contains "$body" '"action":"need-context"' "http placeholder title needs context"
+
 body="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/decide?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&title=Phim+hanh+dong&force=1")"
 contains "$body" '"action":"allow"' "http forced decide fails open"
 

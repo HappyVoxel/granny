@@ -254,6 +254,121 @@ final class NetworkTests: XCTestCase {
         XCTAssertTrue(decision.message?.contains("Ngoại thấy cháu") ?? false)
     }
 
+    func testEngineGenericYouTubeTitleNeedsContext() async {
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(url: "https://www.youtube.com/watch?v=x", title: "YouTube", kind: "video"),
+            tasks: [], phase: .working)
+        XCTAssertEqual(decision.action, .needContext)
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "a placeholder title never reaches a tier")
+    }
+
+    func testEngineDeepReadsYouTubeVideoBeforeFastTiers() async {
+        MockURLProtocol.handler = { [self] request in
+            XCTAssertTrue(request.url?.absoluteString.contains("openrouter.ai") ?? false)
+            return response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"warn","message":"Phim này chưa khớp việc đang làm.","reason":"long-form video"}"#))
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        config.layaURL = "https://laya.example/v1"
+        config.layaKey = "laya-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(
+                url: "https://www.youtube.com/watch?v=movie",
+                title: "Phim Lẻ Hay: THÁNH BÀI - YouTube",
+                channel: "KK Studio",
+                kind: "video"),
+            tasks: [TaskItem(title: "Create data pipeline")], phase: .working)
+        XCTAssertEqual(decision.source, "model")
+        XCTAssertEqual(decision.action, .warn)
+        XCTAssertEqual(MockURLProtocol.requestCount, 1, "the deep read skips the fast tiers")
+    }
+
+    func testEngineForcedWeakContextOnYouTubeWarns() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(url: "https://www.youtube.com/watch?v=x", title: "YouTube", kind: "video"),
+            tasks: [TaskItem(title: "Create data pipeline")], phase: .working, force: true)
+        XCTAssertEqual(decision.action, .warn, "an unreadable page must not be allowed")
+        XCTAssertEqual(decision.source, "context")
+        XCTAssertTrue(decision.message?.contains("YouTube") ?? false)
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "no tier is asked about a page nobody can read")
+    }
+
+    func testEngineDemotesYouTubeBrowsingSurfacesToWarn() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"block","message":"That front page is a feed of distractions.","reason":"feed"}"#))
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(url: "https://www.youtube.com/", title: "Home - YouTube", kind: "youtube"),
+            tasks: [TaskItem(title: "Create data pipeline")], phase: .working, force: true)
+        XCTAssertEqual(decision.action, .warn, "a browsing surface is negotiable, never a dead end")
+        XCTAssertTrue(decision.message?.contains("distractions") ?? false)
+    }
+
+    func testEngineDoesNotCacheVerdictsFromEmptyContext() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"allow","message":"ok","reason":"video"}"#))
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let context = PageContext(url: "https://www.netflix.com/browse")
+        _ = await engine.decide(context: context, tasks: [], phase: .working, force: true)
+        _ = await engine.decide(context: context, tasks: [], phase: .working, force: true)
+        XCTAssertEqual(MockURLProtocol.requestCount, 2, "a verdict without a content signal is not cached")
+    }
+
+    func testEngineNegotiableLineNamesContentNotTaskJargon() async {
+        GrannyLines.language = "vi"
+        defer { GrannyLines.language = "en" }
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: [
+                "answers": ["action": ["type": "choice", "choice": "warn", "answer_confidence": 0.9]],
+            ])
+        }
+        var config = GrannyConfig()
+        config.layaURL = "https://laya.example/v1"
+        config.layaKey = "laya-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(url: "https://www.youtube.com/watch?v=v", title: "Mùi Phở - Review", kind: "video"),
+            tasks: [TaskItem(title: "Learn Hugging Face certificate")],
+            phase: .working)
+        XCTAssertEqual(decision.action, .warn)
+        XCTAssertTrue(decision.message?.contains("Mùi Phở") ?? false)
+        XCTAssertFalse(decision.message?.contains("Hugging Face") ?? true, "task jargon stays out of granny's line")
+    }
+
+    func testLayaDetailedReportsMissReasons() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: [
+                "answers": ["action": ["type": "choice", "choice": "block", "answer_confidence": 0.2]],
+            ])
+        }
+        let client = LayaClient(baseURL: "https://laya.example/v1", apiKey: "k", session: mockSession())
+        let low = await client.decideDetailed(context: PageContext(url: "https://x.com"), tasks: [], phase: .working)
+        XCTAssertNil(low.decision)
+        XCTAssertEqual(low.miss, "low confidence 0.20")
+
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 403, json: ["error": "forbidden"])
+        }
+        let forbidden = await client.decideDetailed(
+            context: PageContext(url: "https://x.com"), tasks: [], phase: .working)
+        XCTAssertNil(forbidden.decision)
+        XCTAssertEqual(forbidden.miss, "http 403")
+    }
+
     func testEngineUnknownHostUsesLaya() async {
         MockURLProtocol.handler = { [self] request in
             response(request.url!, status: 200, json: [

@@ -61,12 +61,21 @@ public struct LayaClient: Sendable {
     }
 
     public func decide(context: PageContext, tasks: [TaskItem], phase: Phase) async -> Decision? {
+        await decideDetailed(context: context, tasks: tasks, phase: phase).decision
+    }
+
+    /// Same verdict, plus why it was unusable when nil ("http 403",
+    /// "transport: …", "low confidence 0.32"). The engine traces the miss so
+    /// a silent classifier never hides inside the fallback chain.
+    public func decideDetailed(
+        context: PageContext, tasks: [TaskItem], phase: Phase
+    ) async -> (decision: Decision?, miss: String?) {
         guard let body = Self.decisionRequestBody(
             language: language, context: context, tasks: tasks, phase: phase, model: model)
-        else { return nil }
+        else { return (nil, "bad request body") }
         // The URL comes from the user's config: a malformed one must fall
         // through to the next tier, not crash the agent.
-        guard let endpoint = Self.endpointURL(from: baseURL) else { return nil }
+        guard let endpoint = Self.endpointURL(from: baseURL) else { return (nil, "bad endpoint") }
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.httpBody = body
@@ -78,10 +87,11 @@ public struct LayaClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            return Self.parseResponse(data, source: source, gate: minConfidence)
+            guard let http = response as? HTTPURLResponse else { return (nil, "not http") }
+            guard http.statusCode == 200 else { return (nil, "http \(http.statusCode)") }
+            return Self.parseResponseDetailed(data, source: source, gate: minConfidence)
         } catch {
-            return nil
+            return (nil, "transport: \(error.localizedDescription)")
         }
     }
 
@@ -104,17 +114,20 @@ public struct LayaClient: Sendable {
                     "instructions": "Judge the page content (title, channel, kind), not the domain. "
                         + "Would opening it serve the grandchild's deep work right now, given the open tasks?",
                     "criteria": [
-                        "allow": "music in any form - songs, playlists, radio, lo-fi, ambient, "
-                            + "instrumental, music videos; lectures, tutorials, documentation; "
+                        "allow": "content that clearly serves the open tasks: music only "
+                            + "when the page is unmistakably music (kind=music, official "
+                            + "MV/audio, artist channel); lectures, tutorials, documentation; "
                             + "tools and dashboards the grandchild uses for work (developer "
                             + "tools, tracing/observability, analytics); AI assistants and "
                             + "research tools (Perplexity, ChatGPT); communication tools "
-                            + "(Slack, Discord, email); anything that directly serves the "
-                            + "open tasks",
-                        "warn": "work-adjacent but likely to drift: social feeds, general-interest "
-                            + "videos that could serve a task but smell like a break",
-                        "block": "passive video entertainment: movies, series, vlogs, gaming, "
-                            + "football streams, pranks, reaction videos, gossip, shorts",
+                            + "(Slack, Discord, email)",
+                        "warn": "work-adjacent but negotiable: social feeds, movies, "
+                            + "series, vlogs, general-interest videos - long-form "
+                            + "entertainment the grandchild may argue serves a task, and "
+                            + "ambiguous videos that cannot be identified; always warn, "
+                            + "never block",
+                        "block": "non-negotiable passive entertainment: shorts, gaming, "
+                            + "football streams, pranks, reaction videos, gossip",
                     ],
                 ],
             ],
@@ -138,14 +151,22 @@ public struct LayaClient: Sendable {
     static func parseResponse(
         _ data: Data, source: String = "laya", gate: Double = LayaClient.confidenceGate
     ) -> Decision? {
+        parseResponseDetailed(data, source: source, gate: gate).decision
+    }
+
+    static func parseResponseDetailed(
+        _ data: Data, source: String = "laya", gate: Double = LayaClient.confidenceGate
+    ) -> (decision: Decision?, miss: String?) {
         guard let root = JSON.dict(from: data),
               let answers = root["answers"] as? [String: Any],
               let action = answers["action"] as? [String: Any],
               let choice = action["choice"] as? String,
               let actionValue = DecisionAction(rawValue: choice),
-              let confidence = (action["answer_confidence"] as? Double) ?? (action["confidence"] as? Double),
-              confidence >= gate
-        else { return nil }
-        return Decision(actionValue, reason: "\(source) \(choice) @ \(confidence)", source: source)
+              let confidence = (action["answer_confidence"] as? Double) ?? (action["confidence"] as? Double)
+        else { return (nil, "unparseable response") }
+        guard confidence >= gate else {
+            return (nil, String(format: "low confidence %.2f", confidence))
+        }
+        return (Decision(actionValue, reason: "\(source) \(choice) @ \(confidence)", source: source), nil)
     }
 }

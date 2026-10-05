@@ -4,7 +4,14 @@
 const HARD_BLOCKED = ['facebook.com', 'instagram.com', 'tiktok.com'];
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (!message || message.type !== 'granny-check') return undefined;
+  if (!message) return undefined;
+  if (message.type === 'granny-close-tab') {
+    // The interstitial's "close the tab" button: the content script cannot
+    // close its own tab, the background can.
+    if (_sender.tab && _sender.tab.id !== undefined) chrome.tabs.remove(_sender.tab.id);
+    return undefined;
+  }
+  if (message.type !== 'granny-check') return undefined;
   (async () => {
     let settings = await chrome.storage.local.get({ decidePort: 47899, token: '' });
     if (!settings.token) {
