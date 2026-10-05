@@ -83,15 +83,17 @@
     line.style.cssText = 'font-size:22px;max-width:640px';
     layer.appendChild(line);
 
-    const buttonStyle =
-      'padding:8px 20px;border-radius:8px;border:1px solid #f4e9d8;background:transparent;color:#f4e9d8;font-size:15px;cursor:pointer';
+    const buttonBase =
+      'padding:8px 20px;border-radius:8px;font-size:15px;cursor:pointer;border:1px solid transparent';
 
     if (options && options.close) {
       // The negotiable verdict: granny states her case, the grandchild
-      // chooses. Confirm closes the tab, continue is the override.
+      // chooses. Closing is the answer she is asking for, so it carries the
+      // brass fill; continue is the quieter override.
       const close = document.createElement('button');
       close.textContent = TEXT.close;
-      close.style.cssText = buttonStyle;
+      close.style.cssText =
+        buttonBase + ';background:#c9a227;border-color:#c9a227;color:#1c1a17;font-weight:600';
       close.addEventListener('click', () => {
         send({ type: 'granny-close-tab' });
         removeLayer();
@@ -103,7 +105,8 @@
       // Immediate, no countdown: the negotiation is a choice, not a wait.
       const button = document.createElement('button');
       button.textContent = TEXT.continue;
-      button.style.cssText = buttonStyle;
+      button.style.cssText =
+        buttonBase + ';background:transparent;border-color:#8a7a63;color:#e6d9c2';
       button.addEventListener('click', () => {
         sessionStorage.setItem(ALLOW_PREFIX + location.href, '1');
         removeLayer();
