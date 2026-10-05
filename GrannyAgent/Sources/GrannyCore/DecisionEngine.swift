@@ -114,8 +114,9 @@ public actor DecisionEngine {
 
         // A context host that still has no readable title after the forced
         // retry must not sail through in work mode: answer warn so the
-        // negotiable interstitial shows and granny names the open tasks.
-        // Silence would be a bypass; only real content earns a real verdict.
+        // negotiable interstitial shows; the line names the content, never
+        // the task list. Silence would be a bypass; only real content earns
+        // a real verdict.
         if force, !context.hasContentSignal, isContextHost(context.url) {
             let unreadable = Decision(
                 .warn,
@@ -227,7 +228,7 @@ public actor DecisionEngine {
 
     /// Laya answers with a bare choice; fill in granny's line from templates
     /// so the interstitial never shows an empty message. A warn names the
-    /// content and the open tasks: it is the negotiation, not a shutdown.
+    /// content, never the task list: it is the negotiation, not a shutdown.
     private func enrich(_ decision: Decision, context: PageContext) -> Decision {
         guard decision.message == nil else { return decision }
         var enriched = decision

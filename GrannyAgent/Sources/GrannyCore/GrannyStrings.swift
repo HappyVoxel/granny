@@ -282,7 +282,8 @@ public struct EnglishStrings: GrannyStrings {
     public var extensionInstallTitle: String { "Browser extension" }
     public var extensionInstallSteps: String {
         "Chrome, Brave, Edge, Arc: open chrome://extensions, turn on Developer mode, "
-            + "press Load unpacked and pick the folder granny just opened.\n\n"
+            + "press Load unpacked and pick the granny-extension folder (granny just "
+            + "copied it to your Applications folder).\n\n"
             + "Safari: open Safari > Settings > Extensions and tick \"granny\". "
             + "The Safari build needs the signed app (source build).\n\n"
             + "Without the extension granny still blocks Facebook, Instagram, TikTok "
@@ -523,7 +524,8 @@ public struct VietnameseStrings: GrannyStrings {
     public var extensionInstallTitle: String { "Extension cho browser" }
     public var extensionInstallSteps: String {
         "Chrome, Brave, Edge, Arc: mở chrome://extensions, bật Developer mode, "
-            + "bấm Load unpacked rồi chọn folder ngoại vừa mở.\n\n"
+            + "bấm Load unpacked rồi chọn folder granny-extension (ngoại vừa copy "
+            + "vào thư mục Applications của cháu).\n\n"
             + "Safari: mở Safari > Settings > Extensions và tick \"granny\". "
             + "Bản Safari cần app đã ký (build từ source).\n\n"
             + "Không có extension ngoại vẫn chặn Facebook, Instagram, TikTok và "
@@ -764,7 +766,8 @@ public struct FinnishStrings: GrannyStrings {
     public var extensionInstallTitle: String { "Selainlaajennus" }
     public var extensionInstallSteps: String {
         "Chrome, Brave, Edge, Arc: avaa chrome://extensions, laita Developer mode "
-            + "päälle, paina Load unpacked ja valitse kansio, jonka mummo juuri avasi.\n\n"
+            + "päälle, paina Load unpacked ja valitse granny-extension-kansio (mummo "
+            + "kopioi sen juuri Applications-kansioosi).\n\n"
             + "Safari: avaa Safari > Settings > Extensions ja rastita \"granny\". "
             + "Safari-versio vaatii allekirjoitetun sovelluksen (lähdekoodista).\n\n"
             + "Ilman laajennusta mummo estää silti Facebookin, Instagramin, TikTokin "

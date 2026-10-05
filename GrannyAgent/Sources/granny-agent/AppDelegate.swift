@@ -201,10 +201,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: GrannyLines.extensionShowFolder)
         alert.addButton(withTitle: GrannyLines.cancelButton)
         switch alert.runModal() {
-        case .alertFirstButtonReturn: openBrowserExtensionSettings()
-        case .alertSecondButtonReturn: showExtensionFolder()
+        case .alertFirstButtonReturn:
+            prepareExtensionFolder()
+            openBrowserExtensionSettings()
+        case .alertSecondButtonReturn:
+            prepareExtensionFolder()
         default: break
         }
+    }
+
+    private var openTool: String {
+        ProcessInfo.processInfo.environment[GrannyEnv.openTool] ?? "/usr/bin/open"
+    }
+
+    /// Copies the packaged extension out of the app bundle: a first-time
+    /// user cannot navigate into a .app in the Load-unpacked picker, and
+    /// ~/Applications is one click away. Reveals the copy in Finder.
+    @discardableResult
+    private func prepareExtensionFolder() -> URL? {
+        guard let source = Bundle.main.resourceURL?.appendingPathComponent("extension"),
+              FileManager.default.fileExists(atPath: source.path) else {
+            showAlert(title: GrannyLines.extensionInstallTitle, body: GrannyLines.extensionFolderMissing)
+            return nil
+        }
+        let destination = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications/granny-extension", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch {
+            showAlert(title: GrannyLines.extensionInstallTitle, body: GrannyLines.extensionFolderMissing)
+            return nil
+        }
+        revealInFinder(destination)
+        return destination
+    }
+
+    private func revealInFinder(_ url: URL) {
+        // `open -R` is the reliable reveal: NSWorkspace's file-viewer calls
+        // did nothing on the pilot machines.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: openTool)
+        process.arguments = ["-R", url.path]
+        try? process.run()
     }
 
     private func openBrowserExtensionSettings() {
@@ -218,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for (bundleID, name) in browsers
         where NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil {
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.executableURL = URL(fileURLWithPath: openTool)
             process.arguments = ["-a", name, "chrome://extensions"]
             try? process.run()
             return
@@ -228,20 +269,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let safari = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari") {
             NSWorkspace.shared.openApplication(at: safari, configuration: .init(), completionHandler: nil)
         }
-    }
-
-    private func showExtensionFolder() {
-        guard let folder = Bundle.main.resourceURL?.appendingPathComponent("extension"),
-              FileManager.default.fileExists(atPath: folder.path) else {
-            showAlert(title: GrannyLines.extensionInstallTitle, body: GrannyLines.extensionFolderMissing)
-            return
-        }
-        // `open -R` is the reliable reveal: NSWorkspace's file-viewer calls
-        // did nothing on the pilot machines.
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-R", folder.path]
-        try? process.run()
     }
 
     @objc private func showSettings() {

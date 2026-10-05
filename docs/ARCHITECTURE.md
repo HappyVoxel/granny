@@ -103,10 +103,9 @@ questions at intake, and the future chat ("đôi co với ngoại"). A YouTube
 watch page (`kind=video` on a context host, real title) takes this deep read
 first, before the fast tiers: movies and vlogs are negotiable, so the
 verdict has to read the title/channel, and the negotiation line has to name
-the content and the open tasks. Movies, series and vlogs answer `warn`;
+the content, never the task list. Movies, series and vlogs answer `warn`;
 shorts, gaming, streams, pranks and endless feeds stay `block`. A `warn`
-interstitial offers two buttons - close the tab, or continue after the
-countdown.
+interstitial offers two buttons - close the tab, or continue immediately.
 
 Verdicts are cached per URL (`need-context` is never cached). On `block`,
 the extension also purges the origin's Cache Storage and unregisters its
@@ -223,8 +222,8 @@ common case and would drown the signal.
   menubar toggles back to work. Before this, the flag was one-way: a task
   remembered after the day-off ritual left the blocks off with open work.
 - **Negotiable long-form video**: a movie, series or vlog is `warn` with a
-  line naming the content and the open tasks plus two buttons (close the
-  tab / continue after the countdown), not a block; shorts, gaming, streams,
+  line naming the content (never the task list) plus two buttons (close the
+  tab / continue immediately), not a block; shorts, gaming, streams,
   pranks and feeds hard-block. A YouTube watch page gets the model tier
   first, because the fast classifier cannot write that line and the verdict
   has to read the title/channel. A placeholder title ("YouTube") always asks

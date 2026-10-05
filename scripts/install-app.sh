@@ -46,7 +46,9 @@ launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 # bootout can leave the old process running (it survives as an orphan and
 # keeps the decision server's port): kill any straggler outright, or the
 # fresh copy fails to bind 47899 and every decision goes unanswered.
-pkill -f "$DEST_APP/Contents/MacOS/granny-agent" 2>/dev/null || true
+# GRANNY_PKILL lets the e2e suites sandbox the kill.
+PKILL="${GRANNY_PKILL:-pkill}"
+"$PKILL" -f "$DEST_APP/Contents/MacOS/granny-agent" 2>/dev/null || true
 sleep 1
 if ! launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null; then
   # Transient launchd races happen right after replacing the bundle.
