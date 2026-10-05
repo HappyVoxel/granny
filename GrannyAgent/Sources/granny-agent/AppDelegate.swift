@@ -236,11 +236,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showAlert(title: GrannyLines.extensionInstallTitle, body: GrannyLines.extensionFolderMissing)
             return
         }
-        NSWorkspace.shared.activateFileViewerSelecting([folder])
-        // Finder can open behind the frontmost app, which reads as "nothing
-        // happened": bring it forward.
-        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
-            .first?.activate(options: [.activateAllWindows])
+        // `open -R` is the reliable reveal: NSWorkspace's file-viewer calls
+        // did nothing on the pilot machines.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-R", folder.path]
+        try? process.run()
     }
 
     @objc private func showSettings() {
