@@ -8,6 +8,8 @@ rm -rf "$OUT" dist/granny-chrome.zip
 mkdir -p "$OUT"
 cp extension/shared/background.js extension/shared/intercept.js \
    extension/shared/options.html extension/shared/options.js "$OUT/"
+mkdir -p "$OUT/icons"
+cp extension/shared/icons/*.png "$OUT/icons/"
 cp extension/chrome/manifest.json "$OUT/manifest.json"
 
 (cd dist && zip -qr granny-chrome.zip granny-chrome)

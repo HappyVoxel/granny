@@ -73,10 +73,16 @@ navigations end here.
 
 **Phase 2 - context (content pages).** Hosts in `contextHosts` (YouTube) are
 judged by content, not URL. At document start the page title does not exist
-yet, so the engine answers `need-context`; the extension shows "Ngoại đang
-xem cháu định làm gì…", waits for the real title/channel/description
-(<= 2.5 s), then asks again. On timeout it retries with `force=1` and
-whatever context exists.
+yet (or is the browser's placeholder, "YouTube"), so the engine answers
+`need-context`; the extension shows "Ngoại đang xem cháu định làm gì…",
+waits for the real title/channel/description (<= 2.5 s), then asks again. On
+timeout it retries with `force=1` and whatever context exists. SPA
+navigation that still carries the previous page's title is treated the same
+way: the extension blanks it rather than letting the previous video's
+verdict get cached for the new one. If the forced retry still has no
+readable title, the engine answers `warn` - an unreadable page never
+sails through in work mode, and the negotiable interstitial shows instead.
+A verdict judged without a content signal is never cached.
 
 **Phase 3 - fast classifier: Laya first, Jev as the fallback.** Laya is the
 self-hosted deployment; Jev is TypeSafe's hosted service (reachable through
@@ -93,7 +99,13 @@ templates.
 **Phase 4 - DeepSeek V4.1 Flash (OpenRouter).** Fallback when the classifier
 is unavailable or not confident (structured JSON output). DeepSeek is the
 core for what needs generation: granny's explanations, the challenge
-questions at intake, and the future chat ("đôi co với ngoại").
+questions at intake, and the future chat ("đôi co với ngoại"). A YouTube
+watch page (`kind=video` on a context host, real title) takes this deep read
+first, before the fast tiers: movies and vlogs are negotiable, so the
+verdict has to read the title/channel, and the negotiation line has to name
+the content, never the task list. Movies, series and vlogs answer `warn`;
+shorts, gaming, streams, pranks and endless feeds stay `block`. A `warn`
+interstitial offers two buttons - close the tab, or continue immediately.
 
 Verdicts are cached per URL (`need-context` is never cached). On `block`,
 the extension also purges the origin's Cache Storage and unregisters its
@@ -209,6 +221,13 @@ common case and would drown the signal.
 - **Day off is reversible**: writing a task cancels the day off and the
   menubar toggles back to work. Before this, the flag was one-way: a task
   remembered after the day-off ritual left the blocks off with open work.
+- **Negotiable long-form video**: a movie, series or vlog is `warn` with a
+  line naming the content (never the task list) plus two buttons (close the
+  tab / continue immediately), not a block; shorts, gaming, streams,
+  pranks and feeds hard-block. A YouTube watch page gets the model tier
+  first, because the fast classifier cannot write that line and the verdict
+  has to read the title/channel. A placeholder title ("YouTube") always asks
+  for context instead of deciding.
 - **Streak**: a day banks only when it ends with tasks all done and no frog
    carried; day off freezes the chain, a day granny never saw breaks it, and
    the flame shows from two clean days on (Duolingo's first-day flame felt

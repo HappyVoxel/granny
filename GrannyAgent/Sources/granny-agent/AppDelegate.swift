@@ -131,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, GrannyLines.menuSettings, #selector(showSettings), ",")
         add(menu, GrannyLines.menuInstallHelper, #selector(installHelper), "")
+        add(menu, GrannyLines.menuInstallExtension, #selector(installExtension), "")
         add(menu, GrannyLines.menuOpenConfig, #selector(openConfig), "")
         if let update = context.availableUpdate {
             add(menu, "\(GrannyLines.menuUpdateAvailable) (v\(update.version))", #selector(installUpdate), "g")
@@ -187,6 +188,88 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func installHelper() { context.installHelper() }
+
+    /// Pilot onboarding for the extension: the dialog explains both consent
+    /// paths, then opens the browser's extensions page or the packaged
+    /// folder. Safari's final toggle is Apple's consent step, so it stays
+    /// manual.
+    @objc private func installExtension() {
+        let alert = NSAlert()
+        alert.messageText = GrannyLines.extensionInstallTitle
+        alert.informativeText = GrannyLines.extensionInstallSteps
+        alert.addButton(withTitle: GrannyLines.extensionOpenSettings)
+        alert.addButton(withTitle: GrannyLines.extensionShowFolder)
+        alert.addButton(withTitle: GrannyLines.cancelButton)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            prepareExtensionFolder()
+            openBrowserExtensionSettings()
+        case .alertSecondButtonReturn:
+            prepareExtensionFolder()
+        default: break
+        }
+    }
+
+    private var openTool: String {
+        ProcessInfo.processInfo.environment[GrannyEnv.openTool] ?? "/usr/bin/open"
+    }
+
+    /// Copies the packaged extension out of the app bundle: a first-time
+    /// user cannot navigate into a .app in the Load-unpacked picker, and
+    /// ~/Applications is one click away. Reveals the copy in Finder.
+    @discardableResult
+    private func prepareExtensionFolder() -> URL? {
+        guard let source = Bundle.main.resourceURL?.appendingPathComponent("extension"),
+              FileManager.default.fileExists(atPath: source.path) else {
+            showAlert(title: GrannyLines.extensionInstallTitle, body: GrannyLines.extensionFolderMissing)
+            return nil
+        }
+        let destination = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications/granny-extension", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch {
+            showAlert(title: GrannyLines.extensionInstallTitle, body: GrannyLines.extensionFolderMissing)
+            return nil
+        }
+        revealInFinder(destination)
+        return destination
+    }
+
+    private func revealInFinder(_ url: URL) {
+        // `open -R` is the reliable reveal: NSWorkspace's file-viewer calls
+        // did nothing on the pilot machines.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: openTool)
+        process.arguments = ["-R", url.path]
+        try? process.run()
+    }
+
+    private func openBrowserExtensionSettings() {
+        let browsers = [
+            ("com.google.Chrome", "Google Chrome"),
+            ("com.brave.Browser", "Brave Browser"),
+            ("com.microsoft.edgemac", "Microsoft Edge"),
+            ("company.thebrowser.Browser", "Arc"),
+            ("org.chromium.Chromium", "Chromium"),
+        ]
+        for (bundleID, name) in browsers
+        where NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: openTool)
+            process.arguments = ["-a", name, "chrome://extensions"]
+            try? process.run()
+            return
+        }
+        // No Chromium-family browser installed: Safari's Extensions pane is
+        // the only host, and macOS gives no deep link to it.
+        if let safari = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari") {
+            NSWorkspace.shared.openApplication(at: safari, configuration: .init(), completionHandler: nil)
+        }
+    }
 
     @objc private func showSettings() {
         let view = SettingsView(
@@ -322,12 +405,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         context.markGreeted()
         let view = GreetingView(
             needsSetup: context.needsSetupKey,
+            needsHelper: !context.helperInstalled,
             carried: context.store.state.carried.map(\.title),
             streak: displayStreak(state: context.store.state),
             onOpenSettings: { [weak self] in
                 self?.window?.orderOut(nil)
                 self?.showSettings()
             },
+            onInstallHelper: { [weak self] in self?.context.installHelper() },
             onSave: { [weak self] text in
                 self?.window?.close()
                 self?.context.submitTasks(text) { [weak self] question in

@@ -251,13 +251,13 @@ final class EngineAndStateTests: XCTestCase {
         XCTAssertEqual(again.action, .needContext)
     }
 
-    func testEngineForcedContextSkipsTheWaitAndFailsOpen() async {
+    func testEngineForcedContextWithoutTitleWarns() async {
         let engine = DecisionEngine(config: GrannyConfig())
         let decision = await engine.decide(
             context: PageContext(url: "https://www.youtube.com/watch?v=abc"),
             tasks: [], phase: .working, force: true)
-        XCTAssertEqual(decision.action, .allow)
-        XCTAssertEqual(decision.source, "failOpen")
+        XCTAssertEqual(decision.action, .warn, "an unreadable page never sails through")
+        XCTAssertEqual(decision.source, "context")
     }
 
     func testEngineNonContextAmbiguousHostDecidesImmediately() async {

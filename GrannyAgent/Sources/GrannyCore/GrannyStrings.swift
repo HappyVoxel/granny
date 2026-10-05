@@ -50,6 +50,9 @@ public protocol GrannyStrings: Sendable {
 
     // Verdicts
     var warnGeneric: String { get }
+    /// The negotiable interstitial names the content, never the task list:
+    /// task titles are the grandchild's own jargon, not granny's words.
+    func negotiable(content: String) -> String
     var shorts: String { get }
     func blocked(host: String) -> String
     func offSurface(task: String) -> String
@@ -65,6 +68,13 @@ public protocol GrannyStrings: Sendable {
     var helperInstallerMissing: String { get }
     func decisionServerFailed(port: Int) -> String
 
+    // Browser extension onboarding
+    var extensionInstallTitle: String { get }
+    var extensionInstallSteps: String { get }
+    var extensionOpenSettings: String { get }
+    var extensionShowFolder: String { get }
+    var extensionFolderMissing: String { get }
+
     // Day cycle
     var sleepNag: String { get }
     func reward(bedtime: Int) -> String
@@ -77,6 +87,8 @@ public protocol GrannyStrings: Sendable {
     var setupHint: String { get }
     var setupKeyReminder: String { get }
     var openSettingsButton: String { get }
+    var helperHint: String { get }
+    var installHelperButton: String { get }
     var appearanceHint: String { get }
 
     // Window titles
@@ -120,6 +132,7 @@ public protocol GrannyStrings: Sendable {
     var menuTestURL: String { get }
     var menuSettings: String { get }
     var menuInstallHelper: String { get }
+    var menuInstallExtension: String { get }
     var menuOpenConfig: String { get }
     var menuQuit: String { get }
     var statusPrefix: String { get }
@@ -222,6 +235,10 @@ public struct EnglishStrings: GrannyStrings {
     public var challengeFallback: String { "What exactly is this task, dear? Tell granny properly." }
 
     public var warnGeneric: String { "Easy there, dear. This isn't helping today's work." }
+    public func negotiable(content: String) -> String {
+        "Granny can't square \"\(content)\" with your work today, dear. "
+            + "Carry on only if it really helps."
+    }
     public var shorts: String { "No Shorts, dear. Finish your work and granny will let you watch all evening." }
     public func blocked(host: String) -> String {
         "Granny saw you heading to \(host). Finish your work first, then play."
@@ -262,6 +279,22 @@ public struct EnglishStrings: GrannyStrings {
         "Granny couldn't open the decision server on port \(port)."
     }
 
+    public var extensionInstallTitle: String { "Browser extension" }
+    public var extensionInstallSteps: String {
+        "Chrome, Brave, Edge, Arc: open chrome://extensions, turn on Developer mode, "
+            + "press Load unpacked and pick the granny-extension folder (granny just "
+            + "copied it to your Applications folder).\n\n"
+            + "Safari: open Safari > Settings > Extensions and tick \"granny\". "
+            + "The Safari build needs the signed app (source build).\n\n"
+            + "Without the extension granny still blocks Facebook, Instagram, TikTok "
+            + "and YouTube Shorts - the extension adds content-aware verdicts."
+    }
+    public var extensionOpenSettings: String { "Open browser settings" }
+    public var extensionShowFolder: String { "Show extension folder" }
+    public var extensionFolderMissing: String {
+        "The packaged extension is missing from the app bundle. Reinstall granny to fix it."
+    }
+
     public var sleepNag: String { "It's late, dear. Off to bed - tomorrow is another day." }
     public func reward(bedtime: Int) -> String { "Good grandchild. Go play, be back before \(bedtime)." }
     public func dayOffConfirm() -> String { "Are you sure? Granny writes it down. A real day off?" }
@@ -276,6 +309,10 @@ public struct EnglishStrings: GrannyStrings {
     }
     public var setupKeyReminder: String { "Granny has no OpenRouter key yet. Open Settings and paste one, dear." }
     public var openSettingsButton: String { "Open Settings" }
+    public var helperHint: String {
+        "Granny asks for your password on every block until the helper is installed once."
+    }
+    public var installHelperButton: String { "Install helper" }
     public var appearanceHint: String { "Switch granny's look; takes effect after relaunch." }
 
     public var settingsTitle: String { "granny Settings" }
@@ -321,6 +358,7 @@ public struct EnglishStrings: GrannyStrings {
     public var menuTestURL: String { "Test a URL…" }
     public var menuSettings: String { "Settings…" }
     public var menuInstallHelper: String { "Install helper…" }
+    public var menuInstallExtension: String { "Install browser extension…" }
     public var menuOpenConfig: String { "Open config" }
     public var menuQuit: String { "Quit granny" }
     public var statusPrefix: String { "Phase" }
@@ -439,6 +477,10 @@ public struct VietnameseStrings: GrannyStrings {
     public var challengeFallback: String { "Việc này cụ thể là gì, cháu nói rõ cho ngoại xem nào?" }
 
     public var warnGeneric: String { "Từ từ đã cháu, cái này chưa giúp gì cho việc hôm nay đâu nhé." }
+    public func negotiable(content: String) -> String {
+        "Ngoại thấy «\(content)» chưa khớp với việc hôm nay của cháu. "
+            + "Thật sự cần thì xem tiếp nhé."
+    }
     public var shorts: String { "Shorts thì không nhé cháu. Xong việc ngoại cho xem cả tối." }
     public func blocked(host: String) -> String {
         "Ngoại thấy cháu định vào \(host) đấy. Xong việc đã rồi hẵng chơi."
@@ -479,6 +521,22 @@ public struct VietnameseStrings: GrannyStrings {
         "Decision server không mở được cổng \(port)."
     }
 
+    public var extensionInstallTitle: String { "Extension cho browser" }
+    public var extensionInstallSteps: String {
+        "Chrome, Brave, Edge, Arc: mở chrome://extensions, bật Developer mode, "
+            + "bấm Load unpacked rồi chọn folder granny-extension (ngoại vừa copy "
+            + "vào thư mục Applications của cháu).\n\n"
+            + "Safari: mở Safari > Settings > Extensions và tick \"granny\". "
+            + "Bản Safari cần app đã ký (build từ source).\n\n"
+            + "Không có extension ngoại vẫn chặn Facebook, Instagram, TikTok và "
+            + "YouTube Shorts - extension thêm phán quyết theo nội dung."
+    }
+    public var extensionOpenSettings: String { "Mở settings browser" }
+    public var extensionShowFolder: String { "Mở folder extension" }
+    public var extensionFolderMissing: String {
+        "Extension đóng gói bị thiếu trong app bundle. Cài lại granny để sửa."
+    }
+
     public var sleepNag: String { "Muộn rồi cháu. Đi ngủ đi, mai còn làm việc." }
     public func reward(bedtime: Int) -> String { "Tốt lắm cháu. Đi chơi đi, nhớ về trước \(bedtime) giờ." }
     public func dayOffConfirm() -> String { "Chắc chưa? Ngoại ghi sổ đấy. Hôm nay nghỉ thật à?" }
@@ -493,6 +551,10 @@ public struct VietnameseStrings: GrannyStrings {
     }
     public var setupKeyReminder: String { "Ngoại chưa có chìa khóa OpenRouter. Vào Settings dán vào nhé cháu." }
     public var openSettingsButton: String { "Mở Settings" }
+    public var helperHint: String {
+        "Ngoại sẽ hỏi password mỗi lần chặn cho tới khi cài helper một lần."
+    }
+    public var installHelperButton: String { "Cài helper" }
     public var appearanceHint: String { "Đổi giao diện ngoại; cần khởi động lại." }
 
     public var settingsTitle: String { "Cài đặt ngoại" }
@@ -538,6 +600,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var menuTestURL: String { "Thử URL…" }
     public var menuSettings: String { "Cài đặt…" }
     public var menuInstallHelper: String { "Cài helper…" }
+    public var menuInstallExtension: String { "Cài extension cho browser…" }
     public var menuOpenConfig: String { "Mở config" }
     public var menuQuit: String { "Thoát granny" }
     public var statusPrefix: String { "Trạng thái" }
@@ -656,6 +719,10 @@ public struct FinnishStrings: GrannyStrings {
     public var challengeFallback: String { "Mikä tämä tehtävä oikein on, kulta? Kerro mummolle tarkemmin." }
 
     public var warnGeneric: String { "Rauhallisesti, kulta. Tämä ei auta tämän päivän töissä." }
+    public func negotiable(content: String) -> String {
+        "Mummo ei saa «\(content)» sopimaan tämän päivän töihin, kulta. "
+            + "Jatka vain, jos siitä on oikeasti apua."
+    }
     public var shorts: String { "Ei Shortseja, kulta. Tee työt loppuun, niin mummo antaa katsoa koko illan." }
     public func blocked(host: String) -> String {
         "Mummo näki, että olit menossa osoitteeseen \(host). Tee työt ensin, leiki sitten."
@@ -696,6 +763,22 @@ public struct FinnishStrings: GrannyStrings {
         "Mummo ei saanut päätöspalvelinta auki porttiin \(port)."
     }
 
+    public var extensionInstallTitle: String { "Selainlaajennus" }
+    public var extensionInstallSteps: String {
+        "Chrome, Brave, Edge, Arc: avaa chrome://extensions, laita Developer mode "
+            + "päälle, paina Load unpacked ja valitse granny-extension-kansio (mummo "
+            + "kopioi sen juuri Applications-kansioosi).\n\n"
+            + "Safari: avaa Safari > Settings > Extensions ja rastita \"granny\". "
+            + "Safari-versio vaatii allekirjoitetun sovelluksen (lähdekoodista).\n\n"
+            + "Ilman laajennusta mummo estää silti Facebookin, Instagramin, TikTokin "
+            + "ja YouTube Shortsit - laajennus lisää sisältökohtaiset päätökset."
+    }
+    public var extensionOpenSettings: String { "Avaa selaimen asetukset" }
+    public var extensionShowFolder: String { "Näytä laajennuskansio" }
+    public var extensionFolderMissing: String {
+        "Paketoitu laajennus puuttuu sovelluspaketista. Asenna granny uudelleen."
+    }
+
     public var sleepNag: String { "Nyt on myöhä, kulta. Nukkumaan - huomenna on taas päivä." }
     public func reward(bedtime: Int) -> String { "Hyvä kulta. Mene leikkimään, palaa ennen kello \(bedtime)." }
     public func dayOffConfirm() -> String { "Oletko varma? Mummo kirjaa sen ylös. Oikeasti vapaapäivä?" }
@@ -710,6 +793,10 @@ public struct FinnishStrings: GrannyStrings {
     }
     public var setupKeyReminder: String { "Mummolla ei ole vielä OpenRouter-avainta. Avaa asetukset ja liitä se, kulta." }
     public var openSettingsButton: String { "Avaa asetukset" }
+    public var helperHint: String {
+        "Mummo kysyy salasanaa joka estolla, kunnes helper on asennettu kerran."
+    }
+    public var installHelperButton: String { "Asenna helper" }
     public var appearanceHint: String { "Vaihda mummon ulkoasua; astuu voimaan uudelleenkäynnistyksen jälkeen." }
 
     public var settingsTitle: String { "grannyn asetukset" }
@@ -755,6 +842,7 @@ public struct FinnishStrings: GrannyStrings {
     public var menuTestURL: String { "Testaa URL…" }
     public var menuSettings: String { "Asetukset…" }
     public var menuInstallHelper: String { "Asenna helper…" }
+    public var menuInstallExtension: String { "Asenna selainlaajennus…" }
     public var menuOpenConfig: String { "Avaa config" }
     public var menuQuit: String { "Lopeta granny" }
     public var statusPrefix: String { "Tila" }

@@ -25,11 +25,12 @@ After install:
 2. **Install the root helper**: granny menu -> *Install helper…*, approve the
    admin prompt once. Runs through the macOS admin dialog - no Terminal.
    Without it, every block/unblock asks for a password.
-3. **Load the browser extension**: it ships inside the app at
-   `granny.app/Contents/Resources/extension` (right-click the app -> Show
-   Package Contents).
+3. **Load the browser extension**: granny menu -> *Install browser
+   extension…* - the dialog explains both paths and copies the extension to
+   `~/Applications/granny-extension` (it also ships inside the app at
+   `granny.app/Contents/Resources/extension`).
    - Chrome / Brave / Edge / Arc / Chromium: `chrome://extensions` ->
-     Developer mode -> **Load unpacked** -> that folder.
+     Developer mode -> **Load unpacked** -> `~/Applications/granny-extension`.
    - Safari: needs the source build below; Safari extensions cannot be
      sideloaded.
 4. **BYOK**: granny menu -> *Settings…* -> paste your OpenRouter key (and

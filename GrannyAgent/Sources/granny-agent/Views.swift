@@ -313,9 +313,11 @@ struct StreakBadge: View {
 /// bullet automatically, and the first line starts with one.
 struct GreetingView: View {
     var needsSetup: Bool
+    var needsHelper: Bool = false
     var carried: [String] = []
     var streak: Int = 0
     var onOpenSettings: () -> Void
+    var onInstallHelper: () -> Void = {}
     var onSave: (String) -> Void
     var onDayOff: () -> Void
     @State private var text = TaskParser.bullet
@@ -367,6 +369,26 @@ struct GreetingView: View {
                         .foregroundStyle(GrannyTheme.text.opacity(0.8))
                     Spacer()
                     Button(GrannyLines.openSettingsButton) { onOpenSettings() }
+                        .buttonStyle(.bordered)
+                        .tint(GrannyTheme.gold)
+                        .font(.system(size: 12, weight: .semibold, design: .serif))
+                        .pointingHandOnHover()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 4).fill(GrannyTheme.gold.opacity(0.10)))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(GrannyTheme.gold.opacity(0.35)))
+            }
+
+            if needsHelper {
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 13))
+                        .foregroundStyle(GrannyTheme.gold)
+                    Text(GrannyLines.helperHint)
+                        .font(.system(size: 12, design: .serif))
+                        .foregroundStyle(GrannyTheme.text.opacity(0.8))
+                    Spacer()
+                    Button(GrannyLines.installHelperButton) { onInstallHelper() }
                         .buttonStyle(.bordered)
                         .tint(GrannyTheme.gold)
                         .font(.system(size: 12, weight: .semibold, design: .serif))

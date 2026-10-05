@@ -42,6 +42,23 @@ public func dayString(_ date: Date, calendar: Calendar = .current) -> String {
     return String(format: "%04d-%02d-%02d", comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
 }
 
+/// Parses a URL query string. Values are form-decoded: "+" means a space
+/// (URLSearchParams writes spaces that way) and %XX is percent-decoded. A
+/// literal plus arrives as %2B and survives, or model titles would come
+/// through mangled ("Phim+Lẻ+Hay" instead of "Phim Lẻ Hay").
+public func parseQuery(_ target: String) -> [String: String] {
+    guard let index = target.firstIndex(of: "?") else { return [:] }
+    var result: [String: String] = [:]
+    let raw = target[target.index(after: index)...]
+    for pair in raw.split(separator: "&") {
+        let keyValue = pair.split(separator: "=", maxSplits: 1).map(String.init)
+        guard keyValue.count == 2 else { continue }
+        let value = keyValue[1].replacingOccurrences(of: "+", with: " ")
+        result[keyValue[0]] = value.removingPercentEncoding ?? value
+    }
+    return result
+}
+
 public enum JSON {
     public static func decode<T: Decodable>(_ type: T.Type, from data: Data) -> T? {
         try? JSONDecoder().decode(type, from: data)

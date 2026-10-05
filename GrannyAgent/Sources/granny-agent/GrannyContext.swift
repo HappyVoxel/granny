@@ -60,6 +60,12 @@ final class GrannyContext {
         (config.openRouterKey ?? "").isEmpty
     }
 
+    /// Until the root helper is installed once, every block asks for the
+    /// admin password; the greeting offers the one-time install.
+    var helperInstalled: Bool {
+        FileManager.default.isExecutableFile(atPath: BlockController.installedHelperPath)
+    }
+
     func phase() -> Phase {
         computePhase(config: config, state: store.state)
     }

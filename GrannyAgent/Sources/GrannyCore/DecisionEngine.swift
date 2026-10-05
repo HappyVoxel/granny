@@ -112,8 +112,21 @@ public actor DecisionEngine {
                 source: "context")
         }
 
+        // A context host that still has no readable title after the forced
+        // retry must not sail through in work mode: answer warn so the
+        // negotiable interstitial shows; the line names the content, never
+        // the task list. Silence would be a bypass; only real content earns
+        // a real verdict.
+        if force, !context.hasContentSignal, isContextHost(context.url) {
+            let unreadable = Decision(
+                .warn,
+                reason: "context host without a readable title",
+                source: "context")
+            return enrich(unreadable, context: context)
+        }
+
         let started = Date()
-        let input = [
+        var input = [
             "url": context.url,
             "title": context.title ?? "",
             "channel": context.channel ?? "",
@@ -124,27 +137,70 @@ public actor DecisionEngine {
 
         var decision: Decision?
         var modelName = "none"
-        if let laya, let verdict = await laya.decide(context: context, tasks: tasks, phase: phase) {
+        var layaMiss: String?
+        // Long-form video is the one case that gets the deep read: judging a
+        // movie or vlog well - and negotiating instead of shutting it - needs
+        // the title, channel and description. The fast classifier leads
+        // everywhere else.
+        if wantsDeepRead(context), let openRouter,
+           let verdict = await openRouter.decide(context: context, tasks: tasks, phase: phase) {
             decision = enrich(verdict, context: context)
-            modelName = config.layaModel ?? "laya/multilingual"
-        } else if let jev, let verdict = await jev.decide(context: context, tasks: tasks, phase: phase) {
+            modelName = config.model
+        }
+        if decision == nil, let laya {
+            let (verdict, miss) = await laya.decideDetailed(context: context, tasks: tasks, phase: phase)
+            layaMiss = miss
+            if let verdict {
+                decision = enrich(verdict, context: context)
+                modelName = config.layaModel ?? "laya/multilingual"
+            }
+        }
+        if decision == nil, let jev, let verdict = await jev.decide(context: context, tasks: tasks, phase: phase) {
             decision = enrich(verdict, context: context)
             modelName = "jev"
-        } else if let jevViaOpenRouter,
-                  let verdict = await jevViaOpenRouter.decide(context: context, tasks: tasks, phase: phase) {
+        }
+        if decision == nil, let jevViaOpenRouter,
+           let verdict = await jevViaOpenRouter.decide(context: context, tasks: tasks, phase: phase) {
             decision = enrich(verdict, context: context)
             modelName = config.jevModel
-        } else if let openRouter, let verdict = await openRouter.decide(context: context, tasks: tasks, phase: phase) {
+        }
+        if decision == nil, let openRouter,
+           let verdict = await openRouter.decide(context: context, tasks: tasks, phase: phase) {
             decision = enrich(verdict, context: context)
             modelName = config.model
         }
 
-        let final = decision ?? Decision(
+        var final = decision ?? Decision(
             .allow,
             reason: "ambiguous host but no model verdict; fail open",
             source: "failOpen")
 
-        if decision != nil { cache[cacheKey] = final }
+        // A browsing surface on a context host (YouTube's front page, feeds,
+        // channel pages) is where content gets chosen, not content itself:
+        // at most a negotiable warn, never a dead end. The chosen video gets
+        // its own verdict on navigation.
+        if isContextHost(context.url), (context.kind ?? "").lowercased() == "youtube",
+           final.action == .block {
+            final = Decision(
+                .warn,
+                message: final.message,
+                reason: "browsing surface: negotiable",
+                source: final.source)
+        }
+
+        // A verdict judged on a placeholder title ("YouTube") or none at all
+        // must not be cached: it would stick the URL to that verdict for the
+        // rest of the day, overlays included. The extension re-asks once the
+        // real title lands.
+        if decision != nil, context.hasContentSignal {
+            cache[cacheKey] = final
+        }
+
+        // Why Laya was skipped, when it was: the pilot needs to see whether
+        // the key, the endpoint or the confidence gate is the problem.
+        if let layaMiss {
+            input["layaMiss"] = layaMiss
+        }
 
         trace.record(.init(
             name: "decide",
@@ -163,8 +219,16 @@ public actor DecisionEngine {
         return config.contextHosts.contains { RulesEngine.hostMatches(host, $0) }
     }
 
+    /// Long-form video is where a verdict must read the content, not just the
+    /// URL: a movie or vlog is negotiable, and the model writes the line that
+    /// explains why. Everything else takes the fast classifier.
+    private func wantsDeepRead(_ context: PageContext) -> Bool {
+        (context.kind ?? "").lowercased() == "video" && isContextHost(context.url)
+    }
+
     /// Laya answers with a bare choice; fill in granny's line from templates
-    /// so the interstitial never shows an empty message.
+    /// so the interstitial never shows an empty message. A warn names the
+    /// content, never the task list: it is the negotiation, not a shutdown.
     private func enrich(_ decision: Decision, context: PageContext) -> Decision {
         guard decision.message == nil else { return decision }
         var enriched = decision
@@ -173,7 +237,9 @@ public actor DecisionEngine {
             let host = URL(string: context.url)?.host ?? context.url
             enriched.message = GrannyLines.blocked(host: host)
         case .warn:
-            enriched.message = GrannyLines.warnGeneric
+            let title = (context.title ?? "").trimmingCharacters(in: .whitespaces)
+            enriched.message = GrannyLines.negotiable(
+                content: title.isEmpty ? (URL(string: context.url)?.host ?? context.url) : title)
         default:
             break
         }

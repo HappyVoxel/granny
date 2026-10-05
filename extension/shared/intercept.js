@@ -27,18 +27,21 @@
     vi: {
       looking: 'Ngoại đang xem cháu định làm gì đấy…',
       continue: 'Tiếp tục',
+      close: 'Đóng tab',
       back: 'Quay lại',
       blocked: 'Ngoại nói không nhé cháu.',
     },
     fi: {
       looking: 'Mummo katsoo, mitä sinä oikein puuhaat…',
       continue: 'Jatka',
+      close: 'Sulje välilehti',
       back: 'Palaa takaisin',
       blocked: 'Mummo sanoo ei, kulta.',
     },
   }[(navigator.language || 'en').toLowerCase().split('-')[0]] || {
     looking: 'Granny is checking what you are up to…',
     continue: 'Continue',
+    close: 'Close the tab',
     back: 'Go back',
     blocked: 'Granny says no, dear.',
   };
@@ -61,7 +64,6 @@
   }
 
   function showLayer(text, options) {
-    const continueAfterSeconds = options && options.continueAfterSeconds;
     const showBack = !options || options.back !== false;
     const root = document.documentElement;
     if (!root) return;
@@ -81,23 +83,27 @@
     line.style.cssText = 'font-size:22px;max-width:640px';
     layer.appendChild(line);
 
-    if (continueAfterSeconds) {
+    const buttonStyle =
+      'padding:8px 20px;border-radius:8px;border:1px solid #f4e9d8;background:transparent;color:#f4e9d8;font-size:15px;cursor:pointer';
+
+    if (options && options.close) {
+      // The negotiable verdict: granny states her case, the grandchild
+      // chooses. Confirm closes the tab, continue is the override.
+      const close = document.createElement('button');
+      close.textContent = TEXT.close;
+      close.style.cssText = buttonStyle;
+      close.addEventListener('click', () => {
+        send({ type: 'granny-close-tab' });
+        removeLayer();
+      });
+      layer.appendChild(close);
+    }
+
+    if (options && options.continue) {
+      // Immediate, no countdown: the negotiation is a choice, not a wait.
       const button = document.createElement('button');
-      button.disabled = true;
-      button.style.cssText =
-        'padding:8px 20px;border-radius:8px;border:1px solid #f4e9d8;background:transparent;color:#f4e9d8;font-size:15px;cursor:pointer';
-      let remaining = continueAfterSeconds;
-          button.textContent = TEXT.continue + ' (' + remaining + ')';
-      const timer = setInterval(() => {
-        remaining -= 1;
-        if (remaining <= 0) {
-          clearInterval(timer);
-          button.disabled = false;
-          button.textContent = TEXT.continue;
-        } else {
-      button.textContent = TEXT.continue + ' (' + remaining + ')';
-        }
-      }, 1000);
+      button.textContent = TEXT.continue;
+      button.style.cssText = buttonStyle;
       button.addEventListener('click', () => {
         sessionStorage.setItem(ALLOW_PREFIX + location.href, '1');
         removeLayer();
@@ -188,6 +194,9 @@
     if (sessionStorage.getItem(ALLOW_PREFIX + url)) return;
 
     let context = extractContext();
+    // SPA navigation keeps the previous page's title until the new one
+    // renders: sending it would judge - and cache - the wrong video.
+    if (previousTitle && context.title === previousTitle) context.title = '';
     let decision = await send({ type: 'granny-check', url: url, title: context.title, channel: context.channel, description: context.description, kind: context.kind });
 
     if (decision && decision.action === 'need-context') {
@@ -203,29 +212,31 @@
       purgeOfflineData();
     }
     showLayer(decision.message || TEXT.blocked, {
-      continueAfterSeconds: decision.action === 'warn' ? 5 : 0,
+      continue: decision.action === 'warn',
+      close: decision.action === 'warn',
     });
   }
 
-  function hookHistory() {
-    for (const method of ['pushState', 'replaceState']) {
-      const original = history[method];
-      history[method] = function () {
-        const previousTitle = document.title;
-        const result = original.apply(this, arguments);
-        window.dispatchEvent(new CustomEvent('granny:navigation', { detail: { previousTitle: previousTitle } }));
-        return result;
-      };
-    }
-    window.addEventListener('popstate', () => {
-      window.dispatchEvent(new CustomEvent('granny:navigation', { detail: { previousTitle: document.title } }));
-    });
-    window.addEventListener('granny:navigation', (event) => {
-      guard(event.detail ? event.detail.previousTitle : undefined);
-    });
+  // SPA navigation: an isolated world cannot wrap the page's history
+  // methods (the page keeps its own), so watch the URL instead and re-run
+  // the check whenever it moves - YouTube's feed-to-video navigation is a
+  // pushState in the page world, invisible to a content-script hook.
+  function watchLocation() {
+    let lastURL = location.href;
+    let lastTitle = document.title;
+    setInterval(() => {
+      if (location.href === lastURL) {
+        lastTitle = document.title;
+        return;
+      }
+      const previousTitle = lastTitle;
+      lastURL = location.href;
+      lastTitle = document.title;
+      guard(previousTitle);
+    }, 500);
   }
 
-  hookHistory();
+  watchLocation();
   if (document.documentElement) guard();
   else document.addEventListener('DOMContentLoaded', () => guard(), { once: true });
 })();

@@ -30,3 +30,6 @@ extension/safari/app/
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# Local reference notes (kept on disk, never committed)
+docs/refer/

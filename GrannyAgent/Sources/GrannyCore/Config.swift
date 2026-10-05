@@ -145,6 +145,7 @@ public struct GrannyConfig: Codable, Sendable {
     /// to watch granny work, and research/communication tools.
     public static let defaultAlwaysAllowedPrefixes = [
         "https://music.youtube.com",
+        "https://github.com",
         "https://cloud.langfuse.com",
         "https://us.cloud.langfuse.com",
         "https://perplexity.ai",

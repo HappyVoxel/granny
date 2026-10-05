@@ -28,7 +28,14 @@ public struct PageContext: Sendable {
         self.kind = kind
     }
 
+    /// True when the title carries actual content. A browser's placeholder
+    /// title ("YouTube" before the watch page renders) is not a signal: the
+    /// engine must ask for context instead of judging - and caching - the
+    /// placeholder.
     public var hasContentSignal: Bool {
-        !(title ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        let title = (self.title ?? "").trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty else { return false }
+        let generic = ["youtube", "youtube music"]
+        return !generic.contains(title.lowercased())
     }
 }

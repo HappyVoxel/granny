@@ -110,8 +110,8 @@ final class ClientTests: XCTestCase {
         XCTAssertEqual(state["kind"] as? String, "video")
         let action = try XCTUnwrap(questions["action"] as? [String: Any])
         let criteria = try XCTUnwrap(action["criteria"] as? [String: String])
-        XCTAssertTrue(criteria["allow"]?.contains("instrumental") ?? false)
-        XCTAssertTrue(criteria["allow"]?.contains("songs") ?? false)
+        XCTAssertTrue(criteria["allow"]?.contains("unmistakably music") ?? false)
+        XCTAssertTrue(criteria["warn"]?.contains("ambiguous") ?? false)
         XCTAssertTrue(criteria["allow"]?.contains("Perplexity") ?? false)
     }
 

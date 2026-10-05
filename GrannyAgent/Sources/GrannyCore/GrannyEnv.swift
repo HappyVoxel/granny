@@ -10,6 +10,7 @@ public enum GrannyEnv {
     public static let skipDNSFlush = "GRANNY_SKIP_DNS_FLUSH"
     public static let traceDebug = "GRANNY_TRACE_DEBUG"
     public static let osaCmd = "GRANNY_OSA_CMD"
+    public static let openTool = "GRANNY_OPEN"
     public static let sudo = "GRANNY_SUDO"
     public static let launchctl = "GRANNY_LAUNCHCTL"
     public static let launchAgent = "GRANNY_LAUNCH_AGENT"

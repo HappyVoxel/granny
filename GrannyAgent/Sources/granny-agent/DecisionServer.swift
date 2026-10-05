@@ -129,7 +129,7 @@ final class DecisionServer {
                 "tasks": state.tasks.map { ["title": $0.title, "done": $0.done] },
             ])
         case ("GET", "/decide"):
-            let query = Self.query(from: target)
+            let query = parseQuery(target)
             let (state, phase) = stateProvider()
             let context = PageContext(
                 url: query["url"] ?? "",
@@ -149,18 +149,6 @@ final class DecisionServer {
         default:
             send(connection, status: 404, json: ["error": "not found"])
         }
-    }
-
-    private static func query(from target: String) -> [String: String] {
-        guard let index = target.firstIndex(of: "?") else { return [:] }
-        var result: [String: String] = [:]
-        let raw = target[target.index(after: index)...]
-        for pair in raw.split(separator: "&") {
-            let keyValue = pair.split(separator: "=", maxSplits: 1).map(String.init)
-            guard keyValue.count == 2 else { continue }
-            result[keyValue[0]] = keyValue[1].removingPercentEncoding ?? keyValue[1]
-        }
-        return result
     }
 
     private func send(_ connection: NWConnection, status: Int, json: [String: Any]) {

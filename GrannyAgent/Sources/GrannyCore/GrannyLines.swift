@@ -40,6 +40,9 @@ public enum GrannyLines {
 
     // Verdicts
     public static var warnGeneric: String { strings.warnGeneric }
+    public static func negotiable(content: String) -> String {
+        strings.negotiable(content: content)
+    }
     public static var shorts: String { strings.shorts }
     public static func blocked(host: String) -> String { strings.blocked(host: host) }
     public static func offSurface(task: String) -> String { strings.offSurface(task: task) }
@@ -57,6 +60,11 @@ public enum GrannyLines {
     public static var helperMissing: String { strings.helperMissing }
     public static var helperInstalled: String { strings.helperInstalled }
     public static var helperInstallerMissing: String { strings.helperInstallerMissing }
+    public static var extensionInstallTitle: String { strings.extensionInstallTitle }
+    public static var extensionInstallSteps: String { strings.extensionInstallSteps }
+    public static var extensionOpenSettings: String { strings.extensionOpenSettings }
+    public static var extensionShowFolder: String { strings.extensionShowFolder }
+    public static var extensionFolderMissing: String { strings.extensionFolderMissing }
     public static func decisionServerFailed(port: Int) -> String {
         strings.decisionServerFailed(port: port)
     }
@@ -73,6 +81,8 @@ public enum GrannyLines {
     public static var setupHint: String { strings.setupHint }
     public static var setupKeyReminder: String { strings.setupKeyReminder }
     public static var openSettingsButton: String { strings.openSettingsButton }
+    public static var helperHint: String { strings.helperHint }
+    public static var installHelperButton: String { strings.installHelperButton }
     public static var appearanceHint: String { strings.appearanceHint }
 
     // Window titles
@@ -113,6 +123,7 @@ public enum GrannyLines {
     public static var menuTestURL: String { strings.menuTestURL }
     public static var menuSettings: String { strings.menuSettings }
     public static var menuInstallHelper: String { strings.menuInstallHelper }
+    public static var menuInstallExtension: String { strings.menuInstallExtension }
     public static var menuOpenConfig: String { strings.menuOpenConfig }
     public static var menuQuit: String { strings.menuQuit }
     public static var statusPrefix: String { strings.statusPrefix }

@@ -93,9 +93,11 @@ CHECKS=$((CHECKS + 1))
 has extension/shared/background.js '/hello'
 has extension/shared/background.js 'pair('
 has extension/shared/intercept.js 'granny-check'
-has extension/shared/intercept.js 'granny:navigation'
+has extension/shared/intercept.js 'granny-close-tab'
+has extension/shared/intercept.js 'watchLocation'
 has extension/shared/intercept.js 'granny-allow:'
 has extension/shared/intercept.js 'need-context'
+has extension/shared/background.js 'granny-close-tab'
 has extension/shared/intercept.js 'waitForTitle'
 has extension/shared/intercept.js 'channel'
 has extension/shared/intercept.js 'purgeOfflineData'
@@ -114,6 +116,10 @@ esac
 case "$listing" in
   *granny-chrome/intercept.js*) CHECKS=$((CHECKS + 1)) ;;
   *) fail "zip missing intercept.js" ;;
+esac
+case "$listing" in
+  *granny-chrome/icons/icon-128.png*) CHECKS=$((CHECKS + 1)) ;;
+  *) fail "zip missing the extension icon" ;;
 esac
 
 installer_output="$(GRANNY_DRY_RUN=1 bash scripts/install-extension.sh)"
