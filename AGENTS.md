@@ -87,7 +87,10 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
 - `/etc/hosts` is edited only between the `# GRANNY-BEGIN` / `# GRANNY-END`
   markers. The Swift renderer (`GrannyCore/HostsFile.swift`) is the single
   source of truth; `scripts/proto.sh` carries a legacy copy and must not grow
-  new behaviour.
+  new behaviour. Every domain is rendered twice, `127.0.0.1` and `::1` - an
+  IPv4-only block is bypassed over IPv6 by any host with AAAA records (Meta's
+  domains all carry them; TikTok's do not, which is why the webdriver suite
+  caught it).
 - The decision endpoint contract (`/decide`) is
   `url,title,channel,description,kind,force`; when adding a parameter, update
   `extension/shared/background.js`, `intercept.js`, and `DecisionServer`

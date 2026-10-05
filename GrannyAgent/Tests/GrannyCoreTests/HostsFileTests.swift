@@ -18,6 +18,14 @@ final class HostsFileTests: XCTestCase {
         XCTAssertTrue(rendered.contains("127.0.0.1 localhost"))
     }
 
+    func testRenderBlocksIPv6Too() {
+        // An IPv4-only block is bypassed over IPv6 by any host with AAAA
+        // records; Meta's domains carry them.
+        let rendered = HostsFile.render(current: clean, domains: ["facebook.com"])
+        XCTAssertTrue(rendered.contains("::1 facebook.com"))
+        XCTAssertTrue(rendered.contains("127.0.0.1 facebook.com"))
+    }
+
     func testRenderIsIdempotent() {
         let once = HostsFile.render(current: clean, domains: ["facebook.com"])
         let twice = HostsFile.render(current: once, domains: ["facebook.com"])

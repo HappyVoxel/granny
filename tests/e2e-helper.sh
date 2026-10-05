@@ -35,6 +35,7 @@ count() {
 out="$(run_helper render)"
 case "$out" in *"$MARK_BEGIN"*) CHECKS=$((CHECKS + 1)) ;; *) fail "render missing marker" ;; esac
 case "$out" in *"127.0.0.1 facebook.com"*) CHECKS=$((CHECKS + 1)) ;; *) fail "render missing facebook" ;; esac
+case "$out" in *"::1 facebook.com"*) CHECKS=$((CHECKS + 1)) ;; *) fail "render missing facebook over IPv6" ;; esac
 case "$out" in *"127.0.0.1 dns.google"*) CHECKS=$((CHECKS + 1)) ;; *) fail "render missing DoH endpoint" ;; esac
 
 # apply with a domains file
@@ -42,6 +43,7 @@ printf '["facebook.com","tiktok.com"]\n' >"$SANDBOX/domains.json"
 run_helper apply "$SANDBOX/domains.json" >/dev/null
 has "$HOSTS" "$MARK_BEGIN"
 has "$HOSTS" "127.0.0.1 facebook.com"
+has "$HOSTS" "::1 facebook.com"
 eq "$(count "$HOSTS" "$MARK_BEGIN")" "1" "marker count"
 eq "$(stat -f '%Lp' "$HOSTS")" "644" "hosts permissions"
 eq "$(run_helper status)" "blocked" "status after apply"
