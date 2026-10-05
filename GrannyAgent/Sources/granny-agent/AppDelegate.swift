@@ -237,6 +237,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         NSWorkspace.shared.activateFileViewerSelecting([folder])
+        // Finder can open behind the frontmost app, which reads as "nothing
+        // happened": bring it forward.
+        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+            .first?.activate(options: [.activateAllWindows])
     }
 
     @objc private func showSettings() {
