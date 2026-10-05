@@ -3,6 +3,13 @@
 granny is not on the App Store. Homebrew is the community-testing path; the
 source build is the full path (it also gives you the Safari extension).
 
+## Direct download (no Homebrew)
+
+[granny-macos.dmg](https://github.com/HappyVoxel/granny/releases/latest/download/granny-macos.dmg)
+from the latest release. Drag granny into Applications. Not notarized yet:
+first open needs right-click -> Open, or System Settings > Privacy & Security
+> Open Anyway.
+
 ## Homebrew (Chrome-family browsers, no Xcode)
 
 ```bash

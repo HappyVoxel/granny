@@ -136,7 +136,9 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   master runs the suites, then `scripts/next-version.sh` resolves the next
   version from Conventional Commits since the last tag (pre-1.0: patch per
   releasable merge, minor for breaking; docs/chore/ci merge releases
-  nothing), builds `scripts/build-release.sh`'s archive, publishes the GitHub
+  nothing), builds `scripts/build-release.sh`'s zip and dmg (the dmg also
+  ships under the stable name `granny-macos.dmg`, which the landing page's
+  Download button links via `releases/latest/download`), publishes the GitHub
   release and updates the Homebrew tap when `TAP_GITHUB_TOKEN` is set. The
   cask lives in `packaging/homebrew/Casks/granny.rb` and is copied into
   `HappyVoxel/homebrew-tap` by that workflow. The workflow never pushes to

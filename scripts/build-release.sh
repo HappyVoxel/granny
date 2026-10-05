@@ -2,9 +2,11 @@
 # Builds the release archive for GitHub Releases and the Homebrew cask:
 #   dist/release/granny-<version>.zip         the app
 #   dist/release/granny-<version>.zip.sha256  its digest
+#   dist/release/granny-<version>.dmg         drag-to-Applications disk image
 #
-# After running: create the GitHub release, upload the zip, and copy the
-# sha256 into packaging/homebrew/Casks/granny.rb before pushing the tap.
+# After running: create the GitHub release, upload the zip and the dmg, and
+# copy the sha256 into packaging/homebrew/Casks/granny.rb before pushing the
+# tap.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,10 +23,23 @@ mkdir -p "$OUT"
 ditto -c -k --sequesterRsrc --keepParent "dist/granny.app" "$OUT/granny-$VERSION.zip"
 shasum -a 256 "$OUT/granny-$VERSION.zip" | awk '{print $1}' >"$OUT/granny-$VERSION.zip.sha256"
 
+# The dmg carries the drag-to-Applications affordance non-technical users
+# expect; the zip stays because the updater and the cask read it.
+STAGE="$(mktemp -d)"
+cp -R "dist/granny.app" "$STAGE/granny.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -quiet -volname "granny" -srcfolder "$STAGE" -ov -format UDZO "$OUT/granny-$VERSION.dmg"
+rm -rf "$STAGE"
+
+# A stable asset name so the landing page can link
+# .../releases/latest/download/granny-macos.dmg across versions.
+cp "$OUT/granny-$VERSION.dmg" "$OUT/granny-macos.dmg"
+
 echo "release: $OUT/granny-$VERSION.zip"
 echo "sha256:  $(cat "$OUT/granny-$VERSION.zip.sha256")"
+echo "dmg:     $OUT/granny-$VERSION.dmg (and granny-macos.dmg)"
 echo ""
 echo "next:"
-echo "  1. gh release create v$VERSION $OUT/granny-$VERSION.zip"
+echo "  1. gh release create v$VERSION $OUT/granny-$VERSION.zip $OUT/granny-$VERSION.dmg $OUT/granny-macos.dmg"
 echo "  2. put the sha256 above into packaging/homebrew/Casks/granny.rb"
 echo "  3. copy that cask into the HappyVoxel/homebrew-tap repository"

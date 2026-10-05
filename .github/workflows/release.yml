@@ -95,6 +95,8 @@ jobs:
           gh release create "v${{ steps.version.outputs.version }}" \
             "dist/release/granny-${{ steps.version.outputs.version }}.zip" \
             "dist/release/granny-${{ steps.version.outputs.version }}.zip.sha256" \
+            "dist/release/granny-${{ steps.version.outputs.version }}.dmg" \
+            "dist/release/granny-macos.dmg" \
             --target "$(git rev-parse HEAD)" \
             --title "granny v${{ steps.version.outputs.version }}" \
             --generate-notes
