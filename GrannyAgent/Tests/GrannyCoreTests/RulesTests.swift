@@ -25,6 +25,23 @@ final class RulesTests: XCTestCase {
         XCTAssertEqual(decision?.action, .block)
     }
 
+    func testSearchResultsAreAllowed() {
+        for url in [
+            "https://www.google.com/search?q=sender",
+            "https://google.fi/search?q=sender",
+            "https://www.bing.com/search?q=sender",
+            "https://duckduckgo.com/?q=sender",
+            "https://search.brave.com/search?q=sender",
+        ] {
+            let decision = engine.evaluate(urlString: url, tasks: [], phase: .working)
+            XCTAssertEqual(decision?.action, .allow, url)
+            XCTAssertEqual(decision?.reason, "search results", url)
+        }
+        // Only the results surface: other paths still go to the classifier.
+        XCTAssertNil(engine.evaluate(urlString: "https://duckduckgo.com/settings", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "https://www.google.com/maps", tasks: [], phase: .working))
+    }
+
     func testPurposefulSurfaceIsAllowed() {
         let decision = engine.evaluate(
             urlString: "https://www.facebook.com/adsmanager/manage/campaigns",

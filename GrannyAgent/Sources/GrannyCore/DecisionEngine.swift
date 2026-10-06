@@ -188,6 +188,17 @@ public actor DecisionEngine {
                 source: final.source)
         }
 
+        // Frequency, meditation and focus audio ("888 Hz abundance", rain,
+        // lofi, study playlists) is music to work by, not entertainment: a
+        // warn from any tier becomes an allow. A block stays a block - a
+        // short or a game is not audio.
+        if final.action == .warn, Self.isFocusAudio(context) {
+            final = Decision(
+                .allow,
+                reason: "focus audio: compatible with work",
+                source: final.source)
+        }
+
         // A verdict judged on a placeholder title ("YouTube") or none at all
         // must not be cached: it would stick the URL to that verdict for the
         // rest of the day, overlays included. The extension re-asks once the
@@ -224,6 +235,29 @@ public actor DecisionEngine {
     /// explains why. Everything else takes the fast classifier.
     private func wantsDeepRead(_ context: PageContext) -> Bool {
         (context.kind ?? "").lowercased() == "video" && isContextHost(context.url)
+    }
+
+    /// Focus audio the grandchild works by: frequency/Hz tracks, meditation
+    /// and sleep audio, rain and noise, lofi and study playlists. Titles like
+    /// "You Will Become Super RICH ~ 888Hz" promise benefits but the form is
+    /// audio, and listening is not a distraction.
+    static func isFocusAudio(_ context: PageContext) -> Bool {
+        let haystack = [context.title, context.channel]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+        guard !haystack.isEmpty else { return false }
+        if haystack.range(of: #"\b\d{1,4}\s?hz\b"#, options: .regularExpression) != nil {
+            return true
+        }
+        let tokens = [
+            "frequency", "frequencies", "solfeggio", "binaural", "meditation",
+            "meditative", "ambient", "lofi", "lo-fi", "white noise", "brown noise",
+            "rain sounds", "nature sounds", "soundscape", "sound bath",
+            "sleep music", "study music", "focus music", "music for studying",
+            "music for work", "relaxing music", "healing music", "calm music",
+        ]
+        return tokens.contains { haystack.contains($0) }
     }
 
     /// Laya answers with a bare choice; fill in granny's line from templates
