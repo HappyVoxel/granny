@@ -64,4 +64,31 @@ final class TaskParserTests: XCTestCase {
         XCTAssertNil(TaskParser.normalizeSurface(""))
         XCTAssertNil(TaskParser.normalizeSurface("dọn nhà"))
     }
+
+    func testRefinedMergeRules() {
+        let mine = TaskItem(
+            title: "Apply to one job",
+            purpose: "Send one tailored application",
+            allowedSurfaces: ["linkedin.com/jobs*"])
+        let engine = TaskItem(
+            title: "Apply to one job",
+            purpose: "Job hunting",
+            allowedSurfaces: ["linkedin.com/jobs*", "vietnamworks.com/*"])
+
+        // Untouched surfaces: the model refreshes them; a purpose the user
+        // wrote survives the model's.
+        let refreshed = TaskParser.refined(mine, with: engine, surfacesEdited: false)
+        XCTAssertEqual(refreshed.allowedSurfaces, engine.allowedSurfaces)
+        XCTAssertEqual(refreshed.purpose, mine.purpose)
+        XCTAssertEqual(refreshed.id, mine.id)
+
+        // Hand-edited surfaces: the model's list is ignored.
+        let kept = TaskParser.refined(mine, with: engine, surfacesEdited: true)
+        XCTAssertEqual(kept.allowedSurfaces, mine.allowedSurfaces)
+
+        // An empty purpose gets filled from the model.
+        var blank = mine
+        blank.purpose = nil
+        XCTAssertEqual(TaskParser.refined(blank, with: engine, surfacesEdited: true).purpose, engine.purpose)
+    }
 }

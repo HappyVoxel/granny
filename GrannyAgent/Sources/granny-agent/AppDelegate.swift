@@ -456,8 +456,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onToggle: { [weak self] id in self?.context.toggle(taskID: id) },
             onMarkAllDone: { [weak self] in self?.context.markAllDone() },
             onAdd: { [weak self] text in self?.context.addTask(text) },
-            onUpdateSurfaces: { [weak self] id, surfaces in
-                self?.context.setSurfaces(taskID: id, surfaces: surfaces)
+            onUpdateTask: { [weak self] id, title, purpose, surfaces, surfacesEdited in
+                self?.context.updateTask(
+                    taskID: id, title: title, purpose: purpose,
+                    surfaces: surfaces, surfacesEdited: surfacesEdited)
             },
             onRemove: { [weak self] id in self?.context.removeTask(taskID: id) },
             onResumeWork: { [weak self] in self?.context.clearDayOff() },

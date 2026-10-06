@@ -189,7 +189,11 @@ public enum GrannyLines {
     public static var surfacesEditTitle: String { strings.surfacesEditTitle }
     public static var surfacesCaption: String { strings.surfacesCaption }
     public static var surfacesPlaceholder: String { strings.surfacesPlaceholder }
-    public static var surfacesEditHelp: String { strings.surfacesEditHelp }
+    public static var taskEditEyebrow: String { strings.taskEditEyebrow }
+    public static var taskEditTitleLabel: String { strings.taskEditTitleLabel }
+    public static var taskEditPurposeLabel: String { strings.taskEditPurposeLabel }
+    public static var taskEditCaption: String { strings.taskEditCaption }
+    public static var taskEditHelp: String { strings.taskEditHelp }
     public static var dropTaskHelp: String { strings.dropTaskHelp }
     public static var settingsSave: String { strings.settingsSave }
     public static var keyCheckValid: String { strings.keyCheckValid }

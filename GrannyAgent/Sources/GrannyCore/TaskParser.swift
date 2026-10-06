@@ -1,6 +1,20 @@
 import Foundation
 
 public enum TaskParser {
+    /// The engine's reading of an edited task, merged into the user's own:
+    /// surfaces come from the model unless the editor set them by hand, and
+    /// the purpose only fills an empty field. The user's words win; the id
+    /// and the done flag survive.
+    public static func refined(_ task: TaskItem, with refined: TaskItem, surfacesEdited: Bool) -> TaskItem {
+        var merged = task
+        if !surfacesEdited {
+            merged.allowedSurfaces = refined.allowedSurfaces
+        }
+        if merged.purpose?.isEmpty ?? true {
+            merged.purpose = refined.purpose
+        }
+        return merged
+    }
     /// Naive fast parse: split on ; , newline and infer allowed surfaces
     /// from keywords. The LLM intake pass refines this when a key exists.
     /// The bullet the notebook editor inserts; the parser strips it back.

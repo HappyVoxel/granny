@@ -193,14 +193,43 @@ final class GrannyContext {
         scheduler.tick()
     }
 
-    /// Rewrites a task's allowed surfaces. The rules consult these before
-    /// the block lists, so this is how a wrong machine-generated surface
-    /// (a moved domain, a missed path) gets fixed without re-adding the task.
-    func setSurfaces(taskID: String, surfaces: [String]) {
+    /// Rewrites a task's words (and, when the editor touched them, its
+    /// surfaces), then re-runs the intake brain on the new wording - the
+    /// edited task gets the same treatment as a freshly added one, so the
+    /// rules open the sites the new words need.
+    func updateTask(taskID: String, title: String, purpose: String?, surfaces: [String], surfacesEdited: Bool) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let purposeText = purpose?.trimmingCharacters(in: .whitespacesAndNewlines)
         mutate { state in
-            if let index = state.tasks.firstIndex(where: { $0.id == taskID }) {
-                state.tasks[index].allowedSurfaces = surfaces
+            guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+            state.tasks[index].title = trimmed
+            state.tasks[index].purpose = (purposeText?.isEmpty ?? true) ? nil : purposeText
+            state.tasks[index].allowedSurfaces = surfaces
+        }
+        scheduler.tick()
+
+        Task { [weak self] in
+            guard let self else { return }
+            let text = [trimmed, purposeText ?? ""]
+                .filter { !$0.isEmpty }
+                .joined(separator: ". ")
+            guard let intake = await self.engine.parseIntake(text: text),
+                  let refined = intake.tasks.first
+            else { return }
+            await MainActor.run {
+                self.applyRefinement(refined, to: taskID, surfacesEdited: surfacesEdited)
             }
+        }
+    }
+
+    /// The engine's reading of an edited task, merged by `TaskParser.refined`:
+    /// the user's own words win, the model fills the gaps.
+    private func applyRefinement(_ refined: TaskItem, to taskID: String, surfacesEdited: Bool) {
+        mutate { state in
+            guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+            state.tasks[index] = TaskParser.refined(
+                state.tasks[index], with: refined, surfacesEdited: surfacesEdited)
         }
     }
 
