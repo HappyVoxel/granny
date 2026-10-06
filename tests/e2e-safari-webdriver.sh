@@ -65,6 +65,9 @@ def call(method, path, body=None, timeout=60):
 
 def new_session():
     global session
+    if session:
+        # Safari refuses a second session while the first is paired.
+        call("DELETE", f"/session/{session}")
     response = call("POST", "/session", {"capabilities": {"alwaysMatch": {"browserName": "safari"}}})
     session = (response.get("value") or {}).get("sessionId")
     if not session:
@@ -110,7 +113,9 @@ def snapshot():
 
 
 def connection_error(text):
-    lowered = text.lower()
+    # Safari's error page uses the typographic apostrophe (Can’t), so fold
+    # it before matching or every error page reads as a loaded page.
+    lowered = text.lower().replace("\u2019", "'")
     markers = ["can't connect", "cannot connect", "can't open the page",
                "not connect to the server", "không thể kết nối", "không mở được"]
     return any(marker in lowered for marker in markers)
@@ -167,7 +172,9 @@ if facebook_state == "loaded":
     # Safari's offline caches. Bust them and reload: if it now fails, the
     # cache was the culprit (clear Website Data for facebook/instagram).
     clear_offline_caches()
-    probe("https://www.facebook.com", "facebook_after_clearing", "facebook")
+    if probe("https://www.facebook.com", "facebook_after_clearing", "facebook") == "loaded":
+        # A cache-busted URL cannot come from Safari's stores.
+        probe("https://www.facebook.com/?granny-cache-bust=1", "facebook_network", "facebook")
 
 # A DoH endpoint carries AAAA records and the janitor never touches it:
 # the cleanest network-layer probe (an IPv4-only hosts block fails here).
@@ -211,8 +218,17 @@ esac
 case "$output" in
   *"CHECK facebook=loaded"*)
     case "$output" in
+      *"CHECK facebook_network=loaded"*)
+        fail "facebook loads over the network with the block applied - a real bypass, investigate"
+        ;;
+      *"CHECK facebook_network=blocked"*|*"CHECK facebook_network=closed"*)
+        fail "facebook is served from Safari's own stores - clear it: Safari > Settings > Privacy > Manage Website Data > remove facebook.com and instagram.com"
+        ;;
       *"CHECK facebook_after_clearing=blocked"*)
         fail "facebook is served from Safari's offline cache - clear it: Safari > Settings > Privacy > Manage Website Data > remove facebook.com and instagram.com"
+        ;;
+      *"CHECK facebook_after_clearing=closed"*)
+        fail "facebook loaded before the janitor closed it - clear Safari's website data for facebook.com and instagram.com, then rerun"
         ;;
       *)
         fail "facebook loads with the network blocked - a real bypass, investigate"
