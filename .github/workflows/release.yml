@@ -85,7 +85,9 @@ jobs:
         if: steps.version.outputs.skip == 'false'
         env:
           GRANNY_VERSION: ${{ steps.version.outputs.version }}
-        run: bash scripts/build-release.sh
+        run: |
+          brew install create-dmg
+          bash scripts/build-release.sh
 
       - name: Create GitHub release
         if: steps.version.outputs.skip == 'false'
