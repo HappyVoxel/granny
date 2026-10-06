@@ -43,8 +43,7 @@ the URL layer, and a movie on YouTube gets whistled at while focus music plays
 on.
 
 Native Swift end to end: a menubar app, a small root helper that owns
-`/etc/hosts`, and a browser extension. No Electron, no JavaScript runtime in
-the enforcement path. AI is built in - bring your own keys.
+`/etc/hosts`, and a browser extension. AI is built in - bring your own keys.
 
 ## Why granny
 
