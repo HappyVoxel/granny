@@ -21,8 +21,6 @@
   const DESCRIPTION_LIMIT = 300;
   const TITLE_TICK_MS = 250;
   const TITLE_WAIT_MS = 2500;
-  // How long the "no warnings for this domain" notice stays before it
-  // fades on its own; the cross in its corner ends it sooner.
   const MUTED_CONFIRM_MS = 3000;
   let layer = null;
 
