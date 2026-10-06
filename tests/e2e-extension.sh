@@ -21,6 +21,7 @@ for manifest in extension/chrome/manifest.json extension/safari/manifest.json; d
   python3 -m json.tool "$manifest" >/dev/null || fail "invalid JSON: $manifest"
   CHECKS=$((CHECKS + 1))
   has "$manifest" '"content_scripts"'
+  has "$manifest" '"theme.js"'
   has "$manifest" '"http://127.0.0.1/*"'
   has "$manifest" '"service_worker"'
 done
@@ -103,6 +104,12 @@ has extension/shared/intercept.js 'channel'
 has extension/shared/intercept.js 'purgeOfflineData'
 has extension/shared/intercept.js 'caches.delete'
 has extension/shared/intercept.js 'unregister'
+has extension/shared/intercept.js 'granny-mute:'
+has extension/shared/intercept.js 'isMuted'
+has extension/shared/intercept.js 'muteDomain'
+has extension/shared/intercept.js 'storage.local'
+has extension/shared/theme.js 'GRANNY_THEME'
+has extension/shared/intercept.js 'GRANNY_THEME'
 has extension/shared/options.html 'options.js'
 
 bash scripts/package-chrome.sh >/dev/null
@@ -116,6 +123,10 @@ esac
 case "$listing" in
   *granny-chrome/intercept.js*) CHECKS=$((CHECKS + 1)) ;;
   *) fail "zip missing intercept.js" ;;
+esac
+case "$listing" in
+  *granny-chrome/theme.js*) CHECKS=$((CHECKS + 1)) ;;
+  *) fail "zip missing theme.js" ;;
 esac
 case "$listing" in
   *granny-chrome/icons/icon-128.png*) CHECKS=$((CHECKS + 1)) ;;

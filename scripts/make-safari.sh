@@ -9,7 +9,7 @@ SRC=dist/granny-safari-src
 rm -rf "$SRC" extension/safari/app
 mkdir -p "$SRC/icons"
 cp extension/shared/background.js extension/shared/intercept.js \
-   extension/shared/options.html extension/shared/options.js "$SRC/"
+   extension/shared/theme.js extension/shared/options.html extension/shared/options.js "$SRC/"
 cp extension/shared/icons/*.png "$SRC/icons/"
 cp extension/safari/manifest.json "$SRC/manifest.json"
 

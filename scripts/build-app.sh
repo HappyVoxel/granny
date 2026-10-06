@@ -31,7 +31,7 @@ fi
 EXT_DIR="$APP/Contents/Resources/extension"
 mkdir -p "$EXT_DIR/icons"
 cp extension/shared/background.js extension/shared/intercept.js \
-   extension/shared/options.html extension/shared/options.js "$EXT_DIR/"
+   extension/shared/theme.js extension/shared/options.html extension/shared/options.js "$EXT_DIR/"
 cp extension/shared/icons/*.png "$EXT_DIR/icons/"
 cp extension/chrome/manifest.json "$EXT_DIR/manifest.json"
 
