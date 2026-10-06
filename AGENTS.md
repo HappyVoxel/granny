@@ -52,9 +52,13 @@ GrannyAgent/                  Swift package
   Sources/granny-helper/      root helper (apply/clear/render/strip/status)
   Tests/GrannyCoreTests/      unit tests, URLProtocol-stubbed network
 extension/
-  shared/                     one MV3 codebase: background, intercept, options
+  src/                        one MV3 codebase in TypeScript (background,
+                              intercept, options, theme) + globals.d.ts
+  build/                      compiled JS (gitignored; scripts/build-extension.sh)
+  shared/                     options.html + icons
   chrome/ | safari/           manifests per browser
   safari/app/                 generated Xcode project (converter output)
+  package.json | tsconfig     TypeScript toolchain (typescript 7, @types/chrome)
 scripts/                      install entrypoint, build/icon/app/helper/extension
                               installers, package-chrome, make-safari,
                               build-release, sync-env, proto.sh (legacy)
@@ -99,7 +103,7 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   caught it).
 - The decision endpoint contract (`/decide`) is
   `url,title,channel,description,kind,force`; when adding a parameter, update
-  `extension/shared/background.js`, `intercept.js`, and `DecisionServer`
+  `extension/src/background.ts`, `intercept.ts`, and `DecisionServer`
   together - `tests/e2e-agent.sh` and `tests/e2e-extension.sh` check both
   ends. `GET /hello` is the tokenless loopback pairing endpoint the extension
   uses to fetch its token; keep it loopback-only.
