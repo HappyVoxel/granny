@@ -3,11 +3,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+bash scripts/build-extension.sh
+
 OUT=dist/granny-chrome
 rm -rf "$OUT" dist/granny-chrome.zip
 mkdir -p "$OUT"
-cp extension/shared/background.js extension/shared/intercept.js \
-   extension/shared/theme.js extension/shared/options.html extension/shared/options.js "$OUT/"
+cp extension/build/background.js extension/build/intercept.js \
+   extension/build/theme.js extension/build/options.js "$OUT/"
+cp extension/shared/options.html "$OUT/"
 mkdir -p "$OUT/icons"
 cp extension/shared/icons/*.png "$OUT/icons/"
 cp extension/chrome/manifest.json "$OUT/manifest.json"

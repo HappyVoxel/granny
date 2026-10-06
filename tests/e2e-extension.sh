@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end checks for the browser extension: JS syntax, manifests,
-# wiring greps, and the Chrome packaging pipeline.
+# End-to-end checks for the browser extension: TypeScript build + JS syntax,
+# manifests, wiring greps, and the Chrome packaging pipeline.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,7 +12,10 @@ has() { grep -Fq -- "$2" "$1" 2>/dev/null || fail "$1 missing: $2"; CHECKS=$((CH
 
 command -v node >/dev/null 2>&1 || fail "node is required for JS syntax checks"
 
-for js in extension/shared/background.js extension/shared/intercept.js extension/shared/options.js; do
+# The sources are TypeScript; the build must succeed and emit plain scripts.
+bash scripts/build-extension.sh >/dev/null || fail "extension TypeScript build failed"
+
+for js in extension/build/background.js extension/build/intercept.js extension/build/options.js; do
   node --check "$js" || fail "JS syntax error in $js"
   CHECKS=$((CHECKS + 1))
 done
@@ -26,15 +29,15 @@ for manifest in extension/chrome/manifest.json extension/safari/manifest.json; d
   has "$manifest" '"service_worker"'
 done
 
-has extension/shared/background.js 'X-Granny-Token'
-has extension/shared/background.js 'HARD_BLOCKED'
-has extension/shared/background.js 'force'
+has extension/src/background.ts 'X-Granny-Token'
+has extension/src/background.ts 'HARD_BLOCKED'
+has extension/src/background.ts 'force'
 
 # The fallback hard list must stay in step with the Swift defaults, or the
 # two ends block different sites when the daemon is down.
 python3 - <<'PY' || fail "HARD_BLOCKED drifted from Config.defaultBlockedDomains"
 import re, sys, pathlib
-js = pathlib.Path("extension/shared/background.js").read_text()
+js = pathlib.Path("extension/src/background.ts").read_text()
 match = re.search(r"HARD_BLOCKED = \[([^\]]*)\]", js)
 assert match, "HARD_BLOCKED literal not found"
 domains = re.findall(r"'([^']+)'", match.group(1))
@@ -55,8 +58,8 @@ import re, sys, pathlib
 swift = pathlib.Path("GrannyAgent/Sources/GrannyCore/Config.swift").read_text()
 port = re.search(r"defaultDecidePort = (\d+)", swift).group(1)
 files = [
-    "extension/shared/background.js",
-    "extension/shared/options.js",
+    "extension/src/background.ts",
+    "extension/src/options.ts",
     "extension/shared/options.html",
     "scripts/install-extension.sh",
     "scripts/sync-env.sh",
@@ -91,25 +94,25 @@ if len(distinct) != 1:
     sys.exit(1)
 PY
 CHECKS=$((CHECKS + 1))
-has extension/shared/background.js '/hello'
-has extension/shared/background.js 'pair('
-has extension/shared/intercept.js 'granny-check'
-has extension/shared/intercept.js 'granny-close-tab'
-has extension/shared/intercept.js 'watchLocation'
-has extension/shared/intercept.js 'granny-allow:'
-has extension/shared/intercept.js 'need-context'
-has extension/shared/background.js 'granny-close-tab'
-has extension/shared/intercept.js 'waitForTitle'
-has extension/shared/intercept.js 'channel'
-has extension/shared/intercept.js 'purgeOfflineData'
-has extension/shared/intercept.js 'caches.delete'
-has extension/shared/intercept.js 'unregister'
-has extension/shared/intercept.js 'granny-mute:'
-has extension/shared/intercept.js 'isMuted'
-has extension/shared/intercept.js 'muteDomain'
-has extension/shared/intercept.js 'storage.local'
-has extension/shared/theme.js 'GRANNY_THEME'
-has extension/shared/intercept.js 'GRANNY_THEME'
+has extension/src/background.ts '/hello'
+has extension/src/background.ts 'pair('
+has extension/src/intercept.ts 'granny-check'
+has extension/src/intercept.ts 'granny-close-tab'
+has extension/src/intercept.ts 'watchLocation'
+has extension/src/intercept.ts 'granny-allow:'
+has extension/src/intercept.ts 'need-context'
+has extension/src/background.ts 'granny-close-tab'
+has extension/src/intercept.ts 'waitForTitle'
+has extension/src/intercept.ts 'channel'
+has extension/src/intercept.ts 'purgeOfflineData'
+has extension/src/intercept.ts 'caches.delete'
+has extension/src/intercept.ts 'unregister'
+has extension/src/intercept.ts 'granny-mute:'
+has extension/src/intercept.ts 'isMuted'
+has extension/src/intercept.ts 'muteDomain'
+has extension/src/intercept.ts 'storage.local'
+has extension/src/theme.ts 'GRANNY_THEME'
+has extension/src/intercept.ts 'GRANNY_THEME'
 has extension/shared/options.html 'options.js'
 
 bash scripts/package-chrome.sh >/dev/null

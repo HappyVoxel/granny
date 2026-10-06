@@ -5,11 +5,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
+bash scripts/build-extension.sh
+
 SRC=dist/granny-safari-src
 rm -rf "$SRC" extension/safari/app
 mkdir -p "$SRC/icons"
-cp extension/shared/background.js extension/shared/intercept.js \
-   extension/shared/theme.js extension/shared/options.html extension/shared/options.js "$SRC/"
+cp extension/build/background.js extension/build/intercept.js \
+   extension/build/theme.js extension/build/options.js "$SRC/"
+cp extension/shared/options.html "$SRC/"
 cp extension/shared/icons/*.png "$SRC/icons/"
 cp extension/safari/manifest.json "$SRC/manifest.json"
 

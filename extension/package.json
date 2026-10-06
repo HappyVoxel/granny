@@ -1,0 +1,13 @@
+{
+  "name": "granny-extension",
+  "private": true,
+  "description": "Build tooling for the granny browser extension (TypeScript in src/, JavaScript out in build/).",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.4",
+    "typescript": "^7.0.2"
+  }
+}

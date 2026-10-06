@@ -21,11 +21,36 @@
   const DESCRIPTION_LIMIT = 300;
   const TITLE_TICK_MS = 250;
   const TITLE_WAIT_MS = 2500;
+  // How long the "no warnings for this domain" notice stays before it
+  // fades on its own; the cross in its corner ends it sooner.
   const MUTED_CONFIRM_MS = 3000;
-  let layer = null;
+  // How often the URL watcher notices an SPA navigation.
+  const LOCATION_POLL_MS = 500;
+  let layer: HTMLDivElement | null = null;
+
+  interface OverlayText {
+    looking: string;
+    continue: string;
+    close: string;
+    back: string;
+    blocked: string;
+    mute: string;
+    muted: string;
+    dismiss: string;
+  }
 
   // English is the default; Vietnamese and Finnish when the machine speaks them.
-  const TEXT = {
+  const ENGLISH: OverlayText = {
+    looking: 'Granny is checking what you are up to…',
+    continue: 'Continue',
+    close: 'Close the tab',
+    back: 'Go back',
+    blocked: 'Granny says no, dear.',
+    mute: "Don't warn for this domain",
+    muted: 'Alright dear - no warnings for {domain} for the rest of today.',
+    dismiss: 'Dismiss',
+  };
+  const BY_LANGUAGE: Record<string, OverlayText> = {
     vi: {
       looking: 'Ngoại đang xem cháu định làm gì đấy…',
       continue: 'Tiếp tục',
@@ -46,28 +71,23 @@
       muted: 'Selvä, mummo ei enää varoita {domain}-osoitteesta tänään.',
       dismiss: 'Sulje',
     },
-  }[(navigator.language || 'en').toLowerCase().split('-')[0]] || {
-    looking: 'Granny is checking what you are up to…',
-    continue: 'Continue',
-    close: 'Close the tab',
-    back: 'Go back',
-    blocked: 'Granny says no, dear.',
-    mute: "Don't warn for this domain",
-    muted: "Alright dear - no warnings for {domain} for the rest of today.",
-    dismiss: 'Dismiss',
   };
+  const language = (navigator.language || 'en').toLowerCase().split('-')[0] ?? 'en';
+  const TEXT: OverlayText = BY_LANGUAGE[language] ?? ENGLISH;
 
-  function send(message) {
+  function send(message: GrannyMessage): Promise<GrannyDecision | null> {
     return new Promise((resolve) => {
       try {
-        chrome.runtime.sendMessage(message, (response) => resolve(response || null));
+        chrome.runtime.sendMessage(message, (response: GrannyDecision | undefined) => {
+          resolve(response || null);
+        });
       } catch (error) {
         resolve(null);
       }
     });
   }
 
-  function removeLayer() {
+  function removeLayer(): void {
     if (layer) {
       layer.remove();
       layer = null;
@@ -77,22 +97,22 @@
   // "Don't warn for this domain": stored per host (www folded away) until
   // the end of today, so a work task that lives on a site stops drawing the
   // negotiable warning for the rest of the day.
-  function muteKey(host) {
+  function muteKey(host: string): string {
     return MUTE_PREFIX + host.replace(/^www\./, '');
   }
 
-  function endOfToday() {
+  function endOfToday(): number {
     const end = new Date();
     end.setHours(23, 59, 59, 999);
     return end.getTime();
   }
 
-  function isMuted(host) {
+  function isMuted(host: string): Promise<boolean> {
     return new Promise((resolve) => {
       const key = muteKey(host);
       try {
         chrome.storage.local.get([key], (data) => {
-          const expiry = data && data[key];
+          const expiry = (data as Record<string, number | undefined>)[key];
           if (!expiry) return resolve(false);
           if (Date.now() > expiry) {
             chrome.storage.local.remove([key]);
@@ -106,7 +126,7 @@
     });
   }
 
-  function muteDomain(host) {
+  function muteDomain(host: string): void {
     try {
       chrome.storage.local.set({ [muteKey(host)]: endOfToday() });
     } catch (error) {
@@ -114,13 +134,13 @@
     }
   }
 
-  function showLayer(text, options) {
+  function showLayer(text: string, options?: LayerOptions): void {
     const showBack = !options || options.back !== false;
     const root = document.documentElement;
     if (!root) return;
 
     // Shared with the app's GrannyTheme; theme.js loads before this script.
-    const THEME = window.GRANNY_THEME || {};
+    const THEME: Partial<GrannyTheme> = window.GRANNY_THEME || {};
 
     removeLayer();
     layer = document.createElement('div');
@@ -161,7 +181,7 @@
     ].join(';');
 
     // A quiet glassy lift on hover, without a stylesheet (page CSP safe).
-    function withHover(el, base, hover) {
+    function withHover(el: HTMLElement, base: string, hover: string): void {
       el.style.cssText = base;
       el.addEventListener('mouseenter', () => {
         el.style.cssText = base + hover;
@@ -237,7 +257,10 @@
       mute.addEventListener('click', () => {
         muteDomain(location.hostname);
         removeLayer();
-        showLayer(TEXT.muted.replace('{domain}', location.hostname.replace(/^www\./, '')), { back: false, dismiss: true });
+        showLayer(TEXT.muted.replace('{domain}', location.hostname.replace(/^www\./, '')), {
+          back: false,
+          dismiss: true,
+        });
         setTimeout(removeLayer, MUTED_CONFIRM_MS);
       });
       card.appendChild(mute);
@@ -265,12 +288,13 @@
     root.appendChild(layer);
   }
 
-  function metaContent(name) {
-    const el = document.querySelector('meta[name="' + name + '"], meta[property="' + name + '"]');
+  function metaContent(name: string): string {
+    const el = document.querySelector<HTMLMetaElement>(
+      'meta[name="' + name + '"], meta[property="' + name + '"]');
     return el ? el.content || '' : '';
   }
 
-  function extractContext() {
+  function extractContext(): PageContext {
     const host = location.hostname;
     const isYouTube = host === 'youtube.com' || host.endsWith('.youtube.com');
     let kind = 'page';
@@ -297,10 +321,10 @@
     };
   }
 
-  function waitForTitle(timeoutMs, previousTitle) {
+  function waitForTitle(timeoutMs: number, previousTitle: string | null): Promise<string> {
     return new Promise((resolve) => {
       const deadline = Date.now() + timeoutMs;
-      const tick = () => {
+      const tick = (): void => {
         const title = (document.title || '').trim();
         if (title && title !== 'YouTube' && title !== previousTitle) return resolve(title);
         if (Date.now() > deadline) return resolve(title);
@@ -312,7 +336,7 @@
 
   /// Deletes the origin's Cache Storage and unregisters its service workers,
   /// so a blocked site cannot re-serve itself from offline cache.
-  async function purgeOfflineData() {
+  async function purgeOfflineData(): Promise<void> {
     try {
       const keys = await caches.keys();
       await Promise.all(keys.map((key) => caches.delete(key)));
@@ -327,7 +351,7 @@
     }
   }
 
-  async function guard(previousTitle) {
+  async function guard(previousTitle: string | null = null): Promise<void> {
     const url = location.href;
     if (sessionStorage.getItem(ALLOW_PREFIX + url)) return;
 
@@ -335,13 +359,13 @@
     // SPA navigation keeps the previous page's title until the new one
     // renders: sending it would judge - and cache - the wrong video.
     if (previousTitle && context.title === previousTitle) context.title = '';
-    let decision = await send({ type: 'granny-check', url: url, title: context.title, channel: context.channel, description: context.description, kind: context.kind });
+    let decision = await send({ type: 'granny-check', url: url, ...context });
 
     if (decision && decision.action === 'need-context') {
       showLayer(TEXT.looking, { back: false });
       await waitForTitle(TITLE_WAIT_MS, previousTitle);
       context = extractContext();
-      decision = await send({ type: 'granny-check', url: url, title: context.title, channel: context.channel, description: context.description, kind: context.kind, force: true });
+      decision = await send({ type: 'granny-check', url: url, ...context, force: true });
     }
 
     removeLayer();
@@ -363,7 +387,7 @@
   // methods (the page keeps its own), so watch the URL instead and re-run
   // the check whenever it moves - YouTube's feed-to-video navigation is a
   // pushState in the page world, invisible to a content-script hook.
-  function watchLocation() {
+  function watchLocation(): void {
     let lastURL = location.href;
     let lastTitle = document.title;
     setInterval(() => {
@@ -375,7 +399,7 @@
       lastURL = location.href;
       lastTitle = document.title;
       guard(previousTitle);
-    }, 500);
+    }, LOCATION_POLL_MS);
   }
 
   watchLocation();
