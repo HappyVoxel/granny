@@ -36,6 +36,15 @@ final class ClientTests: XCTestCase {
         XCTAssertTrue(user.contains("working"))
     }
 
+    func testModelCallsDisableReasoning() throws {
+        let data = try XCTUnwrap(OpenRouterClient.decisionRequestBody(
+            model: "m", context: PageContext(url: "https://x.com"), tasks: [], phase: .working))
+        let body = try XCTUnwrap(JSON.dict(from: data))
+        let reasoning = try XCTUnwrap(body["reasoning"] as? [String: Any])
+        XCTAssertEqual(reasoning["enabled"] as? Bool, false,
+                       "a chain of thought is clock, not value, for a one-line verdict")
+    }
+
     func testPlainDecisionBodyDropsSchemaAndSpellsOutJSON() throws {
         let data = try XCTUnwrap(OpenRouterClient.decisionRequestBody(
             model: "m", context: PageContext(url: "https://x.com"), tasks: [], phase: .working,

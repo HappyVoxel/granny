@@ -41,35 +41,41 @@ public struct OpenRouterClient: Sendable {
             model: settings.model, context: context, tasks: tasks, phase: phase,
             language: settings.language, structured: false
         ) else { return nil }
-        guard let data = await post(strict, plainFallback: plain) else { return nil }
+        guard let data = await post(strict, plainFallback: plain, timeout: settings.timeout) else { return nil }
         return Self.parseDecisionResponse(data, source: source)
     }
 
     /// Intake pass: refine tasks and ask one clarifying question if the
     /// list is vague. nil on any failure; the caller keeps the naive parse.
+    /// A user-initiated one-off deserves patience: a reasoning model can
+    /// think past the verdict timeout, so intake gets its own, longer one.
     public func parseIntake(text: String) async -> ParsedIntake? {
         guard let strict = Self.intakeRequestBody(
             model: settings.model, text: text, language: settings.language),
             let plain = Self.intakeRequestBody(
                 model: settings.model, text: text, language: settings.language, structured: false)
         else { return nil }
-        guard let data = await post(strict, plainFallback: plain) else { return nil }
+        let timeout = max(settings.timeout, Self.intakeTimeout)
+        guard let data = await post(strict, plainFallback: plain, timeout: timeout) else { return nil }
         return Self.parseIntakeResponse(data)
     }
+
+    /// The intake request's own budget, independent of the verdict timeout.
+    static let intakeTimeout: TimeInterval = 30
 
     /// Structured outputs are a request, not a guarantee: a provider that
     /// cannot honour `response_format` answers 400 ("model features
     /// structured outputs not support"). Only that 400 earns a retry with
     /// the plain body, whose prompt spells the JSON shape out - a bad model
     /// or a malformed request fails open without the extra round trip.
-    private func post(_ body: Data, plainFallback: Data) async -> Data? {
-        let first = await perform(body)
+    private func post(_ body: Data, plainFallback: Data, timeout: TimeInterval) async -> Data? {
+        let first = await perform(body, timeout: timeout)
         if first.status == 200 { return first.data }
         guard first.status == Self.unsupportedStructuredOutputStatus,
               let errorBody = first.data,
               Self.mentionsStructuredOutputs(errorBody)
         else { return nil }
-        return await perform(plainFallback).data
+        return await perform(plainFallback, timeout: timeout).data
     }
 
     /// HTTP 400 is what OpenRouter fronts for a provider that rejects the
@@ -88,11 +94,11 @@ public struct OpenRouterClient: Sendable {
         "structured outputs", "structured_outputs", "response_format", "json_schema",
     ]
 
-    private func perform(_ body: Data) async -> (data: Data?, status: Int?) {
+    private func perform(_ body: Data, timeout: TimeInterval) async -> (data: Data?, status: Int?) {
         var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
         request.httpBody = body
-        request.timeoutInterval = settings.timeout
+        request.timeoutInterval = timeout
         request.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
@@ -192,6 +198,9 @@ public struct OpenRouterClient: Sendable {
         var body: [String: Any] = [
             "model": model,
             "temperature": 0,
+            // The answer, not the chain of thought: a reasoning model burns
+            // the clock thinking about a one-line verdict or task.
+            "reasoning": ["enabled": false],
             "messages": [
                 ["role": "system", "content": structured ? system : system + "\n" + jsonHint],
                 ["role": "user", "content": userText],
