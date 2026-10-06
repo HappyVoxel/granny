@@ -75,20 +75,25 @@ final class TaskParserTests: XCTestCase {
             purpose: "Job hunting",
             allowedSurfaces: ["linkedin.com/jobs*", "vietnamworks.com/*"])
 
-        // Untouched surfaces: the model refreshes them; a purpose the user
-        // wrote survives the model's.
-        let refreshed = TaskParser.refined(mine, with: engine, surfacesEdited: false)
+        // Untouched purpose and surfaces: the model refreshes both - a stale
+        // purpose from the old wording is worse than the model's line.
+        let refreshed = TaskParser.refined(
+            mine, with: engine, purposeEdited: false, surfacesEdited: false)
         XCTAssertEqual(refreshed.allowedSurfaces, engine.allowedSurfaces)
-        XCTAssertEqual(refreshed.purpose, mine.purpose)
+        XCTAssertEqual(refreshed.purpose, engine.purpose)
         XCTAssertEqual(refreshed.id, mine.id)
 
-        // Hand-edited surfaces: the model's list is ignored.
-        let kept = TaskParser.refined(mine, with: engine, surfacesEdited: true)
+        // Hand-written purpose and surfaces: the model's words are ignored.
+        let kept = TaskParser.refined(
+            mine, with: engine, purposeEdited: true, surfacesEdited: true)
         XCTAssertEqual(kept.allowedSurfaces, mine.allowedSurfaces)
+        XCTAssertEqual(kept.purpose, mine.purpose)
 
-        // An empty purpose gets filled from the model.
-        var blank = mine
-        blank.purpose = nil
-        XCTAssertEqual(TaskParser.refined(blank, with: engine, surfacesEdited: true).purpose, engine.purpose)
+        // A model that answered no purpose leaves the existing one alone.
+        var silent = engine
+        silent.purpose = nil
+        XCTAssertEqual(
+            TaskParser.refined(mine, with: silent, purposeEdited: false, surfacesEdited: true).purpose,
+            mine.purpose)
     }
 }

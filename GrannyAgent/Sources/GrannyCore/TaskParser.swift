@@ -1,17 +1,20 @@
 import Foundation
 
 public enum TaskParser {
-    /// The engine's reading of an edited task, merged into the user's own:
-    /// surfaces come from the model unless the editor set them by hand, and
-    /// the purpose only fills an empty field. The user's words win; the id
-    /// and the done flag survive.
-    public static func refined(_ task: TaskItem, with refined: TaskItem, surfacesEdited: Bool) -> TaskItem {
+    /// The engine's reading of an edited task, merged into the user's own.
+    /// Surfaces come from the model unless the editor set them by hand; the
+    /// purpose is rewritten whenever the user did not write one themselves -
+    /// a stale purpose from the old wording is worse than the model's line.
+    /// The id and the done flag survive.
+    public static func refined(
+        _ task: TaskItem, with refined: TaskItem, purposeEdited: Bool, surfacesEdited: Bool
+    ) -> TaskItem {
         var merged = task
         if !surfacesEdited {
             merged.allowedSurfaces = refined.allowedSurfaces
         }
-        if merged.purpose?.isEmpty ?? true {
-            merged.purpose = refined.purpose
+        if !purposeEdited, let purpose = refined.purpose, !purpose.isEmpty {
+            merged.purpose = purpose
         }
         return merged
     }

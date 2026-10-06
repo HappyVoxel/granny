@@ -194,6 +194,8 @@ public enum GrannyLines {
     public static var taskEditPurposeLabel: String { strings.taskEditPurposeLabel }
     public static var taskEditCaption: String { strings.taskEditCaption }
     public static var taskEditHelp: String { strings.taskEditHelp }
+    public static var taskEditAskGranny: String { strings.taskEditAskGranny }
+    public static var taskEditAskGrannyHelp: String { strings.taskEditAskGrannyHelp }
     public static var dropTaskHelp: String { strings.dropTaskHelp }
     public static var settingsSave: String { strings.settingsSave }
     public static var keyCheckValid: String { strings.keyCheckValid }
