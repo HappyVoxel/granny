@@ -175,11 +175,56 @@ final class NetworkTests: XCTestCase {
         config.openRouterKey = "or-key"
         let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
         let decision = await engine.decide(
-            context: PageContext(url: "https://www.youtube.com/watch?v=x", title: "Lofi beats"),
+            context: PageContext(url: "https://www.youtube.com/watch?v=x", title: "Interstellar - Official Trailer"),
             tasks: [], phase: .working)
         XCTAssertEqual(decision.source, "typesafe/jev-router")
         XCTAssertEqual(decision.action, .warn)
         XCTAssertEqual(MockURLProtocol.requestCount, 1)
+    }
+
+    func testEngineLetsFocusAudioPass() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"warn","message":"Từ từ đã cháu.","reason":"manifestation video"}"#))
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(
+                url: "https://www.youtube.com/watch?v=pmq45EPNGqE",
+                title: "You Will Become Super RICH | Attract Wealth in 5 Minutes ~ 888Hz",
+                channel: "Golden Aura Frequencies",
+                kind: "video"),
+            tasks: [], phase: .working)
+        XCTAssertEqual(decision.action, .allow, "focus audio is music to work by")
+        XCTAssertEqual(decision.reason, "focus audio: compatible with work")
+    }
+
+    func testFocusAudioSignals() {
+        XCTAssertTrue(DecisionEngine.isFocusAudio(PageContext(
+            url: "u", title: "8Hz 528 Hz ABUNDANCE FREQUENCY", channel: "Golden Aura Frequencies")))
+        XCTAssertTrue(DecisionEngine.isFocusAudio(PageContext(url: "u", title: "lofi hip hop radio")))
+        XCTAssertTrue(DecisionEngine.isFocusAudio(PageContext(url: "u", title: "Rain sounds for sleep")))
+        XCTAssertFalse(DecisionEngine.isFocusAudio(PageContext(
+            url: "u", title: "MrBeast 24 hours challenge")))
+        XCTAssertFalse(DecisionEngine.isFocusAudio(PageContext(url: "u", title: "Interstellar trailer")))
+    }
+
+    func testRulesLevelWarnIsRelievedForFocusAudio() async {
+        // A task surface on YouTube: the video outside it warns in the rules
+        // tier, before any model runs. Focus audio must not nag even there.
+        let task = TaskItem(title: "Watch the lecture", allowedSurfaces: ["youtube.com/watch?v=abc"])
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(
+                url: "https://www.youtube.com/watch?v=zzz",
+                title: "lofi hip hop radio - beats to relax/study to",
+                kind: "video"),
+            tasks: [task], phase: .working)
+        XCTAssertEqual(decision.action, .allow)
+        XCTAssertEqual(decision.reason, "focus audio: compatible with work")
+        XCTAssertEqual(decision.source, "rules")
     }
 
     func testEngineFallsThroughLayaJevToModelAndCaches() async {

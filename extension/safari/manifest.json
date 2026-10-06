@@ -3,18 +3,33 @@
   "name": "granny",
   "version": "0.1.2",
   "description": "Every navigation goes through granny. Work first, play after.",
-  "permissions": ["storage"],
-  "host_permissions": ["http://127.0.0.1/*"],
-  "background": { "service_worker": "background.js" },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["intercept.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "theme.js",
+        "intercept.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
   ],
-  "options_ui": { "page": "options.html", "open_in_tab": false },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

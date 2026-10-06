@@ -10,7 +10,12 @@ public enum HostsFile {
         var lines = stripLines(current)
         lines.append("")
         lines.append(markBegin)
-        lines.append(contentsOf: domains.map { "127.0.0.1 \($0)" })
+        // Both loopback families: an IPv4-only block is bypassed over IPv6
+        // by any host with AAAA records (Meta's domains all have them).
+        for domain in domains {
+            lines.append("127.0.0.1 \(domain)")
+            lines.append("::1 \(domain)")
+        }
         lines.append(markEnd)
         return lines.joined(separator: "\n") + "\n"
     }

@@ -197,12 +197,16 @@ public struct OpenRouterClient: Sendable {
         deep-work session. You are given the page context (url, title, channel, description, kind) \
         and today's open tasks with their purpose. Judge the CONTENT, not the domain. Answer with \
         one of:
-        - allow: content that serves deep work or is compatible with it. Music only \
-        when the page clearly IS music (kind=music, an official music video/audio/lyric \
-        video, an artist channel, or the title says so); listening to music is not a \
-        distraction. Also lectures, tutorials, documentation, job applications; \
+        - allow: content that serves deep work or is compatible with it. Music, \
+        ambient and focus audio count as music: kind=music, an official music \
+        video/audio/lyric video, an artist or music channel, or frequency/Hz, \
+        binaural, solfeggio, meditation, sleep, rain/noise, lofi or study \
+        playlists - even when the title promises wealth, health or sleep \
+        benefits; listening is not a distraction. Also lectures, tutorials, \
+        documentation, job applications; \
         tools/dashboards for work (developer tools, tracing/observability, analytics); \
-        AI assistants and research tools (Perplexity, ChatGPT); communication tools \
+        AI assistants and research tools (Perplexity, ChatGPT); search engine result \
+        pages; communication tools \
         (Slack, Discord, email).
         - warn: work-adjacent but drifting; long-form video the grandchild chooses \
         to watch - movies, series, vlogs - is always warn, never block: the \

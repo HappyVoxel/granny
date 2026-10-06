@@ -38,6 +38,42 @@ public struct RulesEngine: Sendable {
         self.config = config
     }
 
+    /// Search-engine result pages, by host and path. A bare "/" entry means
+    /// the engine's home (DuckDuckGo keeps the query in the path-less URL).
+    private static let searchEngines: [String: [String]] = [
+        "google.com": ["/search"],
+        "bing.com": ["/search"],
+        "duckduckgo.com": ["/"],
+        "search.brave.com": ["/search"],
+        "ecosia.org": ["/search"],
+        "startpage.com": ["/sp/search"],
+        "qwant.com": ["/search"],
+        "kagi.com": ["/search"],
+    ]
+
+    static func isSearchResults(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        let bare = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let path = url.path.isEmpty ? "/" : url.path.lowercased()
+        let prefixes = searchEngines[bare] ?? (isGoogleCountryHost(bare) ? ["/search"] : nil)
+        guard let prefixes else { return false }
+        return prefixes.contains { $0 == "/" ? path == "/" : path.hasPrefix($0) }
+    }
+
+    /// google.fi, google.co.uk and friends - but not google.example.com:
+    /// the fallback must name a real Google registrable domain, or any site
+    /// could expose /search on a "google."-prefixed subdomain and ride the
+    /// allow rule past the blocked-domain checks.
+    private static func isGoogleCountryHost(_ bare: String) -> Bool {
+        guard bare.hasPrefix("google.") else { return false }
+        let rest = bare.dropFirst("google.".count)
+        if rest.count == 2, rest.allSatisfy({ $0.isLetter }) { return true }
+        if rest.hasPrefix("co."), rest.count == 5, rest.dropFirst(3).allSatisfy({ $0.isLetter }) {
+            return true
+        }
+        return false
+    }
+
     public func evaluate(urlString: String, tasks: [TaskItem], phase: Phase) -> Decision? {
         guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return nil }
         if !phase.blocksActive {
@@ -47,6 +83,13 @@ public struct RulesEngine: Sendable {
         let lower = urlString.lowercased()
         for prefix in config.alwaysAllowedURLPrefixes where lower.hasPrefix(prefix.lowercased()) {
             return Decision(.allow, reason: "always allowed", source: "rules")
+        }
+
+        // Looking something up is the first move of most work: a search
+        // result page passes without a classifier round trip. Whatever gets
+        // clicked from it is judged on its own navigation.
+        if Self.isSearchResults(url) {
+            return Decision(.allow, reason: "search results", source: "rules")
         }
 
         let path = url.path.isEmpty ? "/" : url.path

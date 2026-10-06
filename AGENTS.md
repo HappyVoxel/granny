@@ -35,7 +35,13 @@ Coverage: `cd GrannyAgent && swift test --enable-code-coverage`, then
 with profile `.build/out/Products/Debug/codecov/default.profdata`. Keep
 non-network logic in unit tests; the model tiers run through a stubbed
 `URLProtocol`, never the live network. After a real `/etc/hosts` change,
-flush the DNS cache or test results lie.
+flush the DNS cache or test results lie. The stale cache is
+domain-specific - only domains fetched while the block was bypassed keep
+real IPs, and Safari's resolver may prefer them over the hosts entry, so
+facebook loads while everything else blocks. The helper's clear/apply
+flushes it (`sudo -n /usr/local/libexec/granny/granny-helper clear` then
+`apply <domains.json>`); that is what turned `e2e-safari-webdriver.sh`
+green.
 
 ## Layout
 
@@ -87,7 +93,10 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
 - `/etc/hosts` is edited only between the `# GRANNY-BEGIN` / `# GRANNY-END`
   markers. The Swift renderer (`GrannyCore/HostsFile.swift`) is the single
   source of truth; `scripts/proto.sh` carries a legacy copy and must not grow
-  new behaviour.
+  new behaviour. Every domain is rendered twice, `127.0.0.1` and `::1` - an
+  IPv4-only block is bypassed over IPv6 by any host with AAAA records (Meta's
+  domains all carry them; TikTok's do not, which is why the webdriver suite
+  caught it).
 - The decision endpoint contract (`/decide`) is
   `url,title,channel,description,kind,force`; when adding a parameter, update
   `extension/shared/background.js`, `intercept.js`, and `DecisionServer`
@@ -136,7 +145,9 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   master runs the suites, then `scripts/next-version.sh` resolves the next
   version from Conventional Commits since the last tag (pre-1.0: patch per
   releasable merge, minor for breaking; docs/chore/ci merge releases
-  nothing), builds `scripts/build-release.sh`'s archive, publishes the GitHub
+  nothing), builds `scripts/build-release.sh`'s zip and dmg (the dmg also
+  ships under the stable name `granny-macos.dmg`, which the landing page's
+  Download button links via `releases/latest/download`), publishes the GitHub
   release and updates the Homebrew tap when `TAP_GITHUB_TOKEN` is set. The
   cask lives in `packaging/homebrew/Casks/granny.rb` and is copied into
   `HappyVoxel/homebrew-tap` by that workflow. The workflow never pushes to
