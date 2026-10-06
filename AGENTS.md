@@ -35,7 +35,13 @@ Coverage: `cd GrannyAgent && swift test --enable-code-coverage`, then
 with profile `.build/out/Products/Debug/codecov/default.profdata`. Keep
 non-network logic in unit tests; the model tiers run through a stubbed
 `URLProtocol`, never the live network. After a real `/etc/hosts` change,
-flush the DNS cache or test results lie.
+flush the DNS cache or test results lie. The stale cache is
+domain-specific - only domains fetched while the block was bypassed keep
+real IPs, and Safari's resolver may prefer them over the hosts entry, so
+facebook loads while everything else blocks. The helper's clear/apply
+flushes it (`sudo -n /usr/local/libexec/granny/granny-helper clear` then
+`apply <domains.json>`); that is what turned `e2e-safari-webdriver.sh`
+green.
 
 ## Layout
 
