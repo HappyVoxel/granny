@@ -5,8 +5,8 @@ source build is the full path (it also gives you the Safari extension).
 
 ## Direct download (no Homebrew)
 
-[granny-macos.dmg](https://github.com/HappyVoxel/granny/releases/latest/download/granny-macos.dmg)
-from the latest release. Drag granny into Applications. Not notarized yet:
+Download [granny-macos.dmg](https://github.com/HappyVoxel/granny/releases/latest/download/granny-macos.dmg)
+from the latest release, then drag granny into Applications. Not notarized yet:
 first open needs right-click -> Open, or System Settings > Privacy & Security
 > Open Anyway.
 
