@@ -59,12 +59,16 @@ public struct OpenRouterClient: Sendable {
 
     /// Structured outputs are a request, not a guarantee: a provider that
     /// cannot honour `response_format` answers 400 ("model features
-    /// structured outputs not support"). Retry once with the plain body,
-    /// whose prompt spells the JSON shape out.
+    /// structured outputs not support"). Only that 400 earns a retry with
+    /// the plain body, whose prompt spells the JSON shape out - a bad model
+    /// or a malformed request fails open without the extra round trip.
     private func post(_ body: Data, plainFallback: Data) async -> Data? {
         let first = await perform(body)
-        if let data = first.data { return data }
-        guard first.status == Self.unsupportedStructuredOutputStatus else { return nil }
+        if first.status == 200 { return first.data }
+        guard first.status == Self.unsupportedStructuredOutputStatus,
+              let errorBody = first.data,
+              Self.mentionsStructuredOutputs(errorBody)
+        else { return nil }
         return await perform(plainFallback).data
     }
 
@@ -72,6 +76,17 @@ public struct OpenRouterClient: Sendable {
     /// request shape (the structured-outputs case); 401/403/429/5xx are
     /// worth no retry.
     private static let unsupportedStructuredOutputStatus = 400
+
+    /// OpenRouter nests the provider's own error in `metadata.raw`, so the
+    /// whole body is searched for the structured-outputs complaint.
+    static func mentionsStructuredOutputs(_ data: Data) -> Bool {
+        guard let text = String(data: data, encoding: .utf8)?.lowercased() else { return false }
+        return structuredOutputMarkers.contains { text.contains($0) }
+    }
+
+    static let structuredOutputMarkers = [
+        "structured outputs", "structured_outputs", "response_format", "json_schema",
+    ]
 
     private func perform(_ body: Data) async -> (data: Data?, status: Int?) {
         var request = URLRequest(url: Self.endpoint)
@@ -83,7 +98,6 @@ public struct OpenRouterClient: Sendable {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { return (nil, nil) }
-            guard http.statusCode == 200 else { return (nil, http.statusCode) }
             return (data, http.statusCode)
         } catch {
             return (nil, nil)

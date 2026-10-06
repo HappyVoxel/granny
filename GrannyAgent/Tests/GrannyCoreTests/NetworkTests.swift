@@ -111,6 +111,18 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.requestCount, 1)
     }
 
+    /// A 400 that is not about structured outputs (bad model, malformed
+    /// request) fails open without a second round trip.
+    func testUnrelated400DoesNotRetry() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 400, json: ["error": ["message": "invalid model id"]])
+        }
+        let client = OpenRouterClient(settings: .init(apiKey: "k", model: "m"), session: mockSession())
+        let decision = await client.decide(url: "https://x.com/", title: nil, tasks: [], phase: .working)
+        XCTAssertNil(decision)
+        XCTAssertEqual(MockURLProtocol.requestCount, 1, "only the structured-outputs complaint retries")
+    }
+
     func testOpenRouterIntakeOverWire() async {
         MockURLProtocol.handler = { [self] request in
             response(request.url!, status: 200, json: openRouterOK(
