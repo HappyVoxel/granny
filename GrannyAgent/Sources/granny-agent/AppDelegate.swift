@@ -82,11 +82,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.mainMenu = mainMenu
     }
 
-    /// Opening an already-running accessory app again should always surface
-    /// a window: the greeting while the day's list is still empty, the task
-    /// list otherwise. Without this, a greeting missed at login is
-    /// unreachable until the next day.
+    /// Opening an already-running app again should surface what is already
+    /// open - a dock click after a trip to another app must leave settings
+    /// as settings and the notebook as the notebook. Only an app with no
+    /// window at all (closed, or started quietly at login) falls back to the
+    /// greeting / task list.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if let window {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            if window.isVisible || window.isMiniaturized {
+                window.makeKeyAndOrderFront(nil)
+                return true
+            }
+        }
         presentInitialWindow()
         return true
     }
@@ -286,7 +294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self?.showAlert(title: GrannyLines.configSaveFailed, body: error.localizedDescription)
                 }
             },
-            onCancel: { [weak self] in self?.window?.close() })
+            onCancel: { [weak self] in self?.presentInitialWindow() })
         show(view, title: GrannyLines.settingsTitle, styleMask: [.titled, .closable, .resizable, .miniaturizable])
         window?.setContentSize(NSSize(width: 520, height: 580))
         window?.minSize = NSSize(width: 480, height: 400)

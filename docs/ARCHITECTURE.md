@@ -96,8 +96,12 @@ over the page context and the open tasks, gated on `answer_confidence`
 (>= 0.6). Fast and cheap; it cannot write prose, so granny's line comes from
 templates.
 
-**Phase 4 - DeepSeek V4.1 Flash (OpenRouter).** Fallback when the classifier
-is unavailable or not confident (structured JSON output). DeepSeek is the
+**Phase 4 - the model tier (OpenRouter).** Fallback when the classifier
+is unavailable or not confident (structured JSON output). The model is
+whatever the user picks in Settings from the provider's live catalogue
+(`GET /api/v1/models`, fetched, never hardcoded); DeepSeek V4.1 Flash is
+only the default, and a `provider` config field keeps the door open for
+more providers. The model is the
 core for what needs generation: granny's explanations, the challenge
 questions at intake, and the future chat ("đôi co với ngoại"). A YouTube
 watch page (`kind=video` on a context host, real title) takes this deep read
