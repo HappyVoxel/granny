@@ -79,9 +79,12 @@ public actor DecisionEngine {
         }
 
         if let decision = rules.evaluate(urlString: context.url, tasks: tasks, phase: phase) {
+            // Focus audio passes whatever tier warned: a task's off-surface
+            // URL must not nag while a study playlist plays.
+            let final = Self.focusAudioRelief(decision, context: context)
             // Allow verdicts are the common case and stay untraced; block and
             // warn are the interesting rules outcomes (e.g. a Facebook tab).
-            if decision.action != .allow {
+            if final.action != .allow {
                 trace.record(.init(
                     name: "decide",
                     traceName: "granny.decision",
@@ -91,12 +94,12 @@ public actor DecisionEngine {
                         "phase": phase.rawValue,
                         "tasks": tasks.filter { !$0.done }.map(\.title).joined(separator: "; "),
                     ],
-                    output: ["action": decision.action.rawValue, "reason": decision.reason, "source": "rules"],
+                    output: ["action": final.action.rawValue, "reason": final.reason, "source": "rules"],
                     model: nil,
                     startedAt: Date(),
                     endedAt: Date()))
             }
-            return decision
+            return final
         }
 
         let cacheKey = context.url.lowercased()
@@ -192,12 +195,7 @@ public actor DecisionEngine {
         // lofi, study playlists) is music to work by, not entertainment: a
         // warn from any tier becomes an allow. A block stays a block - a
         // short or a game is not audio.
-        if final.action == .warn, Self.isFocusAudio(context) {
-            final = Decision(
-                .allow,
-                reason: "focus audio: compatible with work",
-                source: final.source)
-        }
+        final = Self.focusAudioRelief(final, context: context)
 
         // A verdict judged on a placeholder title ("YouTube") or none at all
         // must not be cached: it would stick the URL to that verdict for the
@@ -235,6 +233,16 @@ public actor DecisionEngine {
     /// explains why. Everything else takes the fast classifier.
     private func wantsDeepRead(_ context: PageContext) -> Bool {
         (context.kind ?? "").lowercased() == "video" && isContextHost(context.url)
+    }
+
+    /// A warn from any tier is relieved when the page is focus audio; block
+    /// stays block.
+    private static func focusAudioRelief(_ decision: Decision, context: PageContext) -> Decision {
+        guard decision.action == .warn, isFocusAudio(context) else { return decision }
+        return Decision(
+            .allow,
+            reason: "focus audio: compatible with work",
+            source: decision.source)
     }
 
     /// Focus audio the grandchild works by: frequency/Hz tracks, meditation

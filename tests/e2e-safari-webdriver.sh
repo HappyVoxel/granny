@@ -44,6 +44,7 @@ done
 cat >"$SANDBOX/driver_client.py" <<'PY'
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -178,8 +179,11 @@ if facebook_state == "loaded":
     # cache was the culprit (clear Website Data for facebook/instagram).
     clear_offline_caches()
     if probe("https://www.facebook.com", "facebook_after_clearing", "facebook") == "loaded":
-        # A cache-busted URL cannot come from Safari's stores.
-        probe("https://www.facebook.com/?granny-cache-bust=1", "facebook_network", "facebook")
+        # A cache-busted URL cannot come from Safari's stores. The buster is
+        # unique per run: a constant one could be served by a cache the
+        # earlier run left behind.
+        probe(f"https://www.facebook.com/?granny-cache-bust={int(time.time())}",
+              "facebook_network", "facebook")
 
 # A DoH endpoint carries AAAA records and the janitor never touches it:
 # the cleanest network-layer probe (an IPv4-only hosts block fails here).

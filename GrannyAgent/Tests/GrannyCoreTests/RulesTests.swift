@@ -40,6 +40,8 @@ final class RulesTests: XCTestCase {
         // Only the results surface: other paths still go to the classifier.
         XCTAssertNil(engine.evaluate(urlString: "https://duckduckgo.com/settings", tasks: [], phase: .working))
         XCTAssertNil(engine.evaluate(urlString: "https://www.google.com/maps", tasks: [], phase: .working))
+        // A look-alike host must not ride the allow rule past enforcement.
+        XCTAssertNil(engine.evaluate(urlString: "https://google.example.com/search?q=x", tasks: [], phase: .working))
     }
 
     func testPurposefulSurfaceIsAllowed() {

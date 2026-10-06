@@ -55,9 +55,23 @@ public struct RulesEngine: Sendable {
         guard let host = url.host?.lowercased() else { return false }
         let bare = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         let path = url.path.isEmpty ? "/" : url.path.lowercased()
-        let prefixes = searchEngines[bare] ?? (bare.hasPrefix("google.") ? ["/search"] : nil)
+        let prefixes = searchEngines[bare] ?? (isGoogleCountryHost(bare) ? ["/search"] : nil)
         guard let prefixes else { return false }
         return prefixes.contains { $0 == "/" ? path == "/" : path.hasPrefix($0) }
+    }
+
+    /// google.fi, google.co.uk and friends - but not google.example.com:
+    /// the fallback must name a real Google registrable domain, or any site
+    /// could expose /search on a "google."-prefixed subdomain and ride the
+    /// allow rule past the blocked-domain checks.
+    private static func isGoogleCountryHost(_ bare: String) -> Bool {
+        guard bare.hasPrefix("google.") else { return false }
+        let rest = bare.dropFirst("google.".count)
+        if rest.count == 2, rest.allSatisfy({ $0.isLetter }) { return true }
+        if rest.hasPrefix("co."), rest.count == 5, rest.dropFirst(3).allSatisfy({ $0.isLetter }) {
+            return true
+        }
+        return false
     }
 
     public func evaluate(urlString: String, tasks: [TaskItem], phase: Phase) -> Decision? {

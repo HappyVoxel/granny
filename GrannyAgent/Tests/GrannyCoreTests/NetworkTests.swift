@@ -211,6 +211,22 @@ final class NetworkTests: XCTestCase {
         XCTAssertFalse(DecisionEngine.isFocusAudio(PageContext(url: "u", title: "Interstellar trailer")))
     }
 
+    func testRulesLevelWarnIsRelievedForFocusAudio() async {
+        // A task surface on YouTube: the video outside it warns in the rules
+        // tier, before any model runs. Focus audio must not nag even there.
+        let task = TaskItem(title: "Watch the lecture", allowedSurfaces: ["youtube.com/watch?v=abc"])
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(
+                url: "https://www.youtube.com/watch?v=zzz",
+                title: "lofi hip hop radio - beats to relax/study to",
+                kind: "video"),
+            tasks: [task], phase: .working)
+        XCTAssertEqual(decision.action, .allow)
+        XCTAssertEqual(decision.reason, "focus audio: compatible with work")
+        XCTAssertEqual(decision.source, "rules")
+    }
+
     func testEngineFallsThroughLayaJevToModelAndCaches() async {
         MockURLProtocol.handler = { [self] request in
             let url = request.url!.absoluteString
