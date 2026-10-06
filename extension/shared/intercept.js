@@ -21,6 +21,9 @@
   const DESCRIPTION_LIMIT = 300;
   const TITLE_TICK_MS = 250;
   const TITLE_WAIT_MS = 2500;
+  // How long the "no warnings for this domain" notice stays before it
+  // fades on its own; the cross in its corner ends it sooner.
+  const MUTED_CONFIRM_MS = 3000;
   let layer = null;
 
   // English is the default; Vietnamese and Finnish when the machine speaks them.
@@ -33,6 +36,7 @@
       blocked: 'Ngoại nói không nhé cháu.',
       mute: 'Đừng nhắc domain này nữa',
       muted: 'Rồi, ngoại không nhắc {domain} nữa cho hết ngày hôm nay nhé.',
+      dismiss: 'Đóng',
     },
     fi: {
       looking: 'Mummo katsoo, mitä sinä oikein puuhaat…',
@@ -42,6 +46,7 @@
       blocked: 'Mummo sanoo ei, kulta.',
       mute: 'Älä varoita tästä verkkotunnuksesta',
       muted: 'Selvä, mummo ei enää varoita {domain}-osoitteesta tänään.',
+      dismiss: 'Sulje',
     },
   }[(navigator.language || 'en').toLowerCase().split('-')[0]] || {
     looking: 'Granny is checking what you are up to…',
@@ -51,6 +56,7 @@
     blocked: 'Granny says no, dear.',
     mute: "Don't warn for this domain",
     muted: "Alright dear - no warnings for {domain} for the rest of today.",
+    dismiss: 'Dismiss',
   };
 
   function send(message) {
@@ -170,6 +176,24 @@
     const lift =
       ';transform:translateY(-1px);box-shadow:0 14px 30px -16px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.10)';
 
+    if (options && options.dismiss) {
+      // A notice, not a lock: a quiet cross in the corner ends it now
+      // instead of waiting out the timer.
+      card.style.position = 'relative';
+      const cross = document.createElement('button');
+      cross.setAttribute('aria-label', TEXT.dismiss);
+      cross.title = TEXT.dismiss;
+      cross.innerHTML =
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>';
+      withHover(
+        cross,
+        'position:absolute;top:10px;right:10px;background:none;border:none;color:' + THEME.muted + ';cursor:pointer;padding:7px;border-radius:999px;display:flex;align-items:center;justify-content:center;transition:background-color .15s ease, color .15s ease',
+        ';color:' + THEME.text + ';background:rgba(237,229,213,.08)'
+      );
+      cross.addEventListener('click', () => removeLayer());
+      card.appendChild(cross);
+    }
+
     if (options && options.close) {
       // The negotiable verdict: granny states her case, the grandchild
       // chooses. One solid primary (close), two coloured outlines, an icon.
@@ -215,8 +239,8 @@
       mute.addEventListener('click', () => {
         muteDomain(location.hostname);
         removeLayer();
-        showLayer(TEXT.muted.replace('{domain}', location.hostname.replace(/^www\./, '')), { back: false });
-        setTimeout(removeLayer, 3000);
+        showLayer(TEXT.muted.replace('{domain}', location.hostname.replace(/^www\./, '')), { back: false, dismiss: true });
+        setTimeout(removeLayer, MUTED_CONFIRM_MS);
       });
       card.appendChild(mute);
     }
