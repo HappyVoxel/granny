@@ -24,11 +24,26 @@ ditto -c -k --sequesterRsrc --keepParent "dist/granny.app" "$OUT/granny-$VERSION
 shasum -a 256 "$OUT/granny-$VERSION.zip" | awk '{print $1}' >"$OUT/granny-$VERSION.zip.sha256"
 
 # The dmg carries the drag-to-Applications affordance non-technical users
-# expect; the zip stays because the updater and the cask read it.
+# expect; the zip stays because the updater and the cask read it. create-dmg
+# draws the Finder layout (background, icon slots, drop link) that a plain
+# `hdiutil -srcfolder` image lacks.
 STAGE="$(mktemp -d)"
 cp -R "dist/granny.app" "$STAGE/granny.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -quiet -volname "granny" -srcfolder "$STAGE" -ov -format UDZO "$OUT/granny-$VERSION.dmg"
+command -v create-dmg >/dev/null || {
+  echo "create-dmg missing: brew install create-dmg" >&2
+  exit 1
+}
+create-dmg \
+  --volname "granny" \
+  --background "$PWD/scripts/assets/dmg-background.png" \
+  --window-pos 200 120 \
+  --window-size 660 420 \
+  --icon-size 120 \
+  --icon "granny.app" 170 200 \
+  --hide-extension "granny.app" \
+  --app-drop-link 490 200 \
+  --no-internet-enable \
+  "$OUT/granny-$VERSION.dmg" "$STAGE"
 rm -rf "$STAGE"
 
 # A stable asset name so the landing page can link
