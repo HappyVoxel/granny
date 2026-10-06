@@ -398,7 +398,7 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya is your self-hosted classifier and runs first. Paste the console's endpoint as it is (or a base URL - granny appends /systemone); granny picks the checkpoint by language. A keyless host (laya.inference.zaitlabs.com) works with an empty key. If Laya is missing or down, granny falls back to Jev: automatically through OpenRouter when a key is set (default model below), or through TypeSafe's own API with the Jev URL/key."
+        "Laya runs first - paste the console endpoint, or a base URL and granny appends /systemone; a keyless host takes an empty key. Without Laya, granny falls back to Jev through OpenRouter, or through its own URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (optional, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -643,7 +643,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya là classifier tự host của bạn, chạy trước. Dán endpoint từ console đúng như nó có (hoặc URL gốc - ngoại tự thêm /systemone); ngoại tự chọn checkpoint theo ngôn ngữ. Host không cần key (laya.inference.zaitlabs.com) để trống key vẫn chạy. Nếu Laya thiếu hoặc down, ngoại rơi xuống Jev: tự động qua OpenRouter khi có key (model mặc định bên dưới), hoặc qua API riêng của TypeSafe bằng Jev URL/key."
+        "Laya chạy trước - dán endpoint từ console, hoặc URL gốc (ngoại tự thêm /systemone); host không cần key để trống vẫn chạy. Không có Laya thì rơi xuống Jev qua OpenRouter, hoặc URL/key riêng."
     }
     public var settingsTracingGroup: String { "Tracing (tuỳ chọn, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -888,7 +888,7 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsJevURL: String { "Jev-URL" }
     public var settingsJevKey: String { "Jev-avain" }
     public var settingsClassifierCaption: String {
-        "Laya on itse ylläpidetty luokittelija ja sitä kokeillaan ensin. Liitä konsolin endpoint sellaisenaan (tai perus-URL - mummo lisää /systemone); mummo valitsee checkpointin kielen mukaan. Avaimeton palvelin (laya.inference.zaitlabs.com) toimii tyhjällä avaimella. Jos Laya puuttuu tai on alhaalla, mummo siirtyy Jeviin: automaattisesti OpenRouterin kautta, kun avain on asetettu (oletusmalli alla), tai TypeSafen omaan APIin Jev-URL:n ja -avaimen kautta."
+        "Laya kokeillaan ensin - liitä konsolin endpoint tai perus-URL, niin mummo lisää /systemone; avaimeton palvelin toimii tyhjällä avaimella. Ilman Layaa mummo siirtyy Jeviin OpenRouterin kautta tai omalla URL:lla ja avaimella."
     }
     public var settingsTracingGroup: String { "Jäljitys (valinnainen, Langfuse)" }
     public var settingsHost: String { "Palvelin" }
