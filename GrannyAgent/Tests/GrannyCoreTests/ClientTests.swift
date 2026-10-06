@@ -36,6 +36,18 @@ final class ClientTests: XCTestCase {
         XCTAssertTrue(user.contains("working"))
     }
 
+    func testPlainDecisionBodyDropsSchemaAndSpellsOutJSON() throws {
+        let data = try XCTUnwrap(OpenRouterClient.decisionRequestBody(
+            model: "m", context: PageContext(url: "https://x.com"), tasks: [], phase: .working,
+            structured: false))
+        let body = try XCTUnwrap(JSON.dict(from: data))
+        XCTAssertNil(body["response_format"], "the plain body must not ask for structured outputs")
+        let messages = body["messages"] as? [[String: Any]]
+        let system = messages?.first?["content"] as? String
+        XCTAssertTrue(system?.contains("single JSON object") ?? false,
+                      "without the schema the prompt itself must name the JSON shape")
+    }
+
     func testDecisionPromptFollowsLanguage() throws {
         let context = PageContext(url: "https://www.youtube.com/watch?v=x", title: "Phim")
 

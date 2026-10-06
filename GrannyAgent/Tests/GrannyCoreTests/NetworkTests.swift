@@ -85,6 +85,32 @@ final class NetworkTests: XCTestCase {
         XCTAssertNil(decision)
     }
 
+    /// A provider that cannot honour structured outputs answers 400; the
+    /// plain body retries once and still parses.
+    func testStructuredOutputRejectionRetriesOnce() async {
+        MockURLProtocol.handler = { [self] request in
+            if MockURLProtocol.requestCount == 1 {
+                return response(request.url!, status: 400, json: ["error": "model features structured outputs not support"])
+            }
+            return response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"warn","message":"Careful, dear.","reason":"entertainment"}"#))
+        }
+        let client = OpenRouterClient(settings: .init(apiKey: "k", model: "m"), session: mockSession())
+        let decision = await client.decide(url: "https://x.com/", title: nil, tasks: [], phase: .working)
+        XCTAssertEqual(decision?.action, .warn)
+        XCTAssertEqual(MockURLProtocol.requestCount, 2, "the 400 on the schema body retries the plain one")
+    }
+
+    func testAuthFailureDoesNotRetry() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 401, json: ["error": "bad key"])
+        }
+        let client = OpenRouterClient(settings: .init(apiKey: "k", model: "m"), session: mockSession())
+        let decision = await client.decide(url: "https://x.com/", title: nil, tasks: [], phase: .working)
+        XCTAssertNil(decision)
+        XCTAssertEqual(MockURLProtocol.requestCount, 1)
+    }
+
     func testOpenRouterIntakeOverWire() async {
         MockURLProtocol.handler = { [self] request in
             response(request.url!, status: 200, json: openRouterOK(

@@ -35,23 +35,45 @@ public struct OpenRouterClient: Sendable {
     }
 
     public func decide(context: PageContext, tasks: [TaskItem], phase: Phase) async -> Decision? {
-        guard let body = Self.decisionRequestBody(
+        guard let strict = Self.decisionRequestBody(
             model: settings.model, context: context, tasks: tasks, phase: phase, language: settings.language
+        ), let plain = Self.decisionRequestBody(
+            model: settings.model, context: context, tasks: tasks, phase: phase,
+            language: settings.language, structured: false
         ) else { return nil }
-        guard let data = await post(body) else { return nil }
+        guard let data = await post(strict, plainFallback: plain) else { return nil }
         return Self.parseDecisionResponse(data, source: source)
     }
 
     /// Intake pass: refine tasks and ask one clarifying question if the
     /// list is vague. nil on any failure; the caller keeps the naive parse.
     public func parseIntake(text: String) async -> ParsedIntake? {
-        guard let body = Self.intakeRequestBody(
-            model: settings.model, text: text, language: settings.language) else { return nil }
-        guard let data = await post(body) else { return nil }
+        guard let strict = Self.intakeRequestBody(
+            model: settings.model, text: text, language: settings.language),
+            let plain = Self.intakeRequestBody(
+                model: settings.model, text: text, language: settings.language, structured: false)
+        else { return nil }
+        guard let data = await post(strict, plainFallback: plain) else { return nil }
         return Self.parseIntakeResponse(data)
     }
 
-    private func post(_ body: Data) async -> Data? {
+    /// Structured outputs are a request, not a guarantee: a provider that
+    /// cannot honour `response_format` answers 400 ("model features
+    /// structured outputs not support"). Retry once with the plain body,
+    /// whose prompt spells the JSON shape out.
+    private func post(_ body: Data, plainFallback: Data) async -> Data? {
+        let first = await perform(body)
+        if let data = first.data { return data }
+        guard first.status == Self.unsupportedStructuredOutputStatus else { return nil }
+        return await perform(plainFallback).data
+    }
+
+    /// HTTP 400 is what OpenRouter fronts for a provider that rejects the
+    /// request shape (the structured-outputs case); 401/403/429/5xx are
+    /// worth no retry.
+    private static let unsupportedStructuredOutputStatus = 400
+
+    private func perform(_ body: Data) async -> (data: Data?, status: Int?) {
         var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
         request.httpBody = body
@@ -60,17 +82,19 @@ public struct OpenRouterClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-            return data
+            guard let http = response as? HTTPURLResponse else { return (nil, nil) }
+            guard http.statusCode == 200 else { return (nil, http.statusCode) }
+            return (data, http.statusCode)
         } catch {
-            return nil
+            return (nil, nil)
         }
     }
 
     // MARK: - Request bodies
 
     static func decisionRequestBody(
-        model: String, context: PageContext, tasks: [TaskItem], phase: Phase, language: String = "en"
+        model: String, context: PageContext, tasks: [TaskItem], phase: Phase,
+        language: String = "en", structured: Bool = true
     ) -> Data? {
         let taskList = tasks.map { task -> [String: Any] in
             [
@@ -107,10 +131,14 @@ public struct OpenRouterClient: Sendable {
             system: Self.decisionSystemPrompt(language: language),
             user: user,
             schemaName: "granny_decision",
-            schema: schema)
+            schema: schema,
+            structured: structured,
+            jsonHint: #"Answer with a single JSON object, no prose and no code fences: {"action": "allow" | "warn" | "block", "message": "<one short sentence>", "reason": "<one short English phrase>"}."#)
     }
 
-    static func intakeRequestBody(model: String, text: String, language: String = "en") -> Data? {
+    static func intakeRequestBody(
+        model: String, text: String, language: String = "en", structured: Bool = true
+    ) -> Data? {
         let schema: [String: Any] = [
             "type": "object",
             "properties": [
@@ -137,25 +165,30 @@ public struct OpenRouterClient: Sendable {
             system: Self.intakeSystemPrompt(language: language),
             user: ["list": text],
             schemaName: "granny_intake",
-            schema: schema)
+            schema: schema,
+            structured: structured,
+            jsonHint: #"Answer with a single JSON object, no prose and no code fences: {"tasks": [{"title": "<task>", "purpose": "<short phrase>", "surfaces": ["<url pattern>"]}], "question": "<one short question or an empty string>"}."#)
     }
 
     private static func chatBody(
-        model: String, system: String, user: [String: Any], schemaName: String, schema: [String: Any]
+        model: String, system: String, user: [String: Any], schemaName: String,
+        schema: [String: Any], structured: Bool = true, jsonHint: String
     ) -> Data? {
         guard let userData = JSON.data(from: user), let userText = String(data: userData, encoding: .utf8) else { return nil }
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "temperature": 0,
             "messages": [
-                ["role": "system", "content": system],
+                ["role": "system", "content": structured ? system : system + "\n" + jsonHint],
                 ["role": "user", "content": userText],
             ],
-            "response_format": [
+        ]
+        if structured {
+            body["response_format"] = [
                 "type": "json_schema",
                 "json_schema": ["name": schemaName, "strict": true, "schema": schema],
-            ],
-        ]
+            ]
+        }
         return JSON.data(from: body)
     }
 
