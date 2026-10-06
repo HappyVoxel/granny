@@ -100,7 +100,7 @@ def ensure_window():
 
 def snapshot():
     result = call("POST", f"/session/{session}/execute/sync", {
-        "script": "return JSON.stringify({title: document.title || '', text: document.body ? document.body.innerText.slice(0, 300) : ''})",
+        "script": "return JSON.stringify({url: location.href, title: document.title || '', text: document.body ? document.body.innerText.slice(0, 300) : ''})",
         "args": [],
     })
     value = result.get("value")
@@ -133,6 +133,11 @@ def probe(url, label, marker):
                 print(f"CHECK {label}=closed")
                 return "closed"
             continue
+        # Language-independent: a blocked page is Safari's own error document,
+        # whatever the system language writes on it.
+        if str(snap.get("url", "")).startswith("safari-resource:"):
+            print(f"CHECK {label}=blocked")
+            return "blocked"
         blob = (snap.get("title", "") + " " + snap.get("text", ""))
         if connection_error(blob):
             print(f"CHECK {label}=blocked")
@@ -178,7 +183,9 @@ if facebook_state == "loaded":
 
 # A DoH endpoint carries AAAA records and the janitor never touches it:
 # the cleanest network-layer probe (an IPv4-only hosts block fails here).
-probe("https://dns.google", "doh", "google")
+# "public dns" is unique to the real page - the error page only carries the
+# hostname, so a broad "google" marker would misread it as loaded.
+probe("https://dns.google", "doh", "public dns")
 
 probe("https://www.youtube.com/shorts/test", "shorts", "youtube")
 

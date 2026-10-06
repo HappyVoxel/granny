@@ -24,8 +24,11 @@ PORT=$((47000 + RANDOM % 2000))
 TOKEN=e2e-token
 
 mkdir -p "$SANDBOX/state"
+# wakeHour 0 / bedtimeHour 23: the phase assertions must not depend on the
+# wall clock of the CI runner (a 05:55 UTC run used to sit in the night
+# phase and fail "status missing: phase: working").
 cat >"$SANDBOX/config.json" <<JSON
-{"token":"$TOKEN","decidePort":$PORT}
+{"token":"$TOKEN","decidePort":$PORT,"wakeHour":0,"bedtimeHour":23}
 JSON
 
 fail() { echo "e2e-agent FAIL: $1" >&2; exit 1; }
