@@ -11,6 +11,10 @@ xcuserdata/
 # Node (extension tooling)
 node_modules/
 
+# TypeScript output of scripts/build-extension.sh; never commit, browsers
+# load the compiled JavaScript from here.
+extension/build/
+
 # Local config and secrets; real config lives outside the repo
 .env
 config.local.json
