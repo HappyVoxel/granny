@@ -158,12 +158,13 @@ public protocol GrannyStrings: Sendable {
     var settingsAIGroup: String { get }
     var settingsOpenRouterKey: String { get }
     var settingsModel: String { get }
+    var settingsProvider: String { get }
+    var settingsModelSearch: String { get }
+    var settingsModelsUnavailable: String { get }
     var settingsAICaption: String { get }
     var settingsClassifierGroup: String { get }
     var settingsLayaURL: String { get }
     var settingsLayaKey: String { get }
-    var settingsLayaModel: String { get }
-    var settingsLayaConfidence: String { get }
     var settingsJevModel: String { get }
     var settingsJevURL: String { get }
     var settingsJevKey: String { get }
@@ -382,19 +383,22 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsAIGroup: String { "AI — page verdicts" }
     public var settingsOpenRouterKey: String { "OpenRouter key" }
     public var settingsModel: String { "Model" }
-    public var settingsAICaption: String {
-        "Fast classifier (Laya/Jev) is tried before the model; leave the model as the fallback and for chat later."
+    public var settingsProvider: String { "Provider" }
+    public var settingsModelSearch: String { "Search models" }
+    public var settingsModelsUnavailable: String {
+        "Couldn't load the model list - type the model id directly."
     }
-    public var settingsClassifierGroup: String { "Fast classifier (optional)" }
+    public var settingsAICaption: String {
+        "Fast classifier (Laya/Jev) is tried before the model; leave the model as the fallback and as the engine for the upcoming chat feature."
+    }
+    public var settingsClassifierGroup: String { "Fast classifier" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
-    public var settingsLayaModel: String { "Laya model" }
-    public var settingsLayaConfidence: String { "Laya min confidence" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya is your self-hosted classifier and runs first. Paste the console's endpoint as it is (or a base URL - granny appends /systemone); the optional model overrides the language-based checkpoint. A keyless host (laya.inference.zaitlabs.com) works with an empty key. If Laya is missing or down, granny falls back to Jev: automatically through OpenRouter when a key is set (default model above), or through TypeSafe's own API with the Jev URL/key."
+        "Laya is your self-hosted classifier and runs first. Paste the console's endpoint as it is (or a base URL - granny appends /systemone); granny picks the checkpoint by language. A keyless host (laya.inference.zaitlabs.com) works with an empty key. If Laya is missing or down, granny falls back to Jev: automatically through OpenRouter when a key is set (default model below), or through TypeSafe's own API with the Jev URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (optional, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -624,19 +628,22 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsAIGroup: String { "AI — phán trang" }
     public var settingsOpenRouterKey: String { "OpenRouter key" }
     public var settingsModel: String { "Model" }
-    public var settingsAICaption: String {
-        "Fast classifier (Laya/Jev) thử trước model; model là fallback và dành cho chat sau này."
+    public var settingsProvider: String { "Provider" }
+    public var settingsModelSearch: String { "Tìm model" }
+    public var settingsModelsUnavailable: String {
+        "Không tải được danh sách model - gõ trực tiếp model id."
     }
-    public var settingsClassifierGroup: String { "Fast classifier (tuỳ chọn)" }
+    public var settingsAICaption: String {
+        "Fast classifier (Laya/Jev) thử trước model; model là fallback và là engine cho tính năng chat sắp tới."
+    }
+    public var settingsClassifierGroup: String { "Fast classifier" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
-    public var settingsLayaModel: String { "Laya model" }
-    public var settingsLayaConfidence: String { "Ngưỡng tin cậy Laya" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya là classifier tự host của bạn, chạy trước. Dán endpoint từ console đúng như nó có (hoặc URL gốc - ngoại tự thêm /systemone); model để trống thì ngoại chọn checkpoint theo ngôn ngữ. Host không cần key (laya.inference.zaitlabs.com) để trống key vẫn chạy. Nếu Laya thiếu hoặc down, ngoại rơi xuống Jev: tự động qua OpenRouter khi có key (model mặc định ở trên), hoặc qua API riêng của TypeSafe bằng Jev URL/key."
+        "Laya là classifier tự host của bạn, chạy trước. Dán endpoint từ console đúng như nó có (hoặc URL gốc - ngoại tự thêm /systemone); ngoại tự chọn checkpoint theo ngôn ngữ. Host không cần key (laya.inference.zaitlabs.com) để trống key vẫn chạy. Nếu Laya thiếu hoặc down, ngoại rơi xuống Jev: tự động qua OpenRouter khi có key (model mặc định bên dưới), hoặc qua API riêng của TypeSafe bằng Jev URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (tuỳ chọn, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -866,19 +873,22 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsAIGroup: String { "Tekoäly — sivujen arviot" }
     public var settingsOpenRouterKey: String { "OpenRouter-avain" }
     public var settingsModel: String { "Malli" }
-    public var settingsAICaption: String {
-        "Nopea luokittelija (Laya/Jev) kokeillaan ennen mallia; malli jää varavaihtoehdoksi ja chattiin myöhemmin."
+    public var settingsProvider: String { "Palveluntarjoaja" }
+    public var settingsModelSearch: String { "Hae malleja" }
+    public var settingsModelsUnavailable: String {
+        "Mallilistaa ei voitu ladata - kirjoita mallin id suoraan."
     }
-    public var settingsClassifierGroup: String { "Nopea luokittelija (valinnainen)" }
+    public var settingsAICaption: String {
+        "Nopea luokittelija (Laya/Jev) kokeillaan ennen mallia; malli jää varavaihtoehdoksi ja tulevan chat-ominaisuuden moottoriksi."
+    }
+    public var settingsClassifierGroup: String { "Nopea luokittelija" }
     public var settingsLayaURL: String { "Laya-URL" }
     public var settingsLayaKey: String { "Laya-avain" }
-    public var settingsLayaModel: String { "Laya-malli" }
-    public var settingsLayaConfidence: String { "Layan vähimmäisluottamus" }
     public var settingsJevModel: String { "Jev-malli" }
     public var settingsJevURL: String { "Jev-URL" }
     public var settingsJevKey: String { "Jev-avain" }
     public var settingsClassifierCaption: String {
-        "Laya on itse ylläpidetty luokittelija ja sitä kokeillaan ensin. Liitä konsolin endpoint sellaisenaan (tai perus-URL - mummo lisää /systemone); tyhjä malli valitsee checkpointin kielen mukaan. Avaimeton palvelin (laya.inference.zaitlabs.com) toimii tyhjällä avaimella. Jos Laya puuttuu tai on alhaalla, mummo siirtyy Jeviin: automaattisesti OpenRouterin kautta, kun avain on asetettu (oletusmalli yllä), tai TypeSafen omaan APIin Jev-URL:n ja -avaimen kautta."
+        "Laya on itse ylläpidetty luokittelija ja sitä kokeillaan ensin. Liitä konsolin endpoint sellaisenaan (tai perus-URL - mummo lisää /systemone); mummo valitsee checkpointin kielen mukaan. Avaimeton palvelin (laya.inference.zaitlabs.com) toimii tyhjällä avaimella. Jos Laya puuttuu tai on alhaalla, mummo siirtyy Jeviin: automaattisesti OpenRouterin kautta, kun avain on asetettu (oletusmalli alla), tai TypeSafen omaan APIin Jev-URL:n ja -avaimen kautta."
     }
     public var settingsTracingGroup: String { "Jäljitys (valinnainen, Langfuse)" }
     public var settingsHost: String { "Palvelin" }

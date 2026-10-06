@@ -15,6 +15,9 @@ public struct LangfuseConfig: Codable, Sendable {
 public struct GrannyConfig: Codable, Sendable {
     public var openRouterKey: String?
     public var model: String
+    /// Which provider serves the model tier; raw values live in
+    /// `ModelProvider`, nil means the default.
+    public var provider: String?
     public var wakeHour: Int
     public var bedtimeHour: Int
     public var language: String
@@ -55,6 +58,7 @@ public struct GrannyConfig: Codable, Sendable {
     public init(
         openRouterKey: String? = nil,
         model: String = "deepseek/deepseek-v4.1-flash",
+        provider: String? = nil,
         wakeHour: Int = 7,
         bedtimeHour: Int = 23,
         language: String = "en",
@@ -81,6 +85,7 @@ public struct GrannyConfig: Codable, Sendable {
     ) {
         self.openRouterKey = openRouterKey
         self.model = model
+        self.provider = provider
         self.wakeHour = wakeHour
         self.bedtimeHour = bedtimeHour
         self.language = language
@@ -206,6 +211,7 @@ public struct GrannyConfig: Codable, Sendable {
         }
         openRouterKey = optional(.openRouterKey)
         model = value(.model, d.model)
+        provider = optional(.provider)
         wakeHour = value(.wakeHour, d.wakeHour)
         bedtimeHour = value(.bedtimeHour, d.bedtimeHour)
         language = value(.language, d.language)

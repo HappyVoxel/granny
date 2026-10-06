@@ -13,10 +13,11 @@ struct SettingsView: View {
 
     @State private var openRouterKey: String
     @State private var model: String
+    @State private var provider: String
+    @State private var models: [ModelInfo] = []
+    @State private var modelsFailed = false
     @State private var layaURL: String
     @State private var layaKey: String
-    @State private var layaModel: String
-    @State private var layaMinConfidence: String
     @State private var jevURL: String
     @State private var jevKey: String
     @State private var jevModel: String
@@ -43,10 +44,9 @@ struct SettingsView: View {
         self.onCancel = onCancel
         _openRouterKey = State(initialValue: config.openRouterKey ?? "")
         _model = State(initialValue: config.model)
+        _provider = State(initialValue: ModelProvider(configValue: config.provider).rawValue)
         _layaURL = State(initialValue: config.layaURL ?? "")
         _layaKey = State(initialValue: config.layaKey ?? "")
-        _layaModel = State(initialValue: config.layaModel ?? "")
-        _layaMinConfidence = State(initialValue: config.layaMinConfidence.map { String($0) } ?? "")
         _jevURL = State(initialValue: config.jevURL ?? "")
         _jevKey = State(initialValue: config.jevKey ?? "")
         _jevModel = State(initialValue: config.jevModel)
@@ -69,22 +69,12 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     header
 
-                    card(GrannyLines.settingsAIGroup, caption: GrannyLines.settingsAICaption) {
-                        secretField(
-                            GrannyLines.settingsOpenRouterKey,
-                            $openRouterKey,
-                            validate: { key in await KeyCheck.openRouter(key: key) })
-                        labeledField(GrannyLines.settingsModel, $model)
-                    }
-
                     card(GrannyLines.settingsClassifierGroup, caption: GrannyLines.settingsClassifierCaption) {
                         labeledField(GrannyLines.settingsLayaURL, $layaURL)
                         secretField(
                             GrannyLines.settingsLayaKey,
                             $layaKey,
                             validate: { key in await KeyCheck.systemOne(baseURL: layaURL, key: key) })
-                        labeledField(GrannyLines.settingsLayaModel, $layaModel)
-                        labeledField(GrannyLines.settingsLayaConfidence, $layaMinConfidence)
                         labeledField(GrannyLines.settingsJevModel, $jevModel)
                         labeledField(GrannyLines.settingsJevURL, $jevURL)
                         secretField(
@@ -93,6 +83,15 @@ struct SettingsView: View {
                             validate: jevURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                 ? nil
                                 : { key in await KeyCheck.systemOne(baseURL: jevURL, key: key) })
+                    }
+
+                    card(GrannyLines.settingsAIGroup, caption: GrannyLines.settingsAICaption) {
+                        providerPicker
+                        secretField(
+                            GrannyLines.settingsOpenRouterKey,
+                            $openRouterKey,
+                            validate: { key in await KeyCheck.openRouter(key: key) })
+                        modelBrowser
                     }
 
                     card(GrannyLines.settingsTracingGroup) {
@@ -218,6 +217,13 @@ struct SettingsView: View {
 
     private var captionStyle: Color { GrannyTheme.text.opacity(0.55) }
 
+    /// Shared label column width, so every row in a card lines up.
+    private static let labelWidth: CGFloat = 130
+    /// Catalogue rows visible at once; the search narrows the list, the
+    /// scroll reaches the rest.
+    private static let modelListHeight: CGFloat = 180
+    private static let maxModelRows = 60
+
     private var header: some View {
         HStack(spacing: 12) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -303,10 +309,97 @@ struct SettingsView: View {
     private func labeledField(_ label: String, _ text: Binding<String>) -> some View {
         HStack(spacing: 8) {
             Text(label)
-                .frame(width: 130, alignment: .trailing)
+                .frame(width: Self.labelWidth, alignment: .trailing)
                 .foregroundStyle(captionStyle)
             TextField("", text: text).textFieldStyle(.roundedBorder)
         }
+    }
+
+    /// Provider first: it decides where the key and the model list come
+    /// from. One entry today (OpenRouter); the picker is the seam for more.
+    private var providerPicker: some View {
+        HStack(spacing: 8) {
+            Text(GrannyLines.settingsProvider)
+                .frame(width: Self.labelWidth, alignment: .trailing)
+                .foregroundStyle(captionStyle)
+            Picker("", selection: $provider) {
+                ForEach(ModelProvider.allCases, id: \.rawValue) { kind in
+                    Text(kind.displayName).tag(kind.rawValue)
+                }
+            }
+            .labelsHidden()
+            .pointingHandOnHover()
+            Spacer()
+        }
+    }
+
+    /// The model field and the catalogue in one control: the text is the
+    /// model id, the list below filters as it is typed, and a row click
+    /// fills it in. A hand-typed id stays valid - a failed fetch (offline,
+    /// or a model the provider has not listed) never blocks Save.
+    private var modelBrowser: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(GrannyLines.settingsModel)
+                .frame(width: Self.labelWidth, alignment: .trailing)
+                .foregroundStyle(captionStyle)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundStyle(captionStyle)
+                    TextField(GrannyLines.settingsModelSearch, text: $model)
+                        .textFieldStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 6).fill(GrannyTheme.background))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(GrannyTheme.hairline))
+
+                if modelsFailed {
+                    Text(GrannyLines.settingsModelsUnavailable)
+                        .font(.caption2)
+                        .foregroundStyle(captionStyle)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(visibleModels) { info in
+                                modelRow(info)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: Self.modelListHeight)
+                }
+            }
+        }
+        .task(id: provider) { await loadModels() }
+    }
+
+    private var visibleModels: [ModelInfo] {
+        Array(ModelCatalog.filter(models, query: model).prefix(Self.maxModelRows))
+    }
+
+    private func modelRow(_ info: ModelInfo) -> some View {
+        Button {
+            model = info.id
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(info.name).font(.system(size: 12))
+                Text(info.id).font(.caption2).foregroundStyle(captionStyle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+            .background(info.id == model ? GrannyTheme.gold.opacity(0.16) : .clear)
+        }
+        .buttonStyle(.plain)
+        .pointingHandOnHover()
+    }
+
+    private func loadModels() async {
+        let fetched = await ModelCatalog.fetch(ModelProvider(configValue: provider))
+        models = fetched
+        modelsFailed = fetched.isEmpty
     }
 
     @ViewBuilder
@@ -384,17 +477,16 @@ struct SettingsView: View {
 
         let key = openRouterKey.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.openRouterKey = key.isEmpty ? nil : key
+        updated.provider = provider
         let modelName = model.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.model = modelName.isEmpty ? GrannyConfig.default.model : modelName
 
         let laya = layaURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let layaSecret = layaKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let layaCheckpoint = layaModel.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.layaURL = laya.isEmpty ? nil : laya
         updated.layaKey = layaSecret.isEmpty ? nil : layaSecret
-        updated.layaModel = layaCheckpoint.isEmpty ? nil : layaCheckpoint
-        let layaGate = Double(layaMinConfidence.trimmingCharacters(in: .whitespacesAndNewlines))
-        updated.layaMinConfidence = layaGate.map { min(max($0, 0), 1) }
+        // layaModel / layaMinConfidence stay out of the UI: advanced knobs
+        // left to config.json, carried over by `var updated = config`.
 
         let jev = jevURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let jevSecret = jevKey.trimmingCharacters(in: .whitespacesAndNewlines)

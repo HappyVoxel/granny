@@ -149,12 +149,13 @@ public enum GrannyLines {
     public static var settingsAIGroup: String { strings.settingsAIGroup }
     public static var settingsOpenRouterKey: String { strings.settingsOpenRouterKey }
     public static var settingsModel: String { strings.settingsModel }
+    public static var settingsProvider: String { strings.settingsProvider }
+    public static var settingsModelSearch: String { strings.settingsModelSearch }
+    public static var settingsModelsUnavailable: String { strings.settingsModelsUnavailable }
     public static var settingsAICaption: String { strings.settingsAICaption }
     public static var settingsClassifierGroup: String { strings.settingsClassifierGroup }
     public static var settingsLayaURL: String { strings.settingsLayaURL }
     public static var settingsLayaKey: String { strings.settingsLayaKey }
-    public static var settingsLayaModel: String { strings.settingsLayaModel }
-    public static var settingsLayaConfidence: String { strings.settingsLayaConfidence }
     public static var settingsJevModel: String { strings.settingsJevModel }
     public static var settingsJevURL: String { strings.settingsJevURL }
     public static var settingsJevKey: String { strings.settingsJevKey }
