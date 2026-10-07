@@ -273,7 +273,10 @@ public struct OpenRouterClient: Sendable {
         Never allow on a guess: if you cannot tell what the page is, or your reason \
         would say "likely", "maybe" or "unclear", answer warn. When unsure between \
         warn and block, remember: long-form video is warn; shorts, games, streams and \
-        feeds are block. message: exactly one short \(spoken) \
+        feeds are block. When mode is night, it is past bedtime: the message sends \
+        the grandchild to bed (it is late, tomorrow is another day) instead of \
+        debating the work - the verdict stays what the content deserves. \
+        message: exactly one short \(spoken) \
         sentence in granny's voice, warm and familiar like a grandmother talking to her \
         grandchild - \(addressStyle(language: language)). Never quote the task list or \
         repeat technical project jargon; talk about "your work" in plain, everyday words. \

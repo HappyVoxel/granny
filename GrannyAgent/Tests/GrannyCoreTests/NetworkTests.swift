@@ -265,6 +265,35 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(decision.source, "rules")
     }
 
+    /// Past bedtime granny's own line replaces the model's; the verdict and
+    /// the reason stay the content's.
+    func testEngineSpeaksBedtimeAtNight() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"warn","message":"Carry on only if it really helps.","reason":"entertainment"}"#))
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+
+        let night = await engine.decide(url: "https://example.com/feed", title: "Feed", tasks: [], phase: .night)
+        XCTAssertEqual(night.action, .warn)
+        XCTAssertEqual(night.message, GrannyLines.sleepNag)
+        XCTAssertEqual(night.reason, "entertainment", "the reason still says what the page is")
+
+        let day = await engine.decide(url: "https://example.com/feed2", title: "Feed", tasks: [], phase: .working)
+        XCTAssertEqual(day.message, "Carry on only if it really helps.")
+    }
+
+    /// Rules-level blocks speak bedtime too - the voice is the phase's, not
+    /// the tier's.
+    func testRulesBlockSpeaksBedtimeAtNight() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(url: "https://www.facebook.com/feed", title: nil, tasks: [], phase: .night)
+        XCTAssertEqual(decision.action, .block)
+        XCTAssertEqual(decision.message, GrannyLines.sleepNag)
+    }
+
     func testEngineFallsThroughLayaJevToModelAndCaches() async {
         MockURLProtocol.handler = { [self] request in
             let url = request.url!.absoluteString
