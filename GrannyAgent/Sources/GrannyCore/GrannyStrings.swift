@@ -404,7 +404,7 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya runs first - paste the console endpoint, or a base URL and granny appends /systemone; a keyless host takes an empty key. Without Laya, granny falls back to Jev through OpenRouter, or through its own URL/key."
+        "Laya runs first - paste the console endpoint, or a base URL and granny appends /systemone (keep the path prefix, e.g. /v1); a keyless host takes an empty key. Without Laya, granny falls back to Jev through OpenRouter, or through its own URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (optional, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -657,7 +657,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya chạy trước - dán endpoint từ console, hoặc URL gốc (ngoại tự thêm /systemone); host không cần key để trống vẫn chạy. Không có Laya thì rơi xuống Jev qua OpenRouter, hoặc URL/key riêng."
+        "Laya chạy trước - dán endpoint từ console, hoặc URL gốc (giữ nguyên path, ví dụ /v1) và ngoại tự thêm /systemone; host không cần key để trống vẫn chạy. Không có Laya thì rơi xuống Jev qua OpenRouter, hoặc URL/key riêng."
     }
     public var settingsTracingGroup: String { "Tracing (tuỳ chọn, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -910,7 +910,7 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsJevURL: String { "Jev-URL" }
     public var settingsJevKey: String { "Jev-avain" }
     public var settingsClassifierCaption: String {
-        "Laya kokeillaan ensin - liitä konsolin endpoint tai perus-URL, niin mummo lisää /systemone; avaimeton palvelin toimii tyhjällä avaimella. Ilman Layaa mummo siirtyy Jeviin OpenRouterin kautta tai omalla URL:lla ja avaimella."
+        "Laya kokeillaan ensin - liitä konsolin endpoint tai perus-URL (säilytä polku, esim. /v1), niin mummo lisää /systemone; avaimeton palvelin toimii tyhjällä avaimella. Ilman Layaa mummo siirtyy Jeviin OpenRouterin kautta tai omalla URL:lla ja avaimella."
     }
     public var settingsTracingGroup: String { "Jäljitys (valinnainen, Langfuse)" }
     public var settingsHost: String { "Palvelin" }
