@@ -18,6 +18,9 @@ public struct GrannyConfig: Codable, Sendable {
     /// Which provider serves the model tier; raw values live in
     /// `ModelProvider`, nil means the default.
     public var provider: String?
+    /// Model for the streak encouragement line; nil keeps the free router
+    /// (`OpenRouterClient.defaultStreakModel`). A tiny task: free is fine.
+    public var streakModel: String?
     public var wakeHour: Int
     public var bedtimeHour: Int
     public var language: String
@@ -59,6 +62,7 @@ public struct GrannyConfig: Codable, Sendable {
         openRouterKey: String? = nil,
         model: String = "deepseek/deepseek-v4.1-flash",
         provider: String? = nil,
+        streakModel: String? = nil,
         wakeHour: Int = 7,
         bedtimeHour: Int = 23,
         language: String = "en",
@@ -86,6 +90,7 @@ public struct GrannyConfig: Codable, Sendable {
         self.openRouterKey = openRouterKey
         self.model = model
         self.provider = provider
+        self.streakModel = streakModel
         self.wakeHour = wakeHour
         self.bedtimeHour = bedtimeHour
         self.language = language
@@ -212,6 +217,7 @@ public struct GrannyConfig: Codable, Sendable {
         openRouterKey = optional(.openRouterKey)
         model = value(.model, d.model)
         provider = optional(.provider)
+        streakModel = optional(.streakModel)
         wakeHour = value(.wakeHour, d.wakeHour)
         bedtimeHour = value(.bedtimeHour, d.bedtimeHour)
         language = value(.language, d.language)

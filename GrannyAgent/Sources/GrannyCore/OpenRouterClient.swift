@@ -63,6 +63,91 @@ public struct OpenRouterClient: Sendable {
     /// The intake request's own budget, independent of the verdict timeout.
     static let intakeTimeout: TimeInterval = 30
 
+    /// A cheap model for the streak line: the free router picks whatever
+    /// free endpoint is up, so the line never depends on one provider.
+    /// Overridable with `streakModel` in the config.
+    public static let defaultStreakModel = "openrouter/free"
+
+    /// One short encouraging line from granny, in the configured language.
+    /// Plain text, tiny budget, no structured outputs and no reasoning: the
+    /// caller keeps its own template on any failure. The deadline is short
+    /// on purpose - a notification must not wait on a slow free endpoint.
+    public func streakLine(kept: Bool, count: Int, model: String) async -> String? {
+        guard let body = Self.streakRequestBody(
+            model: model, kept: kept, count: count, language: settings.language)
+        else { return nil }
+        let response = await perform(body, timeout: Self.streakTimeout)
+        guard response.status == 200, let data = response.data else { return nil }
+        return Self.parseTextResponse(data)
+    }
+
+    /// The streak line's own deadline; the intake budget (30s) would hold a
+    /// notification hostage.
+    static let streakTimeout: TimeInterval = 6
+
+    static func streakRequestBody(model: String, kept: Bool, count: Int, language: String) -> Data? {
+        let spoken = outputLanguageName(language: language)
+        let system = """
+        \(persona(language: language)) Your grandchild \(kept ? "has a streak of \(count) days going" : "just lost a \(count)-day streak"). \
+        Write ONE short sentence in \(spoken), in her voice, like a real grandmother texting - same vibe as these (never copy one of them):
+        \(streakExamples(language: language))
+        Proud, funny, a bit teasing; a little English slang is fine, but no emoticons, no emoji. Do not sound like an AI: no balanced two-part sentences, no explaining, no lists, no quotation marks, do not always repeat the number. Under 20 words. \(addressStyle(language: language)).
+        """
+        let body: [String: Any] = [
+            "model": model,
+            "temperature": 0.9,
+            "max_tokens": 80,
+            "reasoning": ["enabled": false],
+            "messages": [
+                ["role": "system", "content": system],
+                ["role": "user", "content": "\(kept ? "kept" : "lost") \(count); angle: \(streakAngles.randomElement() ?? "proud")"],
+            ],
+        ]
+        return JSON.data(from: body)
+    }
+
+    /// A per-line angle, so two streaks in a row do not read like the same
+    /// card with the number swapped.
+    static let streakAngles = [
+        "bragging to the neighbours", "teasing", "a small threat about tomorrow",
+        "a food reward at the finish line", "drill sergeant", "quiet pride",
+    ]
+
+    /// The register is shown, not described: describing it produced
+    /// greeting-card lines in every language.
+    static func streakExamples(language: String) -> String {
+        switch GrannyLanguage(code: language) ?? .en {
+        case .vi:
+            return """
+            - Bà tự hào khi có 1 chiến binh kỉ luật thép như cháu, 3 ngày rồi, keep it up
+            - Ba ngày sạch sẽ, bà nể cháu thật đấy. Đừng có xịt ngày thứ tư nha
+            - Cháu bà luyện kiểu này thì hàng xóm phải học tập, làm tiếp đi con
+            """
+        case .en:
+            return """
+            - Three days, dear. Your granny has a drill sergeant for a grandchild, apparently.
+            - Look at you - three clean days. The neighbours' kids are getting shown up.
+            - Not bad, dear. Do it again tomorrow and I'll stop calling you lazy.
+            """
+        case .fi:
+            return """
+            - Kolme päivää, kulta. Mummo alkaa kohta ylpeillä sinusta naapureille.
+            - Kunnon kurinalaisuutta, jatka samaan malliin - huomenna ei sitten lipsuta.
+            - Katso nyt, kolme puhdasta päivää. Naapurit jo kadehtivat.
+            """
+        }
+    }
+
+    static func parseTextResponse(_ data: Data) -> String? {
+        guard let root = JSON.dict(from: data),
+              let choices = root["choices"] as? [[String: Any]],
+              let message = choices.first?["message"] as? [String: Any],
+              let content = message["content"] as? String
+        else { return nil }
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     /// Structured outputs are a request, not a guarantee: a provider that
     /// cannot honour `response_format` answers 400 ("model features
     /// structured outputs not support"). Only that 400 earns a retry with
@@ -273,7 +358,10 @@ public struct OpenRouterClient: Sendable {
         Never allow on a guess: if you cannot tell what the page is, or your reason \
         would say "likely", "maybe" or "unclear", answer warn. When unsure between \
         warn and block, remember: long-form video is warn; shorts, games, streams and \
-        feeds are block. message: exactly one short \(spoken) \
+        feeds are block. When mode is night, it is past bedtime: the message sends \
+        the grandchild to bed (it is late, tomorrow is another day) instead of \
+        debating the work - the verdict stays what the content deserves. \
+        message: exactly one short \(spoken) \
         sentence in granny's voice, warm and familiar like a grandmother talking to her \
         grandchild - \(addressStyle(language: language)). Never quote the task list or \
         repeat technical project jargon; talk about "your work" in plain, everyday words. \

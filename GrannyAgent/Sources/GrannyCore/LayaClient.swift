@@ -3,8 +3,9 @@ import Foundation
 /// The fast-classifier tier (self-hosted Laya, or Jev when Laya is absent):
 /// Jev-compatible System One wire format. Keeps browsing URLs on local
 /// infrastructure and answers with a calibrated probability the engine gates
-/// on.
-public struct LayaClient: Sendable {
+/// on. An actor because it remembers which endpoint answered: a bare base
+/// URL is probed once, then reused.
+public actor LayaClient {
     let baseURL: String
     let apiKey: String
     let timeout: TimeInterval
@@ -17,6 +18,8 @@ public struct LayaClient: Sendable {
     let session: URLSession
     /// Verdict label: "laya" or "jev" (same System One wire).
     let source: String
+    /// The candidate that answered; nil until the first request finds it.
+    private var resolvedEndpoint: URL?
 
     public init(
         baseURL: String,
@@ -38,6 +41,9 @@ public struct LayaClient: Sendable {
         self.session = session
     }
 
+    /// Where a new Laya key comes from; the Settings card links here.
+    public static let consoleURL = URL(string: "https://console.opscom.io")!
+
     /// The console hands out full endpoints (`https://host/v1/systemone`),
     /// while `https://host/v1` style bases expect granny to append the path.
     /// Both are used as the user typed them, minus the appended suffix when
@@ -54,6 +60,25 @@ public struct LayaClient: Sendable {
             components.path = "/" + path + (path.isEmpty ? "" : "/") + "systemone"
         }
         return components.url
+    }
+
+    /// What to try, in order. An explicit endpoint is trusted as typed; a
+    /// bare base gets the console shapes as fallbacks (`/v1/systemone`,
+    /// `/api/v1/systemone`) - probed only after the first candidate answers
+    /// 404, so a correct paste never pays for the search. A base with a path
+    /// (`…/v1`) is already explicit: its candidates are exactly what it says.
+    static func endpointCandidates(from configured: String) -> [URL] {
+        guard let primary = endpointURL(from: configured) else { return [] }
+        if configured.lowercased().contains("systemone") { return [primary] }
+        guard var components = URLComponents(url: primary, resolvingAgainstBaseURL: false),
+              components.path == "/systemone"
+        else { return [primary] }
+        var candidates = [primary]
+        for path in ["/v1/systemone", "/api/v1/systemone"] {
+            components.path = path
+            if let url = components.url { candidates.append(url) }
+        }
+        return candidates
     }
 
     public func decide(url: String, title: String?, tasks: [TaskItem], phase: Phase) async -> Decision? {
@@ -73,9 +98,29 @@ public struct LayaClient: Sendable {
         guard let body = Self.decisionRequestBody(
             language: language, context: context, tasks: tasks, phase: phase, model: model)
         else { return (nil, "bad request body") }
-        // The URL comes from the user's config: a malformed one must fall
-        // through to the next tier, not crash the agent.
-        guard let endpoint = Self.endpointURL(from: baseURL) else { return (nil, "bad endpoint") }
+        // A remembered endpoint skips the search entirely.
+        if let resolvedEndpoint {
+            return await send(body, to: resolvedEndpoint)
+        }
+        var last: (decision: Decision?, miss: String?) = (nil, "bad endpoint")
+        for endpoint in Self.endpointCandidates(from: baseURL) {
+            last = await send(body, to: endpoint)
+            // A transport failure means the host is down: another path on it
+            // would fail the same way.
+            if last.miss?.hasPrefix("transport:") == true { return last }
+            if last.miss != Self.notFoundMiss {
+                resolvedEndpoint = endpoint
+                return last
+            }
+        }
+        return last
+    }
+
+    /// The 404 that says "this path does not exist", the only miss worth
+    /// trying another candidate for.
+    static let notFoundMiss = "http 404"
+
+    private func send(_ body: Data, to endpoint: URL) async -> (decision: Decision?, miss: String?) {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.httpBody = body

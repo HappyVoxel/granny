@@ -160,6 +160,39 @@ final class NetworkTests: XCTestCase {
         XCTAssertNil(decision)
     }
 
+    /// A bare host resolves through the console's /v1 shape: 404 on the
+    /// typed path, then the answer - and the found endpoint is remembered.
+    func testLayaBareBaseFallsBackToV1AndRemembers() async {
+        MockURLProtocol.handler = { [self] request in
+            let path = request.url?.path ?? ""
+            if path == "/v1/systemone" {
+                return response(request.url!, status: 200, json: [
+                    "answers": ["action": ["type": "choice", "choice": "warn", "answer_confidence": 0.9]],
+                ])
+            }
+            return response(request.url!, status: 404, json: ["error": "not here"])
+        }
+        let client = LayaClient(baseURL: "https://console.opscom.io", apiKey: "k", session: mockSession())
+
+        let first = await client.decide(url: "https://linkedin.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertEqual(first?.action, .warn)
+        XCTAssertEqual(MockURLProtocol.requestCount, 2, "one 404, then the /v1 answer")
+
+        let second = await client.decide(url: "https://x.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertEqual(second?.action, .warn)
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "the resolved endpoint is remembered")
+    }
+
+    func testLayaBareBase404EverywhereFails() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 404, json: ["error": "not here"])
+        }
+        let client = LayaClient(baseURL: "https://console.opscom.io", apiKey: "k", session: mockSession())
+        let decision = await client.decide(url: "https://linkedin.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertNil(decision)
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "all three candidates were tried")
+    }
+
     /// The free Zaitlabs deployment takes no key; the client must not send
     /// an Authorization header on keyless hosts.
     func testLayaKeylessHostOmitsAuthorization() async {
@@ -263,6 +296,71 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(decision.action, .allow)
         XCTAssertEqual(decision.reason, "focus audio: compatible with work")
         XCTAssertEqual(decision.source, "rules")
+    }
+
+    /// Past bedtime granny's own line replaces the model's; the verdict and
+    /// the reason stay the content's.
+    func testEngineSpeaksBedtimeAtNight() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: openRouterOK(
+                #"{"action":"warn","message":"Carry on only if it really helps.","reason":"entertainment"}"#))
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+
+        let night = await engine.decide(url: "https://example.com/feed", title: "Feed", tasks: [], phase: .night)
+        XCTAssertEqual(night.action, .warn)
+        XCTAssertEqual(night.message, GrannyLines.sleepNag)
+        XCTAssertEqual(night.reason, "entertainment", "the reason still says what the page is")
+
+        let day = await engine.decide(url: "https://example.com/feed2", title: "Feed", tasks: [], phase: .working)
+        XCTAssertEqual(day.message, "Carry on only if it really helps.")
+    }
+
+    /// Rules-level blocks speak bedtime too - the voice is the phase's, not
+    /// the tier's.
+    func testRulesBlockSpeaksBedtimeAtNight() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(url: "https://www.facebook.com/feed", title: nil, tasks: [], phase: .night)
+        XCTAssertEqual(decision.action, .block)
+        XCTAssertEqual(decision.message, GrannyLines.sleepNag)
+    }
+
+    /// The forced-context warning (unreadable YouTube after the retry) is a
+    /// warn from the context tier, so bedtime applies there too.
+    func testForcedContextWarningSpeaksBedtimeAtNight() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let context = PageContext(url: "https://www.youtube.com/watch?v=x", title: nil)
+
+        let night = await engine.decide(context: context, tasks: [], phase: .night, force: true)
+        XCTAssertEqual(night.action, .warn)
+        XCTAssertEqual(night.message, GrannyLines.sleepNag)
+
+        let day = await engine.decide(context: context, tasks: [], phase: .working, force: true)
+        XCTAssertEqual(day.action, .warn)
+        XCTAssertNotEqual(day.message, GrannyLines.sleepNag)
+    }
+
+    /// The streak line rides the free router and parses as plain text.
+    func testEngineStreakLineUsesTheFreeRouter() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: [
+                "choices": [["message": ["role": "assistant", "content": "Ngoan lắm, mai cố thêm nhé."]]],
+            ])
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let line = await engine.streakLine(kept: true, count: 3)
+        XCTAssertEqual(line, "Ngoan lắm, mai cố thêm nhé.")
+    }
+
+    func testEngineStreakLineFailsQuietly() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let line = await engine.streakLine(kept: true, count: 3)
+        XCTAssertNil(line, "no key: the caller keeps its template")
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "and no request leaves the machine")
     }
 
     func testEngineFallsThroughLayaJevToModelAndCaches() async {

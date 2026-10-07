@@ -75,6 +75,14 @@ struct SettingsView: View {
                             GrannyLines.settingsLayaKey,
                             $layaKey,
                             validate: { key in await KeyCheck.systemOne(baseURL: layaURL, key: key) })
+                        HStack {
+                            Spacer()
+                            Button(GrannyLines.settingsLayaGetKey) {
+                                NSWorkspace.shared.open(LayaClient.consoleURL)
+                            }
+                            .buttonStyle(GrannySecondaryButtonStyle())
+                            .pointingHandOnHover()
+                        }
                         labeledField(GrannyLines.settingsJevModel, $jevModel)
                         labeledField(GrannyLines.settingsJevURL, $jevURL)
                         secretField(

@@ -81,7 +81,7 @@ public actor DecisionEngine {
         if let decision = rules.evaluate(urlString: context.url, tasks: tasks, phase: phase) {
             // Focus audio passes whatever tier warned: a task's off-surface
             // URL must not nag while a study playlist plays.
-            let final = Self.focusAudioRelief(decision, context: context)
+            let final = Self.nightVoice(Self.focusAudioRelief(decision, context: context), phase: phase)
             // Allow verdicts are the common case and stay untraced; block and
             // warn are the interesting rules outcomes (e.g. a Facebook tab).
             if final.action != .allow {
@@ -125,7 +125,7 @@ public actor DecisionEngine {
                 .warn,
                 reason: "context host without a readable title",
                 source: "context")
-            return enrich(unreadable, context: context)
+            return Self.nightVoice(enrich(unreadable, context: context), phase: phase)
         }
 
         let started = Date()
@@ -195,7 +195,7 @@ public actor DecisionEngine {
         // lofi, study playlists) is music to work by, not entertainment: a
         // warn from any tier becomes an allow. A block stays a block - a
         // short or a game is not audio.
-        final = Self.focusAudioRelief(final, context: context)
+        final = Self.nightVoice(Self.focusAudioRelief(final, context: context), phase: phase)
 
         // A verdict judged on a placeholder title ("YouTube") or none at all
         // must not be cached: it would stick the URL to that verdict for the
@@ -242,6 +242,20 @@ public actor DecisionEngine {
         return Decision(
             .allow,
             reason: "focus audio: compatible with work",
+            source: decision.source)
+    }
+
+    /// Past bedtime the line is granny's own: the model debates the page,
+    /// she sends the grandchild to bed. The verdict still follows the
+    /// content - only the voice changes.
+    static func nightVoice(_ decision: Decision, phase: Phase) -> Decision {
+        guard phase == .night,
+              decision.action == .warn || decision.action == .block
+        else { return decision }
+        return Decision(
+            decision.action,
+            message: GrannyLines.sleepNag,
+            reason: decision.reason,
             source: decision.source)
     }
 
@@ -303,6 +317,14 @@ public actor DecisionEngine {
                 endedAt: Date()))
         }
         return intake
+    }
+
+    /// A short streak line from the model tier, in the configured language;
+    /// nil keeps the caller's template.
+    public func streakLine(kept: Bool, count: Int) async -> String? {
+        guard let openRouter else { return nil }
+        let model = config.streakModel ?? OpenRouterClient.defaultStreakModel
+        return await openRouter.streakLine(kept: kept, count: count, model: model)
     }
 
     public func clearCache() {

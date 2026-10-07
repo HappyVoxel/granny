@@ -36,6 +36,33 @@ final class ClientTests: XCTestCase {
         XCTAssertTrue(user.contains("working"))
     }
 
+    func testStreakBodyFollowsLanguageAndStaysTiny() throws {
+        let data = try XCTUnwrap(OpenRouterClient.streakRequestBody(
+            model: OpenRouterClient.defaultStreakModel, kept: true, count: 3, language: "vi"))
+        let body = try XCTUnwrap(JSON.dict(from: data))
+        XCTAssertEqual(body["model"] as? String, "openrouter/free")
+        XCTAssertEqual((body["reasoning"] as? [String: Any])?["enabled"] as? Bool, false,
+                       "a streak line needs no chain of thought")
+        XCTAssertEqual(body["max_tokens"] as? Int, 80, "a one-liner must not pay for an essay")
+        XCTAssertEqual(OpenRouterClient.streakTimeout, 6,
+                       "the notification keeps its own short deadline, not the intake budget")
+        let messages = body["messages"] as? [[String: Any]]
+        let system = messages?.first?["content"] as? String
+        XCTAssertTrue(system?.contains("Vietnamese") ?? false, "the line follows the set language")
+        XCTAssertTrue(system?.contains("Ngoại") ?? false, "the persona is the language's")
+        XCTAssertTrue(system?.contains("funny") ?? false, "proud and funny, not a greeting-card line")
+    }
+
+    func testParseTextResponse() throws {
+        let payload: [String: Any] = [
+            "choices": [["message": ["role": "assistant", "content": "  Ngoan lắm, mai cố thêm nhé.  "]]],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        XCTAssertEqual(OpenRouterClient.parseTextResponse(data), "Ngoan lắm, mai cố thêm nhé.")
+        XCTAssertNil(OpenRouterClient.parseTextResponse(Data("{}".utf8)))
+        XCTAssertNil(OpenRouterClient.parseTextResponse(Data(#"{"choices":[{"message":{"content":"  "}}]}"#.utf8)))
+    }
+
     func testModelCallsDisableReasoning() throws {
         let data = try XCTUnwrap(OpenRouterClient.decisionRequestBody(
             model: "m", context: PageContext(url: "https://x.com"), tasks: [], phase: .working))
@@ -188,8 +215,23 @@ final class ClientTests: XCTestCase {
         XCTAssertEqual(
             LayaClient.endpointURL(from: "https://laya.example")?.absoluteString,
             "https://laya.example/systemone")
-        XCTAssertNil(LayaClient.endpointURL(from: "not a url"))
-        XCTAssertNil(LayaClient.endpointURL(from: "ftp://laya.example"))
+    }
+
+    func testLayaEndpointCandidates() {
+        // A bare host: the typed shape first, then the console shapes.
+        XCTAssertEqual(
+            LayaClient.endpointCandidates(from: "https://console.opscom.io").map(\.absoluteString),
+            ["https://console.opscom.io/systemone",
+             "https://console.opscom.io/v1/systemone",
+             "https://console.opscom.io/api/v1/systemone"])
+        // A base with a path is explicit: nothing else to guess.
+        XCTAssertEqual(
+            LayaClient.endpointCandidates(from: "https://console.opscom.io/v1").map(\.absoluteString),
+            ["https://console.opscom.io/v1/systemone"])
+        XCTAssertEqual(
+            LayaClient.endpointCandidates(from: "https://console.opscom.io/v1/systemone").map(\.absoluteString),
+            ["https://console.opscom.io/v1/systemone"])
+        XCTAssertTrue(LayaClient.endpointCandidates(from: "not a url").isEmpty)
     }
 
     func testLayaBodyLetsAConfiguredModelWin() throws {

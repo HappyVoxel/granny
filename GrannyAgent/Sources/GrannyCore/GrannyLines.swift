@@ -63,6 +63,7 @@ public enum GrannyLines {
     public static var extensionInstallTitle: String { strings.extensionInstallTitle }
     public static var extensionInstallSteps: String { strings.extensionInstallSteps }
     public static var extensionOpenSettings: String { strings.extensionOpenSettings }
+    public static var extensionOpenGuide: String { strings.extensionOpenGuide }
     public static var extensionShowFolder: String { strings.extensionShowFolder }
     public static var extensionFolderMissing: String { strings.extensionFolderMissing }
     public static func decisionServerFailed(port: Int) -> String {
@@ -156,6 +157,7 @@ public enum GrannyLines {
     public static var settingsClassifierGroup: String { strings.settingsClassifierGroup }
     public static var settingsLayaURL: String { strings.settingsLayaURL }
     public static var settingsLayaKey: String { strings.settingsLayaKey }
+    public static var settingsLayaGetKey: String { strings.settingsLayaGetKey }
     public static var settingsJevModel: String { strings.settingsJevModel }
     public static var settingsJevURL: String { strings.settingsJevURL }
     public static var settingsJevKey: String { strings.settingsJevKey }

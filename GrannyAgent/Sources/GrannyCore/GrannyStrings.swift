@@ -72,6 +72,7 @@ public protocol GrannyStrings: Sendable {
     var extensionInstallTitle: String { get }
     var extensionInstallSteps: String { get }
     var extensionOpenSettings: String { get }
+    var extensionOpenGuide: String { get }
     var extensionShowFolder: String { get }
     var extensionFolderMissing: String { get }
 
@@ -165,6 +166,7 @@ public protocol GrannyStrings: Sendable {
     var settingsClassifierGroup: String { get }
     var settingsLayaURL: String { get }
     var settingsLayaKey: String { get }
+    var settingsLayaGetKey: String { get }
     var settingsJevModel: String { get }
     var settingsJevURL: String { get }
     var settingsJevKey: String { get }
@@ -297,6 +299,7 @@ public struct EnglishStrings: GrannyStrings {
             + "and YouTube Shorts - the extension adds content-aware verdicts."
     }
     public var extensionOpenSettings: String { "Open browser settings" }
+    public var extensionOpenGuide: String { "Open the guide" }
     public var extensionShowFolder: String { "Show extension folder" }
     public var extensionFolderMissing: String {
         "The packaged extension is missing from the app bundle. Reinstall granny to fix it."
@@ -400,11 +403,12 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Fast classifier" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
+    public var settingsLayaGetKey: String { "Get a free Laya key" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya runs first - paste the console endpoint, or a base URL and granny appends /systemone; a keyless host takes an empty key. Without Laya, granny falls back to Jev through OpenRouter, or through its own URL/key."
+        "Laya runs first - paste the console endpoint, or a base URL and granny appends /systemone (keep the path prefix, e.g. /v1); a keyless host takes an empty key. Without Laya, granny falls back to Jev through OpenRouter, or through its own URL/key."
     }
     public var settingsTracingGroup: String { "Tracing (optional, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -550,6 +554,7 @@ public struct VietnameseStrings: GrannyStrings {
             + "YouTube Shorts - extension thêm phán quyết theo nội dung."
     }
     public var extensionOpenSettings: String { "Mở settings browser" }
+    public var extensionOpenGuide: String { "Mở hướng dẫn" }
     public var extensionShowFolder: String { "Mở folder extension" }
     public var extensionFolderMissing: String {
         "Extension đóng gói bị thiếu trong app bundle. Cài lại granny để sửa."
@@ -653,11 +658,12 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Fast classifier" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
+    public var settingsLayaGetKey: String { "Lấy Laya key miễn phí" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
     public var settingsClassifierCaption: String {
-        "Laya chạy trước - dán endpoint từ console, hoặc URL gốc (ngoại tự thêm /systemone); host không cần key để trống vẫn chạy. Không có Laya thì rơi xuống Jev qua OpenRouter, hoặc URL/key riêng."
+        "Laya chạy trước - dán endpoint từ console, hoặc URL gốc (giữ nguyên path, ví dụ /v1) và ngoại tự thêm /systemone; host không cần key để trống vẫn chạy. Không có Laya thì rơi xuống Jev qua OpenRouter, hoặc URL/key riêng."
     }
     public var settingsTracingGroup: String { "Tracing (tuỳ chọn, Langfuse)" }
     public var settingsHost: String { "Host" }
@@ -803,6 +809,7 @@ public struct FinnishStrings: GrannyStrings {
             + "ja YouTube Shortsit - laajennus lisää sisältökohtaiset päätökset."
     }
     public var extensionOpenSettings: String { "Avaa selaimen asetukset" }
+    public var extensionOpenGuide: String { "Avaa opas" }
     public var extensionShowFolder: String { "Näytä laajennuskansio" }
     public var extensionFolderMissing: String {
         "Paketoitu laajennus puuttuu sovelluspaketista. Asenna granny uudelleen."
@@ -906,11 +913,12 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Nopea luokittelija" }
     public var settingsLayaURL: String { "Laya-URL" }
     public var settingsLayaKey: String { "Laya-avain" }
+    public var settingsLayaGetKey: String { "Hae ilmainen Laya-avain" }
     public var settingsJevModel: String { "Jev-malli" }
     public var settingsJevURL: String { "Jev-URL" }
     public var settingsJevKey: String { "Jev-avain" }
     public var settingsClassifierCaption: String {
-        "Laya kokeillaan ensin - liitä konsolin endpoint tai perus-URL, niin mummo lisää /systemone; avaimeton palvelin toimii tyhjällä avaimella. Ilman Layaa mummo siirtyy Jeviin OpenRouterin kautta tai omalla URL:lla ja avaimella."
+        "Laya kokeillaan ensin - liitä konsolin endpoint tai perus-URL (säilytä polku, esim. /v1), niin mummo lisää /systemone; avaimeton palvelin toimii tyhjällä avaimella. Ilman Layaa mummo siirtyy Jeviin OpenRouterin kautta tai omalla URL:lla ja avaimella."
     }
     public var settingsTracingGroup: String { "Jäljitys (valinnainen, Langfuse)" }
     public var settingsHost: String { "Palvelin" }

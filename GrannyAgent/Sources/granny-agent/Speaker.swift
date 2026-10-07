@@ -26,17 +26,32 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         center.getNotificationSettings { settings in
             switch settings.authorizationStatus {
             case .authorized, .provisional:
-                let content = UNMutableNotificationContent()
-                content.title = title
-                content.body = body
-                content.sound = .default
-                let request = UNNotificationRequest(
-                    identifier: UUID().uuidString, content: content, trigger: nil)
-                center.add(request)
+                Notifier.deliver(title: title, body: body, via: center)
+            case .notDetermined:
+                // A freshly rebuilt (ad-hoc) app starts undetermined; ask
+                // once here so the banner wears granny's icon instead of
+                // osascript's Script Editor one.
+                center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                    if granted {
+                        Notifier.deliver(title: title, body: body, via: center)
+                    } else {
+                        Notifier.osascript(title: title, body: body)
+                    }
+                }
             default:
                 Notifier.osascript(title: title, body: body)
             }
         }
+    }
+
+    private static func deliver(title: String, body: String, via center: UNUserNotificationCenter) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString, content: content, trigger: nil)
+        center.add(request)
     }
 
     /// Show the banner even while granny is the frontmost app.
