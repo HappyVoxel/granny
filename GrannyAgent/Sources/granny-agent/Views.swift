@@ -454,7 +454,8 @@ struct TaskListView: View {
     var onToggle: (String) -> Void
     var onMarkAllDone: () -> Void
     var onAdd: (String) -> Void
-    var onUpdateSurfaces: (String, [String]) -> Void
+    var onUpdateTask: (String, String, String?, [String]) -> Void
+    var onElaborate: (String, String?) async -> String?
     var onRemove: (String) -> Void
     var onResumeWork: () -> Void
     var onOpenSettings: () -> Void
@@ -541,7 +542,7 @@ struct TaskListView: View {
                             .foregroundStyle(GrannyTheme.text.opacity(0.35))
                     }
                     .buttonStyle(.plain)
-                    .help(GrannyLines.surfacesEditHelp)
+                    .help(GrannyLines.taskEditHelp)
                     .pointingHandOnHover()
                     Button {
                         onRemove(task.id)
@@ -561,12 +562,13 @@ struct TaskListView: View {
             .scrollContentBackground(.hidden)
             .grannyCard(cornerRadius: 4)
             .sheet(item: $editing) { task in
-                SurfaceEditorView(
+                TaskEditorView(
                     task: task,
-                    onSave: { surfaces in
-                        onUpdateSurfaces(task.id, surfaces)
+                    onSave: { title, purpose, surfaces in
+                        onUpdateTask(task.id, title, purpose, surfaces)
                         editing = nil
                     },
+                    onElaborate: onElaborate,
                     onCancel: { editing = nil })
             }
 
@@ -666,35 +668,95 @@ struct TaskListView: View {
     }
 }
 
-/// Editor for one task's allowed surfaces: the URL patterns the rules let
-/// through before consulting the block lists. Machine-generated surfaces are
-/// sometimes wrong (a moved domain, a missed path) and this is the fix
-/// without re-adding the task.
-struct SurfaceEditorView: View {
+/// Editor for one task: its words (title, purpose) and the URL patterns the
+/// rules let through before the block lists. Saving re-runs granny's intake
+/// on the new words, so the purpose and the sites the task needs are
+/// re-derived - and a hand-written purpose or surfaces list is left alone.
+struct TaskEditorView: View {
     let task: TaskItem
-    var onSave: ([String]) -> Void
+    var onSave: (String, String?, [String]) -> Void
+    var onElaborate: (String, String?) async -> String?
     var onCancel: () -> Void
 
+    @State private var title: String
+    @State private var purpose: String
     @State private var surfaces: [String]
     @State private var newSurface = ""
+    @State private var elaborating = false
 
-    init(task: TaskItem, onSave: @escaping ([String]) -> Void, onCancel: @escaping () -> Void) {
+    init(
+        task: TaskItem,
+        onSave: @escaping (String, String?, [String]) -> Void,
+        onElaborate: @escaping (String, String?) async -> String?,
+        onCancel: @escaping () -> Void
+    ) {
         self.task = task
         self.onSave = onSave
+        self.onElaborate = onElaborate
         self.onCancel = onCancel
+        _title = State(initialValue: task.title)
+        _purpose = State(initialValue: task.purpose ?? "")
         _surfaces = State(initialValue: task.allowedSurfaces)
+    }
+
+    private var titleIsEmpty: Bool {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
+                Text(GrannyLines.taskEditEyebrow)
+                    .font(.system(size: 11, weight: .semibold, design: .serif))
+                    .tracking(3)
+                    .foregroundStyle(GrannyTheme.gold)
+                Text(GrannyLines.taskEditCaption)
+                    .font(.system(size: 11, design: .serif))
+                    .foregroundStyle(GrannyTheme.text.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            labeledField(GrannyLines.taskEditTitleLabel, $title)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(GrannyLines.taskEditPurposeLabel)
+                        .font(.system(size: 11, design: .serif))
+                        .foregroundStyle(GrannyTheme.text.opacity(0.55))
+                    Spacer()
+                    Button {
+                        askGranny()
+                    } label: {
+                        Text(GrannyLines.taskEditAskGranny)
+                            .font(.system(size: 11, weight: .semibold, design: .serif))
+                            .foregroundStyle(GrannyTheme.gold)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(elaborating || titleIsEmpty)
+                    .help(GrannyLines.taskEditAskGrannyHelp)
+                    .pointingHandOnHover()
+                }
+                TextField("", text: $purpose)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14, design: .serif))
+                    .foregroundStyle(GrannyTheme.text)
+                    .tint(GrannyTheme.gold)
+                    .padding(7)
+                    .grannyCard(cornerRadius: 4)
+                    .overlay(alignment: .trailing) {
+                        if elaborating {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(.trailing, 8)
+                        }
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text(GrannyLines.surfacesEditTitle)
                     .font(.system(size: 11, weight: .semibold, design: .serif))
                     .tracking(3)
                     .foregroundStyle(GrannyTheme.gold)
-                Text(task.title)
-                    .font(.system(size: 17, weight: .semibold, design: .serif))
-                    .foregroundStyle(GrannyTheme.text)
                 Text(GrannyLines.surfacesCaption)
                     .font(.system(size: 11, design: .serif))
                     .foregroundStyle(GrannyTheme.text.opacity(0.55))
@@ -743,15 +805,35 @@ struct SurfaceEditorView: View {
             HStack {
                 Spacer()
                 Button(GrannyLines.cancelButton) { onCancel() }
-                Button(GrannyLines.settingsSave) { onSave(surfaces) }
-                    .buttonStyle(GrannyPrimaryButtonStyle())
-                    .keyboardShortcut(.defaultAction)
+                Button(GrannyLines.settingsSave) {
+                    onSave(title.trimmingCharacters(in: .whitespacesAndNewlines),
+                           purpose, surfaces)
+                }
+                .buttonStyle(GrannyPrimaryButtonStyle())
+                .keyboardShortcut(.defaultAction)
+                .disabled(titleIsEmpty)
             }
         }
         .padding(20)
-        .frame(width: 480, height: 400)
+        .frame(width: 480, height: 500)
         .grannyWindowBackdrop()
         .preferredColorScheme(GrannyTheme.colorScheme)
+    }
+
+    @ViewBuilder
+    private func labeledField(_ label: String, _ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.system(size: 11, design: .serif))
+                .foregroundStyle(GrannyTheme.text.opacity(0.55))
+            TextField("", text: text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14, design: .serif))
+                .foregroundStyle(GrannyTheme.text)
+                .tint(GrannyTheme.gold)
+                .padding(7)
+                .grannyCard(cornerRadius: 4)
+        }
     }
 
     private func commit() {
@@ -759,6 +841,21 @@ struct SurfaceEditorView: View {
         newSurface = ""
         if !surfaces.contains(surface) {
             surfaces.append(surface)
+        }
+    }
+
+    /// "Ask granny": the engine re-reads the task and writes its one-line
+    /// purpose into the field, where the user can keep editing it.
+    private func askGranny() {
+        let titleText = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !titleText.isEmpty, !elaborating else { return }
+        elaborating = true
+        Task {
+            let elaborated = await onElaborate(titleText, purpose.isEmpty ? nil : purpose)
+            await MainActor.run {
+                if let elaborated { purpose = elaborated }
+                elaborating = false
+            }
         }
     }
 }

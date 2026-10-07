@@ -193,14 +193,69 @@ final class GrannyContext {
         scheduler.tick()
     }
 
-    /// Rewrites a task's allowed surfaces. The rules consult these before
-    /// the block lists, so this is how a wrong machine-generated surface
-    /// (a moved domain, a missed path) gets fixed without re-adding the task.
-    func setSurfaces(taskID: String, surfaces: [String]) {
+    /// Rewrites a task's words (and, when the editor touched them, its
+    /// surfaces), then re-runs the intake brain on the new wording - the
+    /// edited task gets the same treatment as a freshly added one, so the
+    /// rules open the sites the new words need and the purpose matches them.
+    /// Whether the user wrote the purpose and the surfaces themselves is
+    /// read off the change: an untouched field belongs to the model.
+    func updateTask(taskID: String, title: String, purpose: String?, surfaces: [String]) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let purposeText = purpose?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let original = store.state.tasks.first { $0.id == taskID }
+        let purposeEdited = (purposeText ?? "") != (original?.purpose ?? "")
+        let surfacesEdited = surfaces != (original?.allowedSurfaces ?? [])
+
         mutate { state in
-            if let index = state.tasks.firstIndex(where: { $0.id == taskID }) {
-                state.tasks[index].allowedSurfaces = surfaces
+            guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+            state.tasks[index].title = trimmed
+            state.tasks[index].purpose = (purposeText?.isEmpty ?? true) ? nil : purposeText
+            state.tasks[index].allowedSurfaces = surfaces
+        }
+        scheduler.tick()
+
+        Task { [weak self] in
+            guard let self else { return }
+            let text = [trimmed, purposeText ?? ""]
+                .filter { !$0.isEmpty }
+                .joined(separator: ". ")
+            guard let intake = await self.engine.parseIntake(text: text),
+                  let refined = intake.tasks.first
+            else { return }
+            await MainActor.run {
+                self.applyRefinement(
+                    refined, to: taskID,
+                    purposeEdited: purposeEdited, surfacesEdited: surfacesEdited)
             }
+        }
+    }
+
+    /// The engine's one-line reading of a task, for the editor's "ask
+    /// granny": elaborates a purpose the user typed.
+    func elaboratePurpose(title: String, purpose: String?) async -> String? {
+        let text = [title, purpose ?? ""]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ". ")
+        guard !text.isEmpty,
+              let intake = await engine.parseIntake(text: text),
+              let refined = intake.tasks.first,
+              let elaborated = refined.purpose, !elaborated.isEmpty
+        else { return nil }
+        return elaborated
+    }
+
+    /// The engine's reading of an edited task, merged by `TaskParser.refined`:
+    /// untouched fields take the model's words, hand-written ones survive.
+    private func applyRefinement(
+        _ refined: TaskItem, to taskID: String, purposeEdited: Bool, surfacesEdited: Bool
+    ) {
+        mutate { state in
+            guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+            state.tasks[index] = TaskParser.refined(
+                state.tasks[index], with: refined,
+                purposeEdited: purposeEdited, surfacesEdited: surfacesEdited)
         }
     }
 

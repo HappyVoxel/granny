@@ -198,7 +198,13 @@ public protocol GrannyStrings: Sendable {
     var surfacesEditTitle: String { get }
     var surfacesCaption: String { get }
     var surfacesPlaceholder: String { get }
-    var surfacesEditHelp: String { get }
+    var taskEditEyebrow: String { get }
+    var taskEditTitleLabel: String { get }
+    var taskEditPurposeLabel: String { get }
+    var taskEditCaption: String { get }
+    var taskEditHelp: String { get }
+    var taskEditAskGranny: String { get }
+    var taskEditAskGrannyHelp: String { get }
     var dropTaskHelp: String { get }
     var settingsSave: String { get }
     var keyCheckValid: String { get }
@@ -435,7 +441,15 @@ public struct EnglishStrings: GrannyStrings {
         "While this task is open, granny lets these URL patterns through - the block lists come second. e.g. threads.com/feed*"
     }
     public var surfacesPlaceholder: String { "e.g. threads.com/feed*" }
-    public var surfacesEditHelp: String { "Edit allowed URLs" }
+    public var taskEditEyebrow: String { "EDIT TASK" }
+    public var taskEditTitleLabel: String { "Task" }
+    public var taskEditPurposeLabel: String { "Purpose" }
+    public var taskEditCaption: String {
+        "On save granny re-reads the task, writes the purpose if you did not, and refreshes the sites it lets through."
+    }
+    public var taskEditHelp: String { "Edit this task" }
+    public var taskEditAskGranny: String { "Ask granny" }
+    public var taskEditAskGrannyHelp: String { "Let granny write the purpose from the task" }
     public var dropTaskHelp: String { "Drop this task from the notebook" }
     public var settingsSave: String { "Save" }
     public var keyCheckValid: String { "Key works." }
@@ -680,7 +694,15 @@ public struct VietnameseStrings: GrannyStrings {
         "Khi task này còn dở, ngoại cho phép mở những mẫu URL này - danh sách chặn phải nhường. Ví dụ: threads.com/feed*"
     }
     public var surfacesPlaceholder: String { "ví dụ: threads.com/feed*" }
-    public var surfacesEditHelp: String { "Sửa URL được phép" }
+    public var taskEditEyebrow: String { "SỬA VIỆC" }
+    public var taskEditTitleLabel: String { "Việc" }
+    public var taskEditPurposeLabel: String { "Mục đích" }
+    public var taskEditCaption: String {
+        "Khi lưu, ngoại đọc lại việc này, tự viết mục đích nếu bạn chưa viết, và cập nhật những site được phép mở."
+    }
+    public var taskEditHelp: String { "Sửa việc này" }
+    public var taskEditAskGranny: String { "Nhờ ngoại viết" }
+    public var taskEditAskGrannyHelp: String { "Để ngoại viết mục đích từ đầu việc" }
     public var dropTaskHelp: String { "Bỏ việc này khỏi sổ" }
     public var settingsSave: String { "Lưu" }
     public var keyCheckValid: String { "Key dùng được." }
@@ -927,7 +949,15 @@ public struct FinnishStrings: GrannyStrings {
         "Kun tämä tehtävä on kesken, mummo päästää nämä osoitekuviot läpi - estolistat väistyvät. Esim. threads.com/feed*"
     }
     public var surfacesPlaceholder: String { "esim. threads.com/feed*" }
-    public var surfacesEditHelp: String { "Muokkaa sallittuja osoitteita" }
+    public var taskEditEyebrow: String { "MUOKKAA TEHTÄVÄÄ" }
+    public var taskEditTitleLabel: String { "Tehtävä" }
+    public var taskEditPurposeLabel: String { "Tarkoitus" }
+    public var taskEditCaption: String {
+        "Tallennus saa mummon lukemaan tehtävän uudelleen, kirjoittamaan tarkoituksen jos et kirjoittanut sitä, ja päivittämään sallitut sivustot."
+    }
+    public var taskEditHelp: String { "Muokkaa tehtävää" }
+    public var taskEditAskGranny: String { "Pyydä mummoa" }
+    public var taskEditAskGrannyHelp: String { "Anna mummon kirjoittaa tarkoitus tehtävästä" }
     public var dropTaskHelp: String { "Poista tämä tehtävä kirjasta" }
     public var settingsSave: String { "Tallenna" }
     public var keyCheckValid: String { "Avain toimii." }
