@@ -215,8 +215,21 @@ final class ClientTests: XCTestCase {
         XCTAssertEqual(
             LayaClient.endpointURL(from: "https://laya.example")?.absoluteString,
             "https://laya.example/systemone")
-        XCTAssertNil(LayaClient.endpointURL(from: "not a url"))
-        XCTAssertNil(LayaClient.endpointURL(from: "ftp://laya.example"))
+    }
+
+    func testLayaEndpointCandidates() {
+        // A bare host: the typed shape first, the console's /v1 shape after.
+        XCTAssertEqual(
+            LayaClient.endpointCandidates(from: "https://console.opscom.io").map(\.absoluteString),
+            ["https://console.opscom.io/systemone", "https://console.opscom.io/v1/systemone"])
+        // A base with a path is explicit: nothing else to guess.
+        XCTAssertEqual(
+            LayaClient.endpointCandidates(from: "https://console.opscom.io/v1").map(\.absoluteString),
+            ["https://console.opscom.io/v1/systemone"])
+        XCTAssertEqual(
+            LayaClient.endpointCandidates(from: "https://console.opscom.io/v1/systemone").map(\.absoluteString),
+            ["https://console.opscom.io/v1/systemone"])
+        XCTAssertTrue(LayaClient.endpointCandidates(from: "not a url").isEmpty)
     }
 
     func testLayaBodyLetsAConfiguredModelWin() throws {

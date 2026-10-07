@@ -160,6 +160,39 @@ final class NetworkTests: XCTestCase {
         XCTAssertNil(decision)
     }
 
+    /// A bare host resolves through the console's /v1 shape: 404 on the
+    /// typed path, then the answer - and the found endpoint is remembered.
+    func testLayaBareBaseFallsBackToV1AndRemembers() async {
+        MockURLProtocol.handler = { [self] request in
+            let path = request.url?.path ?? ""
+            if path == "/v1/systemone" {
+                return response(request.url!, status: 200, json: [
+                    "answers": ["action": ["type": "choice", "choice": "warn", "answer_confidence": 0.9]],
+                ])
+            }
+            return response(request.url!, status: 404, json: ["error": "not here"])
+        }
+        let client = LayaClient(baseURL: "https://console.opscom.io", apiKey: "k", session: mockSession())
+
+        let first = await client.decide(url: "https://linkedin.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertEqual(first?.action, .warn)
+        XCTAssertEqual(MockURLProtocol.requestCount, 2, "one 404, then the /v1 answer")
+
+        let second = await client.decide(url: "https://x.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertEqual(second?.action, .warn)
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "the resolved endpoint is remembered")
+    }
+
+    func testLayaBareBase404EverywhereFails() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 404, json: ["error": "not here"])
+        }
+        let client = LayaClient(baseURL: "https://console.opscom.io", apiKey: "k", session: mockSession())
+        let decision = await client.decide(url: "https://linkedin.com/feed", title: nil, tasks: [], phase: .working)
+        XCTAssertNil(decision)
+        XCTAssertEqual(MockURLProtocol.requestCount, 2, "both candidates were tried")
+    }
+
     /// The free Zaitlabs deployment takes no key; the client must not send
     /// an Authorization header on keyless hosts.
     func testLayaKeylessHostOmitsAuthorization() async {

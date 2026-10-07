@@ -88,6 +88,22 @@ final class KeyCheckTests: XCTestCase {
         XCTAssertEqual(result, .valid)
     }
 
+    /// A bare base probes the /v1 shape the same way the client does, so the
+    /// green check agrees with the decision path.
+    func testSystemOneBareBaseProbesTheV1Endpoint() async {
+        MockURLProtocol.handler = { [self] request in
+            let path = request.url?.path ?? ""
+            if path == "/v1/systemone" {
+                return response(request.url!, status: 200)
+            }
+            return response(request.url!, status: 404)
+        }
+        let result = await KeyCheck.systemOne(
+            baseURL: "https://console.opscom.io", key: "k", session: mockSession())
+        XCTAssertEqual(result, .valid)
+        XCTAssertEqual(MockURLProtocol.requestCount, 2)
+    }
+
     func testSystemOneGarbageURLIsInvalidWithoutARequest() async {
         let result = await KeyCheck.systemOne(
             baseURL: "not a url", key: "k", session: mockSession())

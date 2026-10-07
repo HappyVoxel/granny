@@ -165,6 +165,7 @@ public protocol GrannyStrings: Sendable {
     var settingsClassifierGroup: String { get }
     var settingsLayaURL: String { get }
     var settingsLayaKey: String { get }
+    var settingsLayaGetKey: String { get }
     var settingsJevModel: String { get }
     var settingsJevURL: String { get }
     var settingsJevKey: String { get }
@@ -400,6 +401,7 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Fast classifier" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
+    public var settingsLayaGetKey: String { "Get a free Laya key" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
@@ -653,6 +655,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Fast classifier" }
     public var settingsLayaURL: String { "Laya URL" }
     public var settingsLayaKey: String { "Laya key" }
+    public var settingsLayaGetKey: String { "Lấy Laya key miễn phí" }
     public var settingsJevModel: String { "Jev model" }
     public var settingsJevURL: String { "Jev URL" }
     public var settingsJevKey: String { "Jev key" }
@@ -906,6 +909,7 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsClassifierGroup: String { "Nopea luokittelija" }
     public var settingsLayaURL: String { "Laya-URL" }
     public var settingsLayaKey: String { "Laya-avain" }
+    public var settingsLayaGetKey: String { "Hae ilmainen Laya-avain" }
     public var settingsJevModel: String { "Jev-malli" }
     public var settingsJevURL: String { "Jev-URL" }
     public var settingsJevKey: String { "Jev-avain" }

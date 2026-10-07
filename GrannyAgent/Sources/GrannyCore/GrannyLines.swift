@@ -156,6 +156,7 @@ public enum GrannyLines {
     public static var settingsClassifierGroup: String { strings.settingsClassifierGroup }
     public static var settingsLayaURL: String { strings.settingsLayaURL }
     public static var settingsLayaKey: String { strings.settingsLayaKey }
+    public static var settingsLayaGetKey: String { strings.settingsLayaGetKey }
     public static var settingsJevModel: String { strings.settingsJevModel }
     public static var settingsJevURL: String { strings.settingsJevURL }
     public static var settingsJevKey: String { strings.settingsJevKey }

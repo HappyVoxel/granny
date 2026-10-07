@@ -23,24 +23,44 @@ public enum KeyCheck {
 
     /// System One (Laya, Jev): the smallest real decision request against
     /// the configured endpoint (base or full `.../systemone`); auth failures
-    /// answer 401/403. An empty key is fine for keyless hosts.
+    /// answer 401/403. An empty key is fine for keyless hosts. A bare base
+    /// is probed exactly the way the client probes it, so the check and the
+    /// decision path agree on where the endpoint is.
     public static func systemOne(baseURL: String, key: String, session: URLSession = .shared) async -> KeyCheckResult {
-        guard let url = LayaClient.endpointURL(from: baseURL),
-              let body = LayaClient.decisionRequestBody(
-                  language: "en",
-                  context: PageContext(url: "https://example.com", title: "granny key check"),
-                  tasks: [],
-                  phase: .working)
+        guard let body = LayaClient.decisionRequestBody(
+            language: "en",
+            context: PageContext(url: "https://example.com", title: "granny key check"),
+            tasks: [],
+            phase: .working)
         else { return .invalid }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.timeoutInterval = 10
-        if !key.isEmpty {
-            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        let candidates = LayaClient.endpointCandidates(from: baseURL)
+        guard !candidates.isEmpty else { return .invalid }
+        for endpoint in candidates {
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.httpBody = body
+            request.timeoutInterval = 10
+            if !key.isEmpty {
+                request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+            }
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            guard let status = await status(of: request, session: session) else { return .unreachable }
+            if status == 404 { continue }
+            if (200..<300).contains(status) { return .valid }
+            if status == 401 || status == 403 { return .invalid }
+            return .unreachable
         }
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        return await perform(request, session: session)
+        return .unreachable
+    }
+
+    /// The HTTP status, or nil when the request never got an answer.
+    private static func status(of request: URLRequest, session: URLSession) async -> Int? {
+        do {
+            let (_, response) = try await session.data(for: request)
+            return (response as? HTTPURLResponse)?.statusCode
+        } catch {
+            return nil
+        }
     }
 
     private static func perform(_ request: URLRequest, session: URLSession) async -> KeyCheckResult {
