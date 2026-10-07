@@ -83,12 +83,10 @@ public struct OpenRouterClient: Sendable {
     static func streakRequestBody(model: String, kept: Bool, count: Int, language: String) -> Data? {
         let spoken = outputLanguageName(language: language)
         let system = """
-        \(persona(language: language)) Your grandchild \(kept ? "kept a clean streak" : "lost a streak") \
-        of \(count) days. Write ONE short sentence in \(spoken) in your own voice: proud, funny, a little \
-        cheeky - a grandmother who brags about her grandchild to the neighbours and teases them back to \
-        \(kept ? "work" : "a fresh start"). Surprise me each time: drill sergeant, monk, warrior of \
-        discipline, a food reward waiting at the finish line. Light emoticons like :)) are fine; no \
-        emoji pictures, no quotation marks, no lists. Under 20 words. \(addressStyle(language: language)).
+        \(persona(language: language)) Your grandchild \(kept ? "has a streak of \(count) days going" : "just lost a \(count)-day streak"). \
+        Write ONE short sentence in \(spoken), in her voice, like a real grandmother texting - same vibe as these (never copy one of them):
+        \(streakExamples(language: language))
+        Proud, funny, a bit teasing; a little English slang or emoticons like :)) are fine. Do not sound like an AI: no balanced two-part sentences, no explaining, no lists, no quotation marks, do not always repeat the number. Under 20 words. \(addressStyle(language: language)).
         """
         let body: [String: Any] = [
             "model": model,
@@ -97,10 +95,42 @@ public struct OpenRouterClient: Sendable {
             "reasoning": ["enabled": false],
             "messages": [
                 ["role": "system", "content": system],
-                ["role": "user", "content": kept ? "kept \(count)" : "lost \(count)"],
+                ["role": "user", "content": "\(kept ? "kept" : "lost") \(count); angle: \(streakAngles.randomElement() ?? "proud")"],
             ],
         ]
         return JSON.data(from: body)
+    }
+
+    /// A per-line angle, so two streaks in a row do not read like the same
+    /// card with the number swapped.
+    static let streakAngles = [
+        "bragging to the neighbours", "teasing", "a small threat about tomorrow",
+        "a food reward at the finish line", "drill sergeant", "quiet pride",
+    ]
+
+    /// The register is shown, not described: describing it produced
+    /// greeting-card lines in every language.
+    static func streakExamples(language: String) -> String {
+        switch GrannyLanguage(code: language) ?? .en {
+        case .vi:
+            return """
+            - Bà tự hào khi có 1 chiến binh kỉ luật thép như cháu, 3 ngày rồi, keep it up :)))
+            - Ba ngày sạch sẽ, bà nể cháu thật đấy. Đừng có xịt ngày thứ tư nha :))
+            - Cháu bà luyện kiểu này thì hàng xóm phải học tập, làm tiếp đi con
+            """
+        case .en:
+            return """
+            - Three days, dear. Your granny has a drill sergeant for a grandchild, apparently.
+            - Look at you - three clean days. The neighbours' kids are getting shown up :))
+            - Not bad, dear. Do it again tomorrow and I'll stop calling you lazy.
+            """
+        case .fi:
+            return """
+            - Kolme päivää, kulta. Mummo alkaa kohta ylpeillä sinusta naapureille.
+            - Kunnon kurinalaisuutta, jatka samaan malliin - huomenna ei sitten lipsuta :))
+            - Katso nyt, kolme puhdasta päivää. Naapurit jo kadehtivat.
+            """
+        }
     }
 
     static func parseTextResponse(_ data: Data) -> String? {
