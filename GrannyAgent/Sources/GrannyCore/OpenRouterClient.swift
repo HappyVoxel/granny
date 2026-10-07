@@ -70,15 +70,20 @@ public struct OpenRouterClient: Sendable {
 
     /// One short encouraging line from granny, in the configured language.
     /// Plain text, tiny budget, no structured outputs and no reasoning: the
-    /// caller keeps its own template on any failure.
+    /// caller keeps its own template on any failure. The deadline is short
+    /// on purpose - a notification must not wait on a slow free endpoint.
     public func streakLine(kept: Bool, count: Int, model: String) async -> String? {
         guard let body = Self.streakRequestBody(
             model: model, kept: kept, count: count, language: settings.language)
         else { return nil }
-        let response = await perform(body, timeout: Self.intakeTimeout)
+        let response = await perform(body, timeout: Self.streakTimeout)
         guard response.status == 200, let data = response.data else { return nil }
         return Self.parseTextResponse(data)
     }
+
+    /// The streak line's own deadline; the intake budget (30s) would hold a
+    /// notification hostage.
+    static let streakTimeout: TimeInterval = 6
 
     static func streakRequestBody(model: String, kept: Bool, count: Int, language: String) -> Data? {
         let spoken = outputLanguageName(language: language)

@@ -44,6 +44,8 @@ final class ClientTests: XCTestCase {
         XCTAssertEqual((body["reasoning"] as? [String: Any])?["enabled"] as? Bool, false,
                        "a streak line needs no chain of thought")
         XCTAssertEqual(body["max_tokens"] as? Int, 80, "a one-liner must not pay for an essay")
+        XCTAssertEqual(OpenRouterClient.streakTimeout, 6,
+                       "the notification keeps its own short deadline, not the intake budget")
         let messages = body["messages"] as? [[String: Any]]
         let system = messages?.first?["content"] as? String
         XCTAssertTrue(system?.contains("Vietnamese") ?? false, "the line follows the set language")

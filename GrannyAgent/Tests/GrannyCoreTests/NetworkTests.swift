@@ -294,6 +294,21 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(decision.message, GrannyLines.sleepNag)
     }
 
+    /// The forced-context warning (unreadable YouTube after the retry) is a
+    /// warn from the context tier, so bedtime applies there too.
+    func testForcedContextWarningSpeaksBedtimeAtNight() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let context = PageContext(url: "https://www.youtube.com/watch?v=x", title: nil)
+
+        let night = await engine.decide(context: context, tasks: [], phase: .night, force: true)
+        XCTAssertEqual(night.action, .warn)
+        XCTAssertEqual(night.message, GrannyLines.sleepNag)
+
+        let day = await engine.decide(context: context, tasks: [], phase: .working, force: true)
+        XCTAssertEqual(day.action, .warn)
+        XCTAssertNotEqual(day.message, GrannyLines.sleepNag)
+    }
+
     /// The streak line rides the free router and parses as plain text.
     func testEngineStreakLineUsesTheFreeRouter() async {
         MockURLProtocol.handler = { [self] request in

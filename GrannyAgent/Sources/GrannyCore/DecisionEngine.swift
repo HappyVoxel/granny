@@ -125,7 +125,7 @@ public actor DecisionEngine {
                 .warn,
                 reason: "context host without a readable title",
                 source: "context")
-            return enrich(unreadable, context: context)
+            return Self.nightVoice(enrich(unreadable, context: context), phase: phase)
         }
 
         let started = Date()
