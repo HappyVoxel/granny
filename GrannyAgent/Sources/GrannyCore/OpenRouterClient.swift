@@ -84,9 +84,11 @@ public struct OpenRouterClient: Sendable {
         let spoken = outputLanguageName(language: language)
         let system = """
         \(persona(language: language)) Your grandchild \(kept ? "kept a clean streak" : "lost a streak") \
-        of \(count) days. Write ONE short sentence in \(spoken), in your own voice - warm, a little \
-        strict, never cheesy - that \(kept ? "praises them" : "comforts them") and sends them back \
-        to work. No emoji, no quotation marks, no lists; under 20 words. \(addressStyle(language: language)).
+        of \(count) days. Write ONE short sentence in \(spoken) in your own voice: proud, funny, a little \
+        cheeky - a grandmother who brags about her grandchild to the neighbours and teases them back to \
+        \(kept ? "work" : "a fresh start"). Surprise me each time: drill sergeant, monk, warrior of \
+        discipline, a food reward waiting at the finish line. Light emoticons like :)) are fine; no \
+        emoji pictures, no quotation marks, no lists. Under 20 words. \(addressStyle(language: language)).
         """
         let body: [String: Any] = [
             "model": model,

@@ -48,6 +48,7 @@ final class ClientTests: XCTestCase {
         let system = messages?.first?["content"] as? String
         XCTAssertTrue(system?.contains("Vietnamese") ?? false, "the line follows the set language")
         XCTAssertTrue(system?.contains("Ngoại") ?? false, "the persona is the language's")
+        XCTAssertTrue(system?.contains("funny") ?? false, "proud and funny, not a greeting-card line")
     }
 
     func testParseTextResponse() throws {
