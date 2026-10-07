@@ -26,10 +26,10 @@
 
 <p align="center">
   <a href=".github/assets/granny-demo.mp4">
-    <img src=".github/assets/granny-demo-poster.png" width="800" alt="granny's notebook: today's tasks with their allowed URL surfaces">
+    <img src=".github/assets/granny-demo.gif" width="640" alt="granny catches a LinkedIn feed and sends you back to work">
   </a>
   <br>
-  <sub><a href=".github/assets/granny-demo.mp4">▶ Watch the 2-minute demo</a></sub>
+  <sub><a href=".github/assets/granny-demo.mp4">▶ Watch the full 2-minute demo</a></sub>
 </p>
 
 ## What it does
@@ -47,6 +47,10 @@ site to her.
 Native Swift end to end: a menubar app, a root helper that owns `/etc/hosts`,
 and one MV3 extension for Safari and Chrome. The classifier is yours to host
 (Laya/Jev); the LLM is bring-your-own-key.
+
+<p align="center">
+  <img src=".github/assets/settings-dark.png" width="420" alt="granny Settings: classifier, keys, model, watchlists">
+</p>
 
 ## Install
 
