@@ -25,9 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.context.viewModel.refresh(from: self.context)
             switch event {
             case .kept(let count):
-                postNotification(body: GrannyLines.streakUp(count: count))
+                self.announceStreak(
+                    kept: true, count: count, template: GrannyLines.streakUp(count: count))
             case .lost(let days):
-                postNotification(body: GrannyLines.streakLost(days: days))
+                self.announceStreak(
+                    kept: false, count: days, template: GrannyLines.streakLost(days: days))
             }
         }
         context.start()
@@ -40,6 +42,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // notebook on screen; a login-agent start stays quiet.
         if ProcessInfo.processInfo.environment[GrannyEnv.showWindow] == "1", window == nil {
             presentInitialWindow()
+        }
+    }
+
+    /// The streak notification: granny's own line from the model tier when
+    /// it answers, the template otherwise - a notification never waits on a
+    /// slow model.
+    private func announceStreak(kept: Bool, count: Int, template: String) {
+        Task { [weak self] in
+            let line = await self?.context.engine.streakLine(kept: kept, count: count)
+            await MainActor.run {
+                postNotification(body: line ?? template)
+            }
         }
     }
 

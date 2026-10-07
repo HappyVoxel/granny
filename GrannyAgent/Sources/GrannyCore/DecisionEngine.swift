@@ -319,6 +319,14 @@ public actor DecisionEngine {
         return intake
     }
 
+    /// A short streak line from the model tier, in the configured language;
+    /// nil keeps the caller's template.
+    public func streakLine(kept: Bool, count: Int) async -> String? {
+        guard let openRouter else { return nil }
+        let model = config.streakModel ?? OpenRouterClient.defaultStreakModel
+        return await openRouter.streakLine(kept: kept, count: count, model: model)
+    }
+
     public func clearCache() {
         cache.removeAll()
     }

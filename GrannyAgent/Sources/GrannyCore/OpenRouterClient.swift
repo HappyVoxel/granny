@@ -63,6 +63,54 @@ public struct OpenRouterClient: Sendable {
     /// The intake request's own budget, independent of the verdict timeout.
     static let intakeTimeout: TimeInterval = 30
 
+    /// A cheap model for the streak line: the free router picks whatever
+    /// free endpoint is up, so the line never depends on one provider.
+    /// Overridable with `streakModel` in the config.
+    public static let defaultStreakModel = "openrouter/free"
+
+    /// One short encouraging line from granny, in the configured language.
+    /// Plain text, tiny budget, no structured outputs and no reasoning: the
+    /// caller keeps its own template on any failure.
+    public func streakLine(kept: Bool, count: Int, model: String) async -> String? {
+        guard let body = Self.streakRequestBody(
+            model: model, kept: kept, count: count, language: settings.language)
+        else { return nil }
+        let response = await perform(body, timeout: Self.intakeTimeout)
+        guard response.status == 200, let data = response.data else { return nil }
+        return Self.parseTextResponse(data)
+    }
+
+    static func streakRequestBody(model: String, kept: Bool, count: Int, language: String) -> Data? {
+        let spoken = outputLanguageName(language: language)
+        let system = """
+        \(persona(language: language)) Your grandchild \(kept ? "kept a clean streak" : "lost a streak") \
+        of \(count) days. Write ONE short sentence in \(spoken), in your own voice - warm, a little \
+        strict, never cheesy - that \(kept ? "praises them" : "comforts them") and sends them back \
+        to work. No emoji, no quotation marks, no lists; under 20 words. \(addressStyle(language: language)).
+        """
+        let body: [String: Any] = [
+            "model": model,
+            "temperature": 0.9,
+            "max_tokens": 80,
+            "reasoning": ["enabled": false],
+            "messages": [
+                ["role": "system", "content": system],
+                ["role": "user", "content": kept ? "kept \(count)" : "lost \(count)"],
+            ],
+        ]
+        return JSON.data(from: body)
+    }
+
+    static func parseTextResponse(_ data: Data) -> String? {
+        guard let root = JSON.dict(from: data),
+              let choices = root["choices"] as? [[String: Any]],
+              let message = choices.first?["message"] as? [String: Any],
+              let content = message["content"] as? String
+        else { return nil }
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     /// Structured outputs are a request, not a guarantee: a provider that
     /// cannot honour `response_format` answers 400 ("model features
     /// structured outputs not support"). Only that 400 earns a retry with

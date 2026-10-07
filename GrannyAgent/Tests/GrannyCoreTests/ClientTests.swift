@@ -36,6 +36,30 @@ final class ClientTests: XCTestCase {
         XCTAssertTrue(user.contains("working"))
     }
 
+    func testStreakBodyFollowsLanguageAndStaysTiny() throws {
+        let data = try XCTUnwrap(OpenRouterClient.streakRequestBody(
+            model: OpenRouterClient.defaultStreakModel, kept: true, count: 3, language: "vi"))
+        let body = try XCTUnwrap(JSON.dict(from: data))
+        XCTAssertEqual(body["model"] as? String, "openrouter/free")
+        XCTAssertEqual((body["reasoning"] as? [String: Any])?["enabled"] as? Bool, false,
+                       "a streak line needs no chain of thought")
+        XCTAssertEqual(body["max_tokens"] as? Int, 80, "a one-liner must not pay for an essay")
+        let messages = body["messages"] as? [[String: Any]]
+        let system = messages?.first?["content"] as? String
+        XCTAssertTrue(system?.contains("Vietnamese") ?? false, "the line follows the set language")
+        XCTAssertTrue(system?.contains("Ngoại") ?? false, "the persona is the language's")
+    }
+
+    func testParseTextResponse() throws {
+        let payload: [String: Any] = [
+            "choices": [["message": ["role": "assistant", "content": "  Ngoan lắm, mai cố thêm nhé.  "]]],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        XCTAssertEqual(OpenRouterClient.parseTextResponse(data), "Ngoan lắm, mai cố thêm nhé.")
+        XCTAssertNil(OpenRouterClient.parseTextResponse(Data("{}".utf8)))
+        XCTAssertNil(OpenRouterClient.parseTextResponse(Data(#"{"choices":[{"message":{"content":"  "}}]}"#.utf8)))
+    }
+
     func testModelCallsDisableReasoning() throws {
         let data = try XCTUnwrap(OpenRouterClient.decisionRequestBody(
             model: "m", context: PageContext(url: "https://x.com"), tasks: [], phase: .working))

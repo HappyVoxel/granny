@@ -294,6 +294,27 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(decision.message, GrannyLines.sleepNag)
     }
 
+    /// The streak line rides the free router and parses as plain text.
+    func testEngineStreakLineUsesTheFreeRouter() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: [
+                "choices": [["message": ["role": "assistant", "content": "Ngoan lắm, mai cố thêm nhé."]]],
+            ])
+        }
+        var config = GrannyConfig()
+        config.openRouterKey = "or-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let line = await engine.streakLine(kept: true, count: 3)
+        XCTAssertEqual(line, "Ngoan lắm, mai cố thêm nhé.")
+    }
+
+    func testEngineStreakLineFailsQuietly() async {
+        let engine = DecisionEngine(config: GrannyConfig(), trace: TraceClient(config: nil), session: mockSession())
+        let line = await engine.streakLine(kept: true, count: 3)
+        XCTAssertNil(line, "no key: the caller keeps its template")
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "and no request leaves the machine")
+    }
+
     func testEngineFallsThroughLayaJevToModelAndCaches() async {
         MockURLProtocol.handler = { [self] request in
             let url = request.url!.absoluteString
