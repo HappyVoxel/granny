@@ -63,6 +63,7 @@ public enum GrannyLines {
     public static var extensionInstallTitle: String { strings.extensionInstallTitle }
     public static var extensionInstallSteps: String { strings.extensionInstallSteps }
     public static var extensionOpenSettings: String { strings.extensionOpenSettings }
+    public static var extensionOpenGuide: String { strings.extensionOpenGuide }
     public static var extensionShowFolder: String { strings.extensionShowFolder }
     public static var extensionFolderMissing: String { strings.extensionFolderMissing }
     public static func decisionServerFailed(port: Int) -> String {

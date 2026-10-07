@@ -72,6 +72,7 @@ public protocol GrannyStrings: Sendable {
     var extensionInstallTitle: String { get }
     var extensionInstallSteps: String { get }
     var extensionOpenSettings: String { get }
+    var extensionOpenGuide: String { get }
     var extensionShowFolder: String { get }
     var extensionFolderMissing: String { get }
 
@@ -298,6 +299,7 @@ public struct EnglishStrings: GrannyStrings {
             + "and YouTube Shorts - the extension adds content-aware verdicts."
     }
     public var extensionOpenSettings: String { "Open browser settings" }
+    public var extensionOpenGuide: String { "Open the guide" }
     public var extensionShowFolder: String { "Show extension folder" }
     public var extensionFolderMissing: String {
         "The packaged extension is missing from the app bundle. Reinstall granny to fix it."
@@ -552,6 +554,7 @@ public struct VietnameseStrings: GrannyStrings {
             + "YouTube Shorts - extension thêm phán quyết theo nội dung."
     }
     public var extensionOpenSettings: String { "Mở settings browser" }
+    public var extensionOpenGuide: String { "Mở hướng dẫn" }
     public var extensionShowFolder: String { "Mở folder extension" }
     public var extensionFolderMissing: String {
         "Extension đóng gói bị thiếu trong app bundle. Cài lại granny để sửa."
@@ -806,6 +809,7 @@ public struct FinnishStrings: GrannyStrings {
             + "ja YouTube Shortsit - laajennus lisää sisältökohtaiset päätökset."
     }
     public var extensionOpenSettings: String { "Avaa selaimen asetukset" }
+    public var extensionOpenGuide: String { "Avaa opas" }
     public var extensionShowFolder: String { "Näytä laajennuskansio" }
     public var extensionFolderMissing: String {
         "Paketoitu laajennus puuttuu sovelluspaketista. Asenna granny uudelleen."

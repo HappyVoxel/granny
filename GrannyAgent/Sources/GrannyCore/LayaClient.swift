@@ -63,19 +63,22 @@ public actor LayaClient {
     }
 
     /// What to try, in order. An explicit endpoint is trusted as typed; a
-    /// bare base gets the `/v1/systemone` console shape as its fallback -
-    /// probed only after the first candidate answers 404, so a correct paste
-    /// never pays for the search. A base with a path (`…/v1`) is already
-    /// explicit: its candidates are exactly what it says.
+    /// bare base gets the console shapes as fallbacks (`/v1/systemone`,
+    /// `/api/v1/systemone`) - probed only after the first candidate answers
+    /// 404, so a correct paste never pays for the search. A base with a path
+    /// (`…/v1`) is already explicit: its candidates are exactly what it says.
     static func endpointCandidates(from configured: String) -> [URL] {
         guard let primary = endpointURL(from: configured) else { return [] }
         if configured.lowercased().contains("systemone") { return [primary] }
         guard var components = URLComponents(url: primary, resolvingAgainstBaseURL: false),
               components.path == "/systemone"
         else { return [primary] }
-        components.path = "/v1/systemone"
-        guard let alternate = components.url else { return [primary] }
-        return [primary, alternate]
+        var candidates = [primary]
+        for path in ["/v1/systemone", "/api/v1/systemone"] {
+            components.path = path
+            if let url = components.url { candidates.append(url) }
+        }
+        return candidates
     }
 
     public func decide(url: String, title: String?, tasks: [TaskItem], phase: Phase) async -> Decision? {

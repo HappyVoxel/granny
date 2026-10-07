@@ -218,10 +218,12 @@ final class ClientTests: XCTestCase {
     }
 
     func testLayaEndpointCandidates() {
-        // A bare host: the typed shape first, the console's /v1 shape after.
+        // A bare host: the typed shape first, then the console shapes.
         XCTAssertEqual(
             LayaClient.endpointCandidates(from: "https://console.opscom.io").map(\.absoluteString),
-            ["https://console.opscom.io/systemone", "https://console.opscom.io/v1/systemone"])
+            ["https://console.opscom.io/systemone",
+             "https://console.opscom.io/v1/systemone",
+             "https://console.opscom.io/api/v1/systemone"])
         // A base with a path is explicit: nothing else to guess.
         XCTAssertEqual(
             LayaClient.endpointCandidates(from: "https://console.opscom.io/v1").map(\.absoluteString),

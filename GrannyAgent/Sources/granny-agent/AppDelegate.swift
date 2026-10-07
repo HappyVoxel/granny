@@ -153,7 +153,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, GrannyLines.menuSettings, #selector(showSettings), ",")
         add(menu, GrannyLines.menuInstallHelper, #selector(installHelper), "")
-        add(menu, GrannyLines.menuInstallExtension, #selector(installExtension), "")
+        // The suggestion only exists while it is true: with the extension
+        // installed, the item would just be clutter.
+        if !context.extensionInstalled {
+            add(menu, GrannyLines.menuInstallExtension, #selector(installExtension), "")
+        }
         add(menu, GrannyLines.menuOpenConfig, #selector(openConfig), "")
         if let update = context.availableUpdate {
             add(menu, "\(GrannyLines.menuUpdateAvailable) (v\(update.version))", #selector(installUpdate), "g")
@@ -219,14 +223,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let alert = NSAlert()
         alert.messageText = GrannyLines.extensionInstallTitle
         alert.informativeText = GrannyLines.extensionInstallSteps
+        alert.addButton(withTitle: GrannyLines.extensionOpenGuide)
         alert.addButton(withTitle: GrannyLines.extensionOpenSettings)
         alert.addButton(withTitle: GrannyLines.extensionShowFolder)
         alert.addButton(withTitle: GrannyLines.cancelButton)
         switch alert.runModal() {
         case .alertFirstButtonReturn:
+            NSWorkspace.shared.open(ExtensionCheck.guideURL)
+        case .alertSecondButtonReturn:
             prepareExtensionFolder()
             openBrowserExtensionSettings()
-        case .alertSecondButtonReturn:
+        case .alertThirdButtonReturn:
             prepareExtensionFolder()
         default: break
         }

@@ -190,7 +190,7 @@ final class NetworkTests: XCTestCase {
         let client = LayaClient(baseURL: "https://console.opscom.io", apiKey: "k", session: mockSession())
         let decision = await client.decide(url: "https://linkedin.com/feed", title: nil, tasks: [], phase: .working)
         XCTAssertNil(decision)
-        XCTAssertEqual(MockURLProtocol.requestCount, 2, "both candidates were tried")
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "all three candidates were tried")
     }
 
     /// The free Zaitlabs deployment takes no key; the client must not send

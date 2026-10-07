@@ -339,6 +339,43 @@ final class GrannyContext {
 
     // MARK: - Private
 
+    /// Whether a browser carries granny's extension. Cached briefly: the
+    /// status menu asks on every open, and the scan reads profile files.
+    private var extensionStatus: (installed: Bool, at: Date)?
+
+    var extensionInstalled: Bool {
+        if let status = extensionStatus,
+           Date().timeIntervalSince(status.at) < Self.extensionCacheTTL {
+            return status.installed
+        }
+        // An unreadable Chromium profile counts as installed: a wrong "not
+        // installed" would nag someone who already loaded the extension.
+        let installed = ExtensionCheck.safari(run: Self.runTool)
+            || (ExtensionCheck.chromium() ?? true)
+        extensionStatus = (installed, Date())
+        return installed
+    }
+
+    private static let extensionCacheTTL: TimeInterval = 60
+
+    /// One-shot tool runner for the checks that shell out (pluginkit).
+    private static func runTool(_ path: String, _ arguments: [String]) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        let stdout = Pipe()
+        process.standardOutput = stdout
+        process.standardError = Pipe()
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        process.waitUntilExit()
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8)
+    }
+
     /// The cask cannot self-update: ask GitHub Releases once a day and, when
     /// a newer version exists, let granny nag with the one-line upgrade.
     private static let updateCheckInterval: TimeInterval = 24 * 60 * 60
