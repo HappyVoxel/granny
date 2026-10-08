@@ -24,7 +24,6 @@ public struct GrannyConfig: Codable, Sendable {
     public var wakeHour: Int
     public var bedtimeHour: Int
     public var language: String
-    /// Granny's stationery scheme; valid values live in `GrannyAppearance`.
     public var appearance: String
     /// Ask GitHub Releases once a day whether a newer granny exists.
     public var checkForUpdates: Bool
@@ -130,7 +129,7 @@ public struct GrannyConfig: Codable, Sendable {
         "xoilac", "90phut", "bongdatv", "vipboxtv",
         // adult
         "porn", "xvideos", "xnxx", "xhamster", "redtube", "youporn",
-        "onlyfans", "hentai", "fapello", "thothub",
+        "onlyfans", "hentai", "fapello", "thothub", "tango", "pulsz"
         // games
         "gamevui", "y8.com", "poki", "miniclip", "crazygames", "friv",
         "kongregate", "newgrounds", "addictinggames", "armorgames", "trochoi",
@@ -151,8 +150,7 @@ public struct GrannyConfig: Codable, Sendable {
         "youtube.com", "www.youtube.com", "m.youtube.com",
     ]
 
-    /// Never blocked: focus music, the tracing dashboard the grandchild uses
-    /// to watch granny work, and research/communication tools.
+    /// Never blocked.
     public static let defaultAlwaysAllowedPrefixes = [
         "https://music.youtube.com",
         "https://github.com",
@@ -189,7 +187,6 @@ public struct GrannyConfig: Codable, Sendable {
     ]
 
     public static var `default`: GrannyConfig { GrannyConfig() }
-
     public static let defaultDecidePort = 47899
     public static let defaultLangfuseBaseURL = "https://cloud.langfuse.com"
 

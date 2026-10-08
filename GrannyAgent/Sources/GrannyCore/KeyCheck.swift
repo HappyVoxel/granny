@@ -12,7 +12,7 @@ public enum KeyCheckResult: Sendable, Equatable {
 /// provider, so a pasted key can show a check or a cross before Save. New
 /// providers add one function here; the field component stays the same.
 public enum KeyCheck {
-    /// OpenRouter: GET /api/v1/key, the cheapest authenticated call.
+    /// OpenRouter: GET /api/v1/key.
     public static func openRouter(key: String, session: URLSession = .shared) async -> KeyCheckResult {
         guard !key.isEmpty, let url = httpURL("https://openrouter.ai/api/v1/key") else { return .invalid }
         var request = URLRequest(url: url)

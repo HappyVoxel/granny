@@ -202,6 +202,14 @@ final class ClientTests: XCTestCase {
         XCTAssertEqual(LayaClient.parseResponse(low, gate: 0.1)?.action, .block)
     }
 
+    func testHostedConsoleShortcutOnlyAppliesToItsOwnHost() {
+        XCTAssertTrue(LayaClient.hostedConsoleApplies(to: ""), "no Laya yet: the shortcut helps")
+        XCTAssertTrue(LayaClient.hostedConsoleApplies(to: "https://console.opscom.io/v1/systemone"))
+        XCTAssertTrue(LayaClient.hostedConsoleApplies(to: "https://console.opscom.io"))
+        XCTAssertFalse(LayaClient.hostedConsoleApplies(to: "https://laya.mycompany.dev/v1"))
+        XCTAssertFalse(LayaClient.hostedConsoleApplies(to: "https://laya.inference.zaitlabs.com/v1"))
+    }
+
     func testLayaEndpointAcceptsBaseOrFullURL() {
         XCTAssertEqual(
             LayaClient.endpointURL(from: "https://laya.example/v1")?.absoluteString,

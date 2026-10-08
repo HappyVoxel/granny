@@ -77,11 +77,13 @@ struct SettingsView: View {
                             validate: { key in await KeyCheck.systemOne(baseURL: layaURL, key: key) })
                         HStack {
                             Spacer()
-                            Button(GrannyLines.settingsLayaGetKey) {
-                                NSWorkspace.shared.open(LayaClient.consoleURL)
+                            if LayaClient.hostedConsoleApplies(to: layaURL) {
+                                Button(GrannyLines.settingsLayaGetKey) {
+                                    NSWorkspace.shared.open(LayaClient.hostedConsoleURL)
+                                }
+                                .buttonStyle(GrannySecondaryButtonStyle())
+                                .pointingHandOnHover()
                             }
-                            .buttonStyle(GrannySecondaryButtonStyle())
-                            .pointingHandOnHover()
                         }
                         labeledField(GrannyLines.settingsJevModel, $jevModel)
                         labeledField(GrannyLines.settingsJevURL, $jevURL)

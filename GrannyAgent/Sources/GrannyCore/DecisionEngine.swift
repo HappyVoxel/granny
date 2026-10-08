@@ -260,9 +260,7 @@ public actor DecisionEngine {
     }
 
     /// Focus audio the grandchild works by: frequency/Hz tracks, meditation
-    /// and sleep audio, rain and noise, lofi and study playlists. Titles like
-    /// "You Will Become Super RICH ~ 888Hz" promise benefits but the form is
-    /// audio, and listening is not a distraction.
+    /// and sleep audio, rain and noise, lofi and study playlists.
     static func isFocusAudio(_ context: PageContext) -> Bool {
         let haystack = [context.title, context.channel]
             .compactMap { $0 }

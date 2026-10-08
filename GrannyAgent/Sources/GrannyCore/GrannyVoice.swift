@@ -1,8 +1,6 @@
 import Foundation
 
-/// Picks granny's TTS voice for her speaking language. Voices come from
-/// `say -v '?'`; a configured voice wins only when its locale matches the
-/// language, so switching to English never speaks with Linh.
+/// Picks granny's TTS voice for her speaking language.
 public enum GrannyVoice {
     public struct Voice: Equatable, Sendable {
         public let name: String
