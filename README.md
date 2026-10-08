@@ -25,6 +25,10 @@
 ---
 
 <p align="center">
+  <img src=".github/assets/app-dark.png" width="800" alt="granny's notebook: today's tasks with their allowed URL surfaces">
+</p>
+
+<p align="center">
   <a href=".github/assets/granny-demo.mp4">
     <img src=".github/assets/granny-demo.gif" width="640" alt="granny catches a LinkedIn feed and sends you back to work">
   </a>

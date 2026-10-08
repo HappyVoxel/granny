@@ -104,25 +104,59 @@ final class GrannyContext {
                     state.tasks = state.tasks.filter(\.carriedOver) + intake.tasks
                 }
                 if let question = intake.question {
-                    self.challengeTaskID = intake.tasks.first(where: { $0.purpose == nil })?.id
+                    self.challengeTaskID = self.challengeTarget(in: intake.tasks)?.id
                     onChallenge(question)
                 }
             }
         }
     }
 
+    /// Which task a follow-up question is about: the one missing a purpose,
+    /// else the one missing its sites - the "never invent a domain" case -
+    /// else the only task. A question without a target would drop the
+    /// grandchild's answer on the floor.
+    private func challengeTarget(in tasks: [TaskItem]) -> TaskItem? {
+        tasks.first { $0.purpose == nil }
+            ?? tasks.first { $0.allowedSurfaces.isEmpty }
+            ?? tasks.first
+    }
+
+    /// The answer to the intake's follow-up. It lands as the task's purpose,
+    /// and then the task is re-read the way an edit is: any URL the user
+    /// pasted becomes the surfaces verbatim (the model guesses no hosts -
+    /// that is how "granny.com" got invented once), and the engine's second
+    /// read refreshes the rest.
     func answerChallenge(_ answer: String) {
+        let trimmed = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        // Only write when the challenge still points at a task: never
+        // overwrite an unrelated task's purpose.
+        let target = challengeTaskID.flatMap { id in
+            store.state.tasks.first { $0.id == id }
+        } ?? challengeTarget(in: store.state.tasks)
+        challengeTaskID = nil
+        guard let task = target else { return }
+
+        let explicit = TaskParser.surfaces(in: trimmed)
         mutate { state in
-            // Only write when the challenge still points at a task: never
-            // overwrite an unrelated task's purpose.
-            let target = challengeTaskID.flatMap { id in
-                state.tasks.firstIndex(where: { $0.id == id })
-            } ?? state.tasks.firstIndex(where: { $0.purpose == nil })
-            if let target {
-                state.tasks[target].purpose = answer
+            guard let index = state.tasks.firstIndex(where: { $0.id == task.id }) else { return }
+            state.tasks[index].purpose = trimmed
+            if !explicit.isEmpty { state.tasks[index].allowedSurfaces = explicit }
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+            let text = "\(task.title). \(trimmed)"
+            guard let intake = await self.engine.parseIntake(text: text),
+                  let refined = intake.tasks.first
+            else { return }
+            await MainActor.run {
+                self.applyRefinement(
+                    refined, to: task.id,
+                    purposeEdited: true,
+                    surfacesEdited: !explicit.isEmpty)
             }
         }
-        challengeTaskID = nil
     }
 
     /// Adds tasks after the list was submitted. The naive parse lands first

@@ -26,7 +26,13 @@
   const MUTED_CONFIRM_MS = 3000;
   // How often the URL watcher notices an SPA navigation.
   const LOCATION_POLL_MS = 500;
+  // An SPA often rewrites the URL right after the grandchild dismisses an
+  // overlay (LinkedIn appends tracking params). Within this window a URL on
+  // the **same origin and path** inherits the allow - a query or hash
+  // rewrite of the page just dismissed, not a new route.
+  const CONTINUE_GRACE_MS = 1500;
   let layer: HTMLDivElement | null = null;
+  let lastContinue: { origin: string; pathname: string; at: number } | null = null;
 
   interface OverlayText {
     looking: string;
@@ -240,6 +246,11 @@
         ';background:rgba(194,161,92,.14)' + lift
       );
       button.addEventListener('click', () => {
+        lastContinue = {
+          origin: location.origin,
+          pathname: location.pathname,
+          at: Date.now(),
+        };
         sessionStorage.setItem(ALLOW_PREFIX + location.href, '1');
         removeLayer();
       });
@@ -354,28 +365,50 @@
   async function guard(previousTitle: string | null = null): Promise<void> {
     const url = location.href;
     if (sessionStorage.getItem(ALLOW_PREFIX + url)) return;
+    // Same origin and path as the dismissed page, a moment later: the site
+    // rewrote the query, it did not move the grandchild to a new route.
+    if (
+      lastContinue !== null &&
+      Date.now() - lastContinue.at < CONTINUE_GRACE_MS &&
+      lastContinue.origin === location.origin &&
+      lastContinue.pathname === location.pathname
+    ) {
+      sessionStorage.setItem(ALLOW_PREFIX + url, '1');
+      return;
+    }
 
     let context = extractContext();
     // SPA navigation keeps the previous page's title until the new one
     // renders: sending it would judge - and cache - the wrong video.
     if (previousTitle && context.title === previousTitle) context.title = '';
     let decision = await send({ type: 'granny-check', url: url, ...context });
+    // The page may have moved while the verdict was in flight: a fresh
+    // guard owns the new URL, and a stale answer must not draw for it.
+    if (url !== location.href) return;
 
     if (decision && decision.action === 'need-context') {
       showLayer(TEXT.looking, { back: false });
       await waitForTitle(TITLE_WAIT_MS, previousTitle);
       context = extractContext();
       decision = await send({ type: 'granny-check', url: url, ...context, force: true });
+      if (url !== location.href) return;
     }
 
     removeLayer();
     if (!decision || decision.action === 'allow') return;
+    // The grandchild may have hit Continue while this verdict was in
+    // flight; the allow wins over a late answer.
+    if (sessionStorage.getItem(ALLOW_PREFIX + location.href)) return;
     if (decision.action === 'block') {
       purgeOfflineData();
     } else if (await isMuted(location.hostname)) {
       // "Don't warn for this domain" is in force until the end of today.
       return;
     }
+    // The mute check awaits storage: the page may have moved on or been
+    // allowed while it was answering.
+    if (url !== location.href) return;
+    if (sessionStorage.getItem(ALLOW_PREFIX + location.href)) return;
     showLayer(decision.message || TEXT.blocked, {
       continue: decision.action === 'warn',
       close: decision.action === 'warn',
