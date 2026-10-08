@@ -360,16 +360,23 @@
     // renders: sending it would judge - and cache - the wrong video.
     if (previousTitle && context.title === previousTitle) context.title = '';
     let decision = await send({ type: 'granny-check', url: url, ...context });
+    // The page may have moved while the verdict was in flight: a fresh
+    // guard owns the new URL, and a stale answer must not draw for it.
+    if (url !== location.href) return;
 
     if (decision && decision.action === 'need-context') {
       showLayer(TEXT.looking, { back: false });
       await waitForTitle(TITLE_WAIT_MS, previousTitle);
       context = extractContext();
       decision = await send({ type: 'granny-check', url: url, ...context, force: true });
+      if (url !== location.href) return;
     }
 
     removeLayer();
     if (!decision || decision.action === 'allow') return;
+    // The grandchild may have hit Continue while this verdict was in
+    // flight; the allow wins over a late answer.
+    if (sessionStorage.getItem(ALLOW_PREFIX + location.href)) return;
     if (decision.action === 'block') {
       purgeOfflineData();
     } else if (await isMuted(location.hostname)) {
