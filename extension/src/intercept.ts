@@ -26,7 +26,13 @@
   const MUTED_CONFIRM_MS = 3000;
   // How often the URL watcher notices an SPA navigation.
   const LOCATION_POLL_MS = 500;
+  // An SPA often rewrites the URL right after the grandchild dismisses an
+  // overlay (LinkedIn appends tracking params). Within this window the new
+  // URL inherits the allow - same document, same hand on the mouse - so one
+  // click means one dismissal.
+  const CONTINUE_GRACE_MS = 1500;
   let layer: HTMLDivElement | null = null;
+  let lastContinueAt = 0;
 
   interface OverlayText {
     looking: string;
@@ -240,6 +246,7 @@
         ';background:rgba(194,161,92,.14)' + lift
       );
       button.addEventListener('click', () => {
+        lastContinueAt = Date.now();
         sessionStorage.setItem(ALLOW_PREFIX + location.href, '1');
         removeLayer();
       });
@@ -354,6 +361,12 @@
   async function guard(previousTitle: string | null = null): Promise<void> {
     const url = location.href;
     if (sessionStorage.getItem(ALLOW_PREFIX + url)) return;
+    if (Date.now() - lastContinueAt < CONTINUE_GRACE_MS) {
+      // The site moved the URL, not the grandchild: this document just got
+      // an allow and the follow-up URL inherits it.
+      sessionStorage.setItem(ALLOW_PREFIX + url, '1');
+      return;
+    }
 
     let context = extractContext();
     // SPA navigation keeps the previous page's title until the new one
