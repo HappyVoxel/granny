@@ -63,6 +63,16 @@ final class TaskParserTests: XCTestCase {
         XCTAssertEqual(TaskParser.normalizeSurface("github.com/new*"), "github.com/new*")
         XCTAssertNil(TaskParser.normalizeSurface(""))
         XCTAssertNil(TaskParser.normalizeSurface("dọn nhà"))
+        XCTAssertNil(TaskParser.normalizeSurface("hello"), "a bare word is not a host")
+    }
+
+    func testSurfacesFromAnswer() {
+        // The exact answer that once made the model invent "granny.com".
+        XCTAssertEqual(
+            TaskParser.surfaces(in: "https://dashboard.fastbackr.com/; https://granny.happyvoxel.com/"),
+            ["dashboard.fastbackr.com", "granny.happyvoxel.com"])
+        XCTAssertEqual(TaskParser.surfaces(in: "b.com/x and https://threads.net/feed"), ["b.com/x", "threads.com/feed"])
+        XCTAssertEqual(TaskParser.surfaces(in: "trên LinkedIn thôi"), [])
     }
 
     func testRefinedMergeRules() {

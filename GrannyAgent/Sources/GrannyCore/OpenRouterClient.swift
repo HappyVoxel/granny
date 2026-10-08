@@ -377,9 +377,10 @@ public struct OpenRouterClient: Sendable {
         short \(spoken) phrase), and surfaces (URL patterns like "linkedin.com/jobs*" that the \
         task genuinely needs; use the site's domain as it exists today - sites move, for example \
         Threads is threads.com, not threads.net - and when the grandchild wrote a domain, use it \
-        exactly). If any task is too vague to verify later (e.g. "learn AI" with no concrete \
-        deliverable), set question to exactly one short \(spoken) question asking for specifics, \
-        otherwise an empty string.
+        exactly). Never invent a domain: if the task does not name a site and you are not certain \
+        of the real one, leave surfaces empty and ask a question instead. If any task is too \
+        vague to verify later (e.g. "learn AI" with no concrete deliverable), set question to \
+        exactly one short \(spoken) question asking for specifics, otherwise an empty string.
         """
     }
 

@@ -101,7 +101,35 @@ public enum TaskParser {
         }
         if text.hasSuffix("/") { text = String(text.dropLast()) }
         guard !text.isEmpty, !text.contains(" "), !text.contains("\t") else { return nil }
+        // A surface is a host - prose must never become one.
+        guard looksLikeHost(text) else { return nil }
         return canonicalSurface(text)
+    }
+
+    /// Explicit hosts/URLs inside a clarifying answer ("…: https://a.com/;
+    /// b.com/x"). Deterministic and conservative: whatever the user pasted is
+    /// the truth, and the model is never asked to retype a URL it could
+    /// invent.
+    public static func surfaces(in text: String) -> [String] {
+        let separators = CharacterSet.whitespacesAndNewlines
+            .union(CharacterSet(charactersIn: ",;()[]<>\"'`"))
+        var found: [String] = []
+        for token in text.components(separatedBy: separators) where !token.isEmpty {
+            guard let surface = normalizeSurface(token) else { continue }
+            if !found.contains(surface) { found.append(surface) }
+        }
+        return found
+    }
+
+    /// A host carries a dot and plausible labels; a bare word never passes.
+    static func looksLikeHost(_ surface: String) -> Bool {
+        var host = String(surface.split(separator: "/", maxSplits: 1)[0])
+        if host.hasSuffix("*") { host = String(host.dropLast()) }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2, let tld = labels.last, tld.count >= 2 else { return false }
+        return labels.allSatisfy { label in
+            !label.isEmpty && label.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        }
     }
 }
 
