@@ -104,11 +104,21 @@ final class GrannyContext {
                     state.tasks = state.tasks.filter(\.carriedOver) + intake.tasks
                 }
                 if let question = intake.question {
-                    self.challengeTaskID = intake.tasks.first(where: { $0.purpose == nil })?.id
+                    self.challengeTaskID = self.challengeTarget(in: intake.tasks)?.id
                     onChallenge(question)
                 }
             }
         }
+    }
+
+    /// Which task a follow-up question is about: the one missing a purpose,
+    /// else the one missing its sites - the "never invent a domain" case -
+    /// else the only task. A question without a target would drop the
+    /// grandchild's answer on the floor.
+    private func challengeTarget(in tasks: [TaskItem]) -> TaskItem? {
+        tasks.first { $0.purpose == nil }
+            ?? tasks.first { $0.allowedSurfaces.isEmpty }
+            ?? tasks.first
     }
 
     /// The answer to the intake's follow-up. It lands as the task's purpose,
@@ -123,7 +133,7 @@ final class GrannyContext {
         // overwrite an unrelated task's purpose.
         let target = challengeTaskID.flatMap { id in
             store.state.tasks.first { $0.id == id }
-        } ?? store.state.tasks.first { $0.purpose == nil }
+        } ?? challengeTarget(in: store.state.tasks)
         challengeTaskID = nil
         guard let task = target else { return }
 

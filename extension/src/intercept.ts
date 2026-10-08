@@ -27,12 +27,12 @@
   // How often the URL watcher notices an SPA navigation.
   const LOCATION_POLL_MS = 500;
   // An SPA often rewrites the URL right after the grandchild dismisses an
-  // overlay (LinkedIn appends tracking params). Within this window the new
-  // URL inherits the allow - same document, same hand on the mouse - so one
-  // click means one dismissal.
+  // overlay (LinkedIn appends tracking params). Within this window a URL on
+  // the **same origin and path** inherits the allow - a query or hash
+  // rewrite of the page just dismissed, not a new route.
   const CONTINUE_GRACE_MS = 1500;
   let layer: HTMLDivElement | null = null;
-  let lastContinueAt = 0;
+  let lastContinue: { origin: string; pathname: string; at: number } | null = null;
 
   interface OverlayText {
     looking: string;
@@ -246,7 +246,11 @@
         ';background:rgba(194,161,92,.14)' + lift
       );
       button.addEventListener('click', () => {
-        lastContinueAt = Date.now();
+        lastContinue = {
+          origin: location.origin,
+          pathname: location.pathname,
+          at: Date.now(),
+        };
         sessionStorage.setItem(ALLOW_PREFIX + location.href, '1');
         removeLayer();
       });
@@ -361,9 +365,14 @@
   async function guard(previousTitle: string | null = null): Promise<void> {
     const url = location.href;
     if (sessionStorage.getItem(ALLOW_PREFIX + url)) return;
-    if (Date.now() - lastContinueAt < CONTINUE_GRACE_MS) {
-      // The site moved the URL, not the grandchild: this document just got
-      // an allow and the follow-up URL inherits it.
+    // Same origin and path as the dismissed page, a moment later: the site
+    // rewrote the query, it did not move the grandchild to a new route.
+    if (
+      lastContinue !== null &&
+      Date.now() - lastContinue.at < CONTINUE_GRACE_MS &&
+      lastContinue.origin === location.origin &&
+      lastContinue.pathname === location.pathname
+    ) {
       sessionStorage.setItem(ALLOW_PREFIX + url, '1');
       return;
     }
@@ -396,6 +405,10 @@
       // "Don't warn for this domain" is in force until the end of today.
       return;
     }
+    // The mute check awaits storage: the page may have moved on or been
+    // allowed while it was answering.
+    if (url !== location.href) return;
+    if (sessionStorage.getItem(ALLOW_PREFIX + location.href)) return;
     showLayer(decision.message || TEXT.blocked, {
       continue: decision.action === 'warn',
       close: decision.action === 'warn',

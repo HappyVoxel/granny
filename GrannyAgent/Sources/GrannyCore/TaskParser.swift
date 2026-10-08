@@ -99,6 +99,11 @@ public enum TaskParser {
         for scheme in ["https://", "http://"] where text.hasPrefix(scheme) {
             text = String(text.dropFirst(scheme.count))
         }
+        // The rules compare against URL.path only: a query or fragment would
+        // make the surface match nothing, so it is cut here.
+        if let cut = text.firstIndex(where: { $0 == "?" || $0 == "#" }) {
+            text = String(text[..<cut])
+        }
         if text.hasSuffix("/") { text = String(text.dropLast()) }
         guard !text.isEmpty, !text.contains(" "), !text.contains("\t") else { return nil }
         // A surface is a host - prose must never become one.

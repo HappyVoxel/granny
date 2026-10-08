@@ -66,6 +66,15 @@ final class TaskParserTests: XCTestCase {
         XCTAssertNil(TaskParser.normalizeSurface("hello"), "a bare word is not a host")
     }
 
+    func testNormalizeSurfaceStripsQueryAndFragment() {
+        // The rules match against URL.path only; a query in the surface
+        // would make it match nothing.
+        XCTAssertEqual(TaskParser.normalizeSurface("example.com/report?id=1"), "example.com/report")
+        XCTAssertEqual(TaskParser.normalizeSurface("https://example.com/report?x=1#top"), "example.com/report")
+        XCTAssertEqual(TaskParser.normalizeSurface("example.com?x=1"), "example.com")
+        XCTAssertEqual(TaskParser.normalizeSurface("youtube.com/watch?v=abc"), "youtube.com/watch")
+    }
+
     func testSurfacesFromAnswer() {
         // The exact answer that once made the model invent "granny.com".
         XCTAssertEqual(
