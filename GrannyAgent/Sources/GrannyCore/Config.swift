@@ -129,7 +129,7 @@ public struct GrannyConfig: Codable, Sendable {
         "xoilac", "90phut", "bongdatv", "vipboxtv",
         // adult
         "porn", "xvideos", "xnxx", "xhamster", "redtube", "youporn",
-        "onlyfans", "hentai", "fapello", "thothub", "tango", "pulsz"
+        "onlyfans", "hentai", "fapello", "thothub", "tango", "pulsz",
         // games
         "gamevui", "y8.com", "poki", "miniclip", "crazygames", "friv",
         "kongregate", "newgrounds", "addictinggames", "armorgames", "trochoi",
