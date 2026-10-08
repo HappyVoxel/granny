@@ -5,8 +5,6 @@ import Foundation
 /// selects the language and forwards every member, so views never care
 /// which language is active.
 public enum GrannyLines {
-    // Read from the engine's background tasks and written by Settings on the
-    // main thread: the switch and the read both take the lock.
     private static let lock = NSLock()
     private static var _strings: any GrannyStrings = EnglishStrings()
     private static var currentLanguage: GrannyLanguage = .en

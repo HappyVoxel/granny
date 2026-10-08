@@ -1,7 +1,6 @@
 import Foundation
 
 /// Manages the granny block section inside a hosts file.
-/// The same rendering rules as the Phase 0 shell prototype, in Swift.
 public enum HostsFile {
     public static let markBegin = "# GRANNY-BEGIN (managed by granny-agent; do not edit)"
     public static let markEnd = "# GRANNY-END"

@@ -10,15 +10,10 @@ public actor LayaClient {
     let apiKey: String
     let timeout: TimeInterval
     let language: String
-    /// Pins a checkpoint on hosts that take one (e.g. `laya/multilingual`);
-    /// nil keeps the language-based default.
     let model: String?
-    /// Confidence gate for the answer; hosts calibrate differently.
     let minConfidence: Double
     let session: URLSession
-    /// Verdict label: "laya" or "jev" (same System One wire).
     let source: String
-    /// The candidate that answered; nil until the first request finds it.
     private var resolvedEndpoint: URL?
 
     public init(
@@ -41,8 +36,19 @@ public actor LayaClient {
         self.session = session
     }
 
-    /// Where a new Laya key comes from; the Settings card links here.
-    public static let consoleURL = URL(string: "https://console.opscom.io")!
+    /// The hosted console the Settings shortcut points to: a product
+    /// shortcut for someone who has no Laya yet, not a derivation of the
+    /// user's own URL.
+    public static let hostedConsoleURL = URL(string: "https://console.opscom.io")!
+
+    /// Whether that shortcut is useful for this configuration. Someone who
+    /// already points granny at their own deployment elsewhere does not
+    /// need a "get a key" button, so the card hides it.
+    public static func hostedConsoleApplies(to configured: String) -> Bool {
+        let trimmed = configured.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        return URL(string: trimmed)?.host?.lowercased() == hostedConsoleURL.host
+    }
 
     /// The console hands out full endpoints (`https://host/v1/systemone`),
     /// while `https://host/v1` style bases expect granny to append the path.
