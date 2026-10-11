@@ -23,6 +23,15 @@ public enum TaskParser {
     /// The bullet the notebook editor inserts; the parser strips it back.
     public static let bullet = "• "
 
+    /// What the notebook does with a `- ` (or `* `) just typed at the start
+    /// of an empty line: it becomes the drawn bullet, the way Notion does it.
+    /// Only the end of the text counts - a mid-document edit must not move
+    /// the cursor.
+    public static func bulleted(afterTypingLineMarker text: String) -> String {
+        guard text.hasSuffix("\n- ") || text.hasSuffix("\n* ") else { return text }
+        return String(text.dropLast(2)) + bullet
+    }
+
     /// Leading list bullets ("• ", "- ", "* ") are stripped so the bulleted
     /// editor in the UI can feed straight into the parser.
     public static func parse(_ text: String) -> [TaskItem] {

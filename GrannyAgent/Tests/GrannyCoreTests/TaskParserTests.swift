@@ -75,6 +75,15 @@ final class TaskParserTests: XCTestCase {
         XCTAssertEqual(TaskParser.normalizeSurface("youtube.com/watch?v=abc"), "youtube.com/watch")
     }
 
+    func testTypedLineMarkerBecomesTheBullet() {
+        XCTAssertEqual(TaskParser.bulleted(afterTypingLineMarker: "• first\n- "), "• first\n• ")
+        XCTAssertEqual(TaskParser.bulleted(afterTypingLineMarker: "• first\n* "), "• first\n• ")
+        XCTAssertEqual(TaskParser.bulleted(afterTypingLineMarker: "• first\n-"), "• first\n-",
+                       "the marker alone does not convert")
+        XCTAssertEqual(TaskParser.bulleted(afterTypingLineMarker: "• call mom- "), "• call mom- ",
+                       "only a line start converts")
+    }
+
     func testSurfacesFromAnswer() {
         // The exact answer that once made the model invent "granny.com".
         XCTAssertEqual(
