@@ -415,6 +415,11 @@ struct GreetingView: View {
                     } else if newValue.isEmpty {
                         // The first line always keeps its bullet.
                         text = TaskParser.bullet
+                    } else if newValue.count > oldValue.count {
+                        // "- " typed at the start of a line becomes the
+                        // drawn bullet, the way Notion does it.
+                        let bulleted = TaskParser.bulleted(afterTypingLineMarker: newValue)
+                        if bulleted != newValue { text = bulleted }
                     }
                 }
 
