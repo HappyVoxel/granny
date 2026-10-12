@@ -58,6 +58,13 @@ notebook header both offer "Back to work".
   cannot survive on offline cache.
 - **Decision engine** (inside GrannyAgent) - see below. Laya and the
   OpenRouter model are pluggable tiers, off by default for OSS.
+- **Pomodoro tomato** (in GrannyAgent) - the notebook's bottom-left corner.
+  A click starts a 25-minute deep-work round; the breaks follow on their own
+  (5 minutes, and 15 every fourth round). The fruit's colour is the stage,
+  the countdown sits on the fruit, and the single number outside it counts
+  today's instances of that stage - "the 3rd short break", "the 1st long
+  break" - so no digit needs a legend. Durations and the cadence are config;
+  the counters live in the day state, so midnight starts the tomato over.
 
 ## Interception and decisions
 
@@ -159,9 +166,10 @@ common case and would drown the signal.
   key, model slug, wake/bedtime hours, language, speech, optional Laya
   URL/key, optional Langfuse keys, the local API token and port. Missing
   fields fall back to defaults, so old config files never break.
-- State (the day's tasks, day-off flag, greeted flag, and the streak with
-  its last chain day) lives at `~/Library/Application Support/granny/state.json`
-  and rolls over at midnight.
+- State (the day's tasks, day-off flag, greeted flag, the streak with its
+  last chain day, and today's pomodoro counter) lives at
+  `~/Library/Application Support/granny/state.json` and rolls over at
+  midnight.
 - The HTTP decision endpoint binds 127.0.0.1 only and requires the token
   header; the extension's options page holds the same port and token.
 
@@ -238,3 +246,12 @@ common case and would drown the signal.
    like noise next to the frog reminder). Counting happens at rollover, so
    the badge can include today the moment its tasks are done; notifications
    fire only for displayed streaks, growing or dying.
+- **Pomodoro**: the timer is the technique's, the drawing is granny's. One
+  counter (`finished` rounds) decides both the number beside the tomato and
+  the break the round earns, so the two can never disagree. A finished round
+  hands over to its break on its own (the pomofocus default) while the next
+  deep-work round waits for a click - granny must not start a 25-minute round
+  while nobody is at the desk. The countdown is a deadline in memory, not a
+  persisted second: a relaunch starts the tomato over instead of resuming a
+  stale round, and no disk write happens per tick. Pausing is the whole
+  control set; a misclick costs one frozen round, not a lost day.

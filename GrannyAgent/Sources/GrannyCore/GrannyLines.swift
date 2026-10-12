@@ -105,6 +105,15 @@ public enum GrannyLines {
     public static func carryOver(tasks: [String]) -> String { strings.carryOver(tasks: tasks) }
     public static var carriedBadge: String { strings.carriedBadge }
     public static var streakHelp: String { strings.streakHelp }
+
+    // Pomodoro
+    public static var pomodoroHelp: String { strings.pomodoroHelp }
+    public static var pomodoroDeepWork: String { strings.pomodoroDeepWork }
+    public static var pomodoroShortBreak: String { strings.pomodoroShortBreak }
+    public static var pomodoroLongBreak: String { strings.pomodoroLongBreak }
+    public static func pomodoroNext(stage: String, minutes: Int) -> String {
+        strings.pomodoroNext(stage: stage, minutes: minutes)
+    }
     public static func streakUp(count: Int) -> String { strings.streakUp(count: count) }
     public static func streakLost(days: Int) -> String { strings.streakLost(days: days) }
 
@@ -176,6 +185,14 @@ public enum GrannyLines {
     public static var settingsWakeHour: String { strings.settingsWakeHour }
     public static var settingsBedtime: String { strings.settingsBedtime }
     public static var settingsSpeechToggle: String { strings.settingsSpeechToggle }
+    public static var settingsPomodoroGroup: String { strings.settingsPomodoroGroup }
+    public static func settingsPomodoroCaption(every: Int) -> String {
+        strings.settingsPomodoroCaption(every: every)
+    }
+    public static var settingsPomodoroWork: String { strings.settingsPomodoroWork }
+    public static var settingsPomodoroShortBreak: String { strings.settingsPomodoroShortBreak }
+    public static var settingsPomodoroLongBreak: String { strings.settingsPomodoroLongBreak }
+    public static var settingsPomodoroEvery: String { strings.settingsPomodoroEvery }
     public static var settingsListsGroup: String { strings.settingsListsGroup }
     public static var settingsAppsLabel: String { strings.settingsAppsLabel }
     public static var settingsAppsCaption: String { strings.settingsAppsCaption }

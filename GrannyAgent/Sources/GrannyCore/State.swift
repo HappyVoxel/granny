@@ -49,6 +49,9 @@ public struct DayState: Codable, Sendable {
     public var dayOff: Bool
     public var greeted: Bool
     public var tasks: [TaskItem]
+    /// Today's tomato. It lives here so the midnight rollover resets the
+    /// round counters with the day, the way the notebook does.
+    public var pomodoro: PomodoroRun
     /// Unfinished tasks from yesterday, waiting for the morning intake to
     /// merge them into the new notebook.
     public var carried: [TaskItem]
@@ -65,6 +68,7 @@ public struct DayState: Codable, Sendable {
         greeted: Bool = false,
         tasks: [TaskItem] = [],
         carried: [TaskItem] = [],
+        pomodoro: PomodoroRun = .fresh,
         streak: Int = 0,
         streakDay: String? = nil
     ) {
@@ -72,6 +76,7 @@ public struct DayState: Codable, Sendable {
         self.dayOff = dayOff
         self.greeted = greeted
         self.tasks = tasks
+        self.pomodoro = pomodoro
         self.carried = carried
         self.streak = streak
         self.streakDay = streakDay
@@ -104,6 +109,7 @@ public struct DayState: Codable, Sendable {
         greeted = try c.decodeIfPresent(Bool.self, forKey: .greeted) ?? false
         tasks = try c.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? []
         carried = try c.decodeIfPresent([TaskItem].self, forKey: .carried) ?? []
+        pomodoro = try c.decodeIfPresent(PomodoroRun.self, forKey: .pomodoro) ?? .fresh
         streak = try c.decodeIfPresent(Int.self, forKey: .streak) ?? 0
         streakDay = try c.decodeIfPresent(String.self, forKey: .streakDay)
     }
