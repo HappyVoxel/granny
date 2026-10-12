@@ -254,4 +254,7 @@ common case and would drown the signal.
   while nobody is at the desk. The countdown is a deadline in memory, not a
   persisted second: a relaunch starts the tomato over instead of resuming a
   stale round, and no disk write happens per tick. Pausing is the whole
-  control set; a misclick costs one frozen round, not a lost day.
+  control set; a misclick costs one frozen round, not a lost day. The bell
+  rings three times (one system sound vanishes under music or a meeting), the
+  click that answers it silences it, and the banner behind it opens granny at
+  the notebook - the tomato is what the click is for.

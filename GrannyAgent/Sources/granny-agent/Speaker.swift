@@ -10,6 +10,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
     private var started = false
 
+    /// What a click on one of granny's notifications does. The app delegate
+    /// sets it: granny comes forward with her notebook, which is where the
+    /// tasks are - and the tomato. A finished round is answered by clicking
+    /// that tomato, so the bell's banner has to land where the tomato is.
+    var onOpen: (() -> Void)?
+
     func start() {
         guard !started, Bundle.main.bundleIdentifier != nil else { return }
         started = true
@@ -64,6 +70,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound])
     }
 
+    /// A click on the banner brings granny forward instead of leaving the
+    /// grandchild to find her.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        DispatchQueue.main.async { [weak self] in self?.onOpen?() }
+        completionHandler()
+    }
+
     static func osascript(title: String, body: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -79,23 +96,65 @@ func postNotification(title: String = "granny", body: String) {
     Notifier.shared.post(title: title, body: body)
 }
 
-/// The pomodoro's bell, rung by granny herself. A notification can be muted
-/// by Focus or by the banner settings, and a round that ends silently is a
-/// round the grandchild works straight through.
-enum Chime {
-    /// A deep-work round is over: the break has started.
-    static func breakTime() { play("Glass") }
-    /// A break is over: back to the desk.
-    static func backToWork() { play("Ping") }
+/// The pomodoro's bell, rung by granny herself. A notification can be muted by
+/// Focus or by the banner settings, and one system sound is about a second -
+/// it disappears under music or a meeting. So the bell rings a few times, and
+/// stops the moment it is answered.
+///
+/// An instance rather than a namespace: the ring pattern is state (a timer and
+/// a count left), and static mutable state needs isolation this does not.
+final class Chime {
+    /// How many times the bell rings, and how far apart: one system sound runs
+    /// about a second, so three of them are roughly four seconds of bell.
+    private static let rings = 3
+    private static let gap: TimeInterval = 1.3
 
-    /// `GRANNY_CHIME` replaces the system sound with a command, the way
-    /// `GRANNY_OSA_CMD` replaces osascript: a run can silence the bell, and a
-    /// manual one can watch it ring.
-    private static func play(_ name: String) {
+    private var timer: Timer?
+    private var ringsLeft = 0
+    private var name = "Glass"
+
+    /// A deep-work round is over: the break has started.
+    func breakTime() { ring("Glass") }
+    /// A break is over: back to the desk.
+    func backToWork() { ring("Ping") }
+
+    /// Rings no more. The tomato answers the bell the moment it is clicked,
+    /// and a new stage's bell takes over from the one still ringing.
+    func silence() {
+        timer?.invalidate()
+        timer = nil
+        ringsLeft = 0
+        NSSound(named: NSSound.Name(name))?.stop()
+    }
+
+    func ring(_ sound: String) {
+        silence()
+        name = sound
+        ringsLeft = Self.rings
+        play()
+        guard ringsLeft > 0 else { return }
+        let timer = Timer(timeInterval: Self.gap, repeats: true) { [weak self] _ in
+            self?.play()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    private func play() {
+        guard ringsLeft > 0 else { return silence() }
+        ringsLeft -= 1
+        // `GRANNY_CHIME` replaces the system sound with a command, the way
+        // `GRANNY_OSA_CMD` replaces osascript: a run can silence the bell, and
+        // a manual one can watch it ring (the command gets the sound's name).
         if let tool = ProcessInfo.processInfo.environment[GrannyEnv.chime], !tool.isEmpty {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: tool)
             process.arguments = [name]
+            // Forward the command's output: the point of the seam is to watch
+            // the bell ring - `/bin/date` shows the three rings and their
+            // spacing.
+            process.standardOutput = FileHandle.standardOutput
+            process.standardError = FileHandle.standardError
             try? process.run()
             return
         }
@@ -104,7 +163,7 @@ enum Chime {
             return
         }
         // System sounds are shared and cached: stop before replaying, so a
-        // quick second chime is not swallowed.
+        // quick second ring is not swallowed.
         sound.stop()
         sound.volume = 0.85
         sound.play()

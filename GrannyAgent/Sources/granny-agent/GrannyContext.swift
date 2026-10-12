@@ -11,6 +11,7 @@ final class GrannyContext {
     let speaker = Speaker()
     let block = BlockController()
     let scheduler: Scheduler
+    private let chime = Chime()
     let viewModel = GrannyViewModel()
 
     /// Set when GitHub reports a newer release; the menu offers the link.
@@ -65,6 +66,11 @@ final class GrannyContext {
         startAppKiller()
         startBrowserJanitor()
         startUpdateCheck()
+        // A round can be asked to start itself, so a run can watch a whole
+        // stage end - the bell, the banner, the next stage - without a click.
+        if ProcessInfo.processInfo.environment[GrannyEnv.pomodoroAutostart] == "1" {
+            startPomodoro()
+        }
     }
 
     func snapshot() -> (DayState, Phase) {
@@ -473,6 +479,8 @@ final class GrannyContext {
     /// losing one to a misclick is not a disaster, and every extra button on
     /// a tomato this small would be clutter.
     func togglePomodoro() {
+        // The click is also the answer to the bell: stop ringing.
+        chime.silence()
         pomodoroRunning ? pausePomodoro() : startPomodoro()
     }
 
@@ -538,7 +546,7 @@ final class GrannyContext {
         mutate { $0.pomodoro = next }
         // The bell first: it is the part that has to work with the window
         // behind another app or the screen asleep.
-        if over == .deepWork { Chime.breakTime() } else { Chime.backToWork() }
+        if over == .deepWork { chime.breakTime() } else { chime.backToWork() }
         announce(GrannyLines.pomodoroNext(stage: stageName(next.stage), minutes: minutes))
     }
 
