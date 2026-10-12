@@ -31,9 +31,6 @@ final class GrannyContext {
     private var pomodoroRemaining: TimeInterval = 0
     private var pomodoroRunning = false
     private var pomodoroTimer: Timer?
-    /// The stage the in-memory clock is counting, which is how a rollover
-    /// (the day's tomato back to round one) is told from a normal tick.
-    private var clockStage: PomodoroStage = .deepWork
 
     init() {
         GrannyPaths.ensureDirectories()
@@ -54,11 +51,15 @@ final class GrannyContext {
         viewModel.refresh(from: self)
         // Idle, the tomato wears the stage that a click would start.
         pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
-        clockStage = store.state.pomodoro.stage
         syncPomodoro()
     }
 
     func start() {
+        // Midnight moves the tomato to a new day even when the stage it left
+        // was deep work too - which is exactly what a running round looks
+        // like, and why the clock is reset here instead of by comparing
+        // stages.
+        scheduler.onDayRollover = { [weak self] in self?.startPomodoroDay() }
         scheduler.start()
         startDecisionServer()
         startAppKiller()
@@ -470,7 +471,7 @@ final class GrannyContext {
     /// The tomato: click to start the stage, click again to freeze it where
     /// it is. Pausing is the whole control set - a round is 25 minutes, so
     /// losing one to a misclick is not a disaster, and every extra button on
-    /// a 62-point tomato would be clutter.
+    /// a tomato this small would be clutter.
     func togglePomodoro() {
         pomodoroRunning ? pausePomodoro() : startPomodoro()
     }
@@ -479,7 +480,6 @@ final class GrannyContext {
         if pomodoroRemaining <= 0 {
             pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
         }
-        clockStage = store.state.pomodoro.stage
         pomodoroDeadline = Date().addingTimeInterval(pomodoroRemaining)
         pomodoroRunning = true
         startPomodoroTimer()
@@ -528,7 +528,6 @@ final class GrannyContext {
         let minutes = next.minutes(config.pomodoro)
         pomodoroRemaining = TimeInterval(minutes * 60)
         pomodoroRunning = next.stage != .deepWork
-        clockStage = next.stage
         pomodoroDeadline = pomodoroRunning ? Date().addingTimeInterval(pomodoroRemaining) : nil
         if pomodoroRunning {
             startPomodoroTimer()
@@ -543,19 +542,9 @@ final class GrannyContext {
         announce(GrannyLines.pomodoroNext(stage: stageName(next.stage), minutes: minutes))
     }
 
-    /// Pushes the clock into the view. Also the seam that notices a midnight
-    /// rollover: the day's tomato is back to round one while the clock is
-    /// still counting the old stage, so the clock adopts the store.
+    /// Pushes the clock into the view.
     func syncPomodoro() {
         let run = store.state.pomodoro
-        if run.stage != clockStage {
-            clockStage = run.stage
-            pomodoroRemaining = TimeInterval(run.minutes(config.pomodoro) * 60)
-            pomodoroRunning = false
-            pomodoroDeadline = nil
-            pomodoroTimer?.invalidate()
-            pomodoroTimer = nil
-        }
         viewModel.pomodoroStage = run.stage
         viewModel.pomodoroIndex = run.index(longBreakEvery: config.pomodoro.resolved.longBreakEvery)
         viewModel.pomodoroTotal = TimeInterval(run.minutes(config.pomodoro) * 60)
@@ -563,12 +552,19 @@ final class GrannyContext {
         viewModel.pomodoroRunning = pomodoroRunning
     }
 
+    /// A new day: the day's tomato starts over, and so does its clock. Paused,
+    /// running or mid-break, nothing of yesterday carries into today.
+    private func startPomodoroDay() {
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = nil
+        pomodoroDeadline = nil
+        pomodoroRunning = false
+        pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
+        syncPomodoro()
+    }
+
     private func stageName(_ stage: PomodoroStage) -> String {
-        switch stage {
-        case .deepWork: return GrannyLines.pomodoroDeepWork
-        case .shortBreak: return GrannyLines.pomodoroShortBreak
-        case .longBreak: return GrannyLines.pomodoroLongBreak
-        }
+        GrannyLines.pomodoroStage(stage)
     }
 
     private func announce(_ line: String) {

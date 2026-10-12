@@ -114,6 +114,20 @@ public enum GrannyLines {
     public static func pomodoroNext(stage: String, minutes: Int) -> String {
         strings.pomodoroNext(stage: stage, minutes: minutes)
     }
+    public static func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        strings.pomodoroState(stage: stage, index: index, clock: clock)
+    }
+    public static var pomodoroClickToRun: String { strings.pomodoroClickToRun }
+    public static var pomodoroClickToPause: String { strings.pomodoroClickToPause }
+    /// The stage's name in the active language; the tomato shows the stage as
+    /// a colour, so this is what says it out loud.
+    public static func pomodoroStage(_ stage: PomodoroStage) -> String {
+        switch stage {
+        case .deepWork: return strings.pomodoroDeepWork
+        case .shortBreak: return strings.pomodoroShortBreak
+        case .longBreak: return strings.pomodoroLongBreak
+        }
+    }
     public static func streakUp(count: Int) -> String { strings.streakUp(count: count) }
     public static func streakLost(days: Int) -> String { strings.streakLost(days: days) }
 

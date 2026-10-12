@@ -147,4 +147,35 @@ final class PomodoroTests: XCTestCase {
         XCTAssertEqual(fifth.filter { !$0.lit }.count, 2)
         XCTAssertEqual(fifth[2].from, 0.2, accuracy: 0.0005)
     }
+
+    /// The day's tomato belongs to the day, so the rollover must clear the
+    /// whole run - not just its counters. A break left mid-stage at midnight
+    /// is what the live clock used to keep counting.
+    func testRolloverStartsTheTomatoOver() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("granny-pomodoro-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("state.json")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        let now = Date()
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
+        let dayBefore = calendar.date(byAdding: .day, value: -2, to: now)!
+
+        var saved = DayState(
+            date: dayString(yesterday, calendar: calendar),
+            greeted: true,
+            tasks: [TaskItem(title: "a", done: true)],
+            pomodoro: PomodoroRun(stage: .longBreak, finished: 4))
+        saved.streak = 3
+        // A chain that reached yesterday: `streakDay` is the day before it.
+        saved.streakDay = dayString(dayBefore, calendar: calendar)
+        try XCTUnwrap(JSON.encode(saved)).write(to: url)
+
+        let store = StateStore(url: url, calendar: calendar)
+        XCTAssertEqual(store.state.date, dayString(now, calendar: calendar))
+        XCTAssertEqual(store.state.pomodoro, .fresh, "yesterday's break is not today's")
+        XCTAssertEqual(store.state.streak, 4, "and the streak still banked")
+    }
 }

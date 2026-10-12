@@ -693,7 +693,11 @@ struct PomodoroTomatoView: View {
         .onHover { hovering = $0 }
         .pointingHandOnHover()
         .help(GrannyLines.pomodoroHelp)
-        .accessibilityLabel("\(GrannyLines.pomodoroHelp) \(clock)")
+        .accessibilityLabel(GrannyLines.pomodoroHelp)
+        .accessibilityValue(
+            GrannyLines.pomodoroState(
+                stage: GrannyLines.pomodoroStage(stage), index: index, clock: clock))
+        .accessibilityHint(running ? GrannyLines.pomodoroClickToPause : GrannyLines.pomodoroClickToRun)
     }
 }
 

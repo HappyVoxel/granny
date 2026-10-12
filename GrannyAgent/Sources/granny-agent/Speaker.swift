@@ -88,7 +88,17 @@ enum Chime {
     /// A break is over: back to the desk.
     static func backToWork() { play("Ping") }
 
+    /// `GRANNY_CHIME` replaces the system sound with a command, the way
+    /// `GRANNY_OSA_CMD` replaces osascript: a run can silence the bell, and a
+    /// manual one can watch it ring.
     private static func play(_ name: String) {
+        if let tool = ProcessInfo.processInfo.environment[GrannyEnv.chime], !tool.isEmpty {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: tool)
+            process.arguments = [name]
+            try? process.run()
+            return
+        }
         guard let sound = NSSound(named: NSSound.Name(name)) else {
             NSSound.beep()
             return

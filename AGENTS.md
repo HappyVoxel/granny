@@ -66,8 +66,10 @@ tests/                        e2e shell suites + legacy Phase 0 suite
 docs/                         ARCHITECTURE.md (design), INSTALL.md (guide)
 packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
 .github/                      CI workflow, issue templates, logo
-.agents/skills/               granny-swift review skill - the only real copy;
-                              .claude/skills/granny-swift is a symlink to it
+.agents/skills/               agent skills, one real copy each: granny-swift
+                              (the Swift review skill) and langfuse (vendored
+                              from langfuse/skills, MIT, for reading granny's
+                              traces). .claude/skills/* are symlinks to them
 ```
 
 ## Conventions
@@ -91,9 +93,9 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   (`GRANNY_CONFIG_FILE`, `GRANNY_STATE_DIR`, `GRANNY_HOSTS_FILE`,
   `GRANNY_ALLOW_NONROOT`, `GRANNY_SUDO`, `GRANNY_OSA_CMD`, `GRANNY_LAUNCHCTL`,
   `GRANNY_LAUNCH_AGENT`, `GRANNY_SKIP_DNS_FLUSH`, `GRANNY_TRACE_DEBUG`,
-  `GRANNY_SHOW_WINDOW`, `GRANNY_OPEN`, `GRANNY_PKILL`, and the updater's tool
-  paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New system calls
-  must get an override or the e2e suites cannot reach them.
+  `GRANNY_SHOW_WINDOW`, `GRANNY_OPEN`, `GRANNY_PKILL`, `GRANNY_CHIME`, and the
+  updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
+  system calls must get an override or the e2e suites cannot reach them.
 - `/etc/hosts` is edited only between the `# GRANNY-BEGIN` / `# GRANNY-END`
   markers. The Swift renderer (`GrannyCore/HostsFile.swift`) is the single
   source of truth; `scripts/proto.sh` carries a legacy copy and must not grow

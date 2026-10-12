@@ -126,6 +126,11 @@ public protocol GrannyStrings: Sendable {
     var pomodoroShortBreak: String { get }
     var pomodoroLongBreak: String { get }
     func pomodoroNext(stage: String, minutes: Int) -> String
+    /// What VoiceOver reads for the tomato: the stage, the round and the
+    /// clock. The colour says the stage to the eye; this says it out loud.
+    func pomodoroState(stage: String, index: Int, clock: String) -> String
+    var pomodoroClickToRun: String { get }
+    var pomodoroClickToPause: String { get }
 
     // Status line
     var statusAwaiting: String { get }
@@ -378,8 +383,13 @@ public struct EnglishStrings: GrannyStrings {
     public var pomodoroShortBreak: String { "a short break" }
     public var pomodoroLongBreak: String { "a long break" }
     public func pomodoroNext(stage: String, minutes: Int) -> String {
-        "\(minutes) minutes of \(stage), dear. Off you go."
+        "\(minutes) minute\(minutes == 1 ? "" : "s") of \(stage), dear. Off you go."
     }
+    public func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        "\(stage), round \(index), \(clock) left"
+    }
+    public var pomodoroClickToRun: String { "Start the round" }
+    public var pomodoroClickToPause: String { "Pause the round" }
 
     public var statusAwaiting: String { "Today's list isn't written yet." }
     public var statusWorking: String { "Working. Granny lets you play when it's all done." }
@@ -656,6 +666,11 @@ public struct VietnameseStrings: GrannyStrings {
     public func pomodoroNext(stage: String, minutes: Int) -> String {
         "\(minutes) phút \(stage) nhé cháu. Ngoại canh đồng hồ."
     }
+    public func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        "\(stage), vòng \(index), còn \(clock)"
+    }
+    public var pomodoroClickToRun: String { "Bắt đầu vòng" }
+    public var pomodoroClickToPause: String { "Tạm dừng vòng" }
 
     public var statusAwaiting: String { "Chưa nhập danh sách hôm nay." }
     public var statusWorking: String { "Đang làm việc. Xong hết ngoại mới cho chơi." }
@@ -930,8 +945,13 @@ public struct FinnishStrings: GrannyStrings {
     public var pomodoroShortBreak: String { "lyhyttä taukoa" }
     public var pomodoroLongBreak: String { "pitkää taukoa" }
     public func pomodoroNext(stage: String, minutes: Int) -> String {
-        "\(minutes) minuuttia \(stage), kulta. Mummo katsoo kelloa."
+        "\(minutes) minuutti\(minutes == 1 ? "" : "a") \(stage), kulta. Mummo katsoo kelloa."
     }
+    public func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        "\(stage), kierros \(index), \(clock) jäljellä"
+    }
+    public var pomodoroClickToRun: String { "Aloita kierros" }
+    public var pomodoroClickToPause: String { "Keskeytä kierros" }
 
     public var statusAwaiting: String { "Tämän päivän listaa ei ole vielä kirjoitettu." }
     public var statusWorking: String { "Työ kesken. Mummo päästää leikkimään, kun kaikki on valmista." }

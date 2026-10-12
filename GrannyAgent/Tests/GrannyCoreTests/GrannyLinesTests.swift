@@ -80,3 +80,29 @@ final class GrannyLinesTests: XCTestCase {
         XCTAssertEqual(GrannyLines.greeting, EnglishStrings().greeting)
     }
 }
+
+extension GrannyLinesTests {
+    /// A one-minute stage is reachable from Settings, and granny does not say
+    /// "1 minutes" about it.
+    func testPomodoroSingularMinute() {
+        GrannyLines.language = "en"
+        XCTAssertTrue(GrannyLines.pomodoroNext(stage: "deep work", minutes: 1).contains("1 minute of"))
+        XCTAssertTrue(GrannyLines.pomodoroNext(stage: "deep work", minutes: 25).contains("25 minutes of"))
+
+        GrannyLines.language = "fi"
+        XCTAssertTrue(GrannyLines.pomodoroNext(stage: "työtä", minutes: 1).contains("1 minuutti "))
+        XCTAssertTrue(GrannyLines.pomodoroNext(stage: "työtä", minutes: 25).contains("25 minuuttia "))
+    }
+
+    /// The tomato says the stage out loud: the colour is the eye's copy.
+    func testPomodoroStateReadsTheStageAndTheClock() {
+        GrannyLines.language = "en"
+        let line = GrannyLines.pomodoroState(stage: GrannyLines.pomodoroStage(.shortBreak), index: 3, clock: "4:12")
+        XCTAssertTrue(line.contains("a short break"))
+        XCTAssertTrue(line.contains("3"))
+        XCTAssertTrue(line.contains("4:12"))
+
+        GrannyLines.language = "vi"
+        XCTAssertTrue(GrannyLines.pomodoroStage(.longBreak) == "nghỉ dài")
+    }
+}
