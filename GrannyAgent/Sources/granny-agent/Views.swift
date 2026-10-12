@@ -456,7 +456,10 @@ private struct TomatoCalyx: View {
             /// A leaf turned where it is, then moved into place. Turning
             /// after moving would swing it around the canvas corner.
             func placed(_ leaf: Path, toward angle: Double) -> Path {
-                let radians = angle * .pi / 180
+                // CGFloat, not Double: both `_math` and CoreGraphics offer
+                // `sin`, and an unconverted argument leaves the call ambiguous
+                // on toolchains this repo is not built with locally.
+                let radians = CGFloat(angle) * .pi / 180
                 let centre = CGPoint(
                     x: origin.x + sin(radians) * Self.reach,
                     y: origin.y - cos(radians) * Self.reach)
@@ -560,7 +563,8 @@ struct PomodoroTomatoView: View {
 
     /// Where the hand is, in clock degrees from twelve.
     private var tip: CGPoint {
-        let radians = (1 - remainingFraction) * 2 * .pi
+        // Same CGFloat note as the calyx: keep `sin`/`cos` unambiguous.
+        let radians = CGFloat(1 - remainingFraction) * 2 * .pi
         let radius = Self.diameter / 2
         return CGPoint(x: sin(radians) * radius, y: -cos(radians) * radius)
     }
