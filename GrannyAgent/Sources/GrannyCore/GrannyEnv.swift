@@ -16,6 +16,9 @@ public enum GrannyEnv {
     public static let launchAgent = "GRANNY_LAUNCH_AGENT"
     public static let user = "GRANNY_USER"
     public static let showWindow = "GRANNY_SHOW_WINDOW"
+    /// Start a pomodoro round at launch, so a run can watch a whole stage -
+    /// the dial draining, the bell, the banner - without a click.
+    public static let pomodoroAutostart = "GRANNY_POMODORO_AUTOSTART"
     /// A command to run instead of playing a system sound (it gets the sound
     /// name as its argument), the way `osaCmd` replaces osascript.
     public static let chime = "GRANNY_CHIME"

@@ -93,7 +93,8 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   (`GRANNY_CONFIG_FILE`, `GRANNY_STATE_DIR`, `GRANNY_HOSTS_FILE`,
   `GRANNY_ALLOW_NONROOT`, `GRANNY_SUDO`, `GRANNY_OSA_CMD`, `GRANNY_LAUNCHCTL`,
   `GRANNY_LAUNCH_AGENT`, `GRANNY_SKIP_DNS_FLUSH`, `GRANNY_TRACE_DEBUG`,
-  `GRANNY_SHOW_WINDOW`, `GRANNY_OPEN`, `GRANNY_PKILL`, `GRANNY_CHIME`, and the
+  `GRANNY_SHOW_WINDOW`, `GRANNY_OPEN`, `GRANNY_PKILL`, `GRANNY_CHIME`,
+  `GRANNY_POMODORO_AUTOSTART`, and the
   updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
   system calls must get an override or the e2e suites cannot reach them.
 - `/etc/hosts` is edited only between the `# GRANNY-BEGIN` / `# GRANNY-END`

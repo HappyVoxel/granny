@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // greeting / task list back.
         NSApp.setActivationPolicy(.regular)
         Notifier.shared.start()
+        // Clicking a banner (the pomodoro's bell above all) brings granny and
+        // her notebook forward, so the round can be answered there.
+        Notifier.shared.onOpen = { [weak self] in self?.presentInitialWindow() }
         buildMainMenu()
         context.scheduler.onGreetingNeeded = { [weak self] in
             self?.remindIntake()
