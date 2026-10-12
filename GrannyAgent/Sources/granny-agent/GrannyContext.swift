@@ -24,6 +24,14 @@ final class GrannyContext {
     /// that task even if the list changed while the dialog was open.
     private var challengeTaskID: String?
 
+    /// The tomato's live countdown. Only the stage and the round count are
+    /// persisted (in the day state); the seconds are a deadline in memory,
+    /// so the tick cannot make them drift and a relaunch starts fresh.
+    private var pomodoroDeadline: Date?
+    private var pomodoroRemaining: TimeInterval = 0
+    private var pomodoroRunning = false
+    private var pomodoroTimer: Timer?
+
     init() {
         GrannyPaths.ensureDirectories()
         let config = GrannyConfig.load()
@@ -41,9 +49,17 @@ final class GrannyContext {
             voices: Speaker.systemVoices())
         block.onError = { message in postNotification(body: message) }
         viewModel.refresh(from: self)
+        // Idle, the tomato wears the stage that a click would start.
+        pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
+        syncPomodoro()
     }
 
     func start() {
+        // Midnight moves the tomato to a new day even when the stage it left
+        // was deep work too - which is exactly what a running round looks
+        // like, and why the clock is reset here instead of by comparing
+        // stages.
+        scheduler.onDayRollover = { [weak self] in self?.startPomodoroDay() }
         scheduler.start()
         startDecisionServer()
         startAppKiller()
@@ -444,9 +460,111 @@ final class GrannyContext {
     private func mutate(_ block: (inout DayState) -> Void) {
         store.update(block)
         viewModel.refresh(from: self)
+        syncPomodoro()
         // Cached verdicts were computed against the previous task list and
         // phase; a task change can flip what is allowed.
         Task { await engine.clearCache() }
+    }
+
+    // MARK: - Pomodoro
+
+    /// The tomato: click to start the stage, click again to freeze it where
+    /// it is. Pausing is the whole control set - a round is 25 minutes, so
+    /// losing one to a misclick is not a disaster, and every extra button on
+    /// a tomato this small would be clutter.
+    func togglePomodoro() {
+        pomodoroRunning ? pausePomodoro() : startPomodoro()
+    }
+
+    private func startPomodoro() {
+        if pomodoroRemaining <= 0 {
+            pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
+        }
+        pomodoroDeadline = Date().addingTimeInterval(pomodoroRemaining)
+        pomodoroRunning = true
+        startPomodoroTimer()
+        syncPomodoro()
+    }
+
+    private func pausePomodoro() {
+        if let deadline = pomodoroDeadline {
+            pomodoroRemaining = max(0, deadline.timeIntervalSinceNow)
+        }
+        pomodoroDeadline = nil
+        pomodoroRunning = false
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = nil
+        syncPomodoro()
+    }
+
+    /// Quarter-second ticks: the painted second must not lag the real one,
+    /// and the ring's edge glides instead of stepping.
+    private func startPomodoroTimer() {
+        pomodoroTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            self?.pomodoroTick()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        pomodoroTimer = timer
+    }
+
+    private func pomodoroTick() {
+        guard let deadline = pomodoroDeadline else { return }
+        pomodoroRemaining = deadline.timeIntervalSinceNow
+        guard pomodoroRemaining > 0 else {
+            finishPomodoroStage()
+            return
+        }
+        syncPomodoro()
+    }
+
+    /// A stage is over: bank it, show what comes next, and let a break run on
+    /// its own. The next deep-work round waits for the click - that is the
+    /// pomofocus default, and it keeps granny from starting a 25-minute
+    /// round while nobody is at the desk.
+    private func finishPomodoroStage() {
+        let over = store.state.pomodoro.stage
+        let next = store.state.pomodoro.advanced(config.pomodoro)
+        let minutes = next.minutes(config.pomodoro)
+        pomodoroRemaining = TimeInterval(minutes * 60)
+        pomodoroRunning = next.stage != .deepWork
+        pomodoroDeadline = pomodoroRunning ? Date().addingTimeInterval(pomodoroRemaining) : nil
+        if pomodoroRunning {
+            startPomodoroTimer()
+        } else {
+            pomodoroTimer?.invalidate()
+            pomodoroTimer = nil
+        }
+        mutate { $0.pomodoro = next }
+        // The bell first: it is the part that has to work with the window
+        // behind another app or the screen asleep.
+        if over == .deepWork { Chime.breakTime() } else { Chime.backToWork() }
+        announce(GrannyLines.pomodoroNext(stage: stageName(next.stage), minutes: minutes))
+    }
+
+    /// Pushes the clock into the view.
+    func syncPomodoro() {
+        let run = store.state.pomodoro
+        viewModel.pomodoroStage = run.stage
+        viewModel.pomodoroIndex = run.index(longBreakEvery: config.pomodoro.resolved.longBreakEvery)
+        viewModel.pomodoroTotal = TimeInterval(run.minutes(config.pomodoro) * 60)
+        viewModel.pomodoroRemaining = pomodoroRemaining
+        viewModel.pomodoroRunning = pomodoroRunning
+    }
+
+    /// A new day: the day's tomato starts over, and so does its clock. Paused,
+    /// running or mid-break, nothing of yesterday carries into today.
+    private func startPomodoroDay() {
+        pomodoroTimer?.invalidate()
+        pomodoroTimer = nil
+        pomodoroDeadline = nil
+        pomodoroRunning = false
+        pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
+        syncPomodoro()
+    }
+
+    private func stageName(_ stage: PomodoroStage) -> String {
+        GrannyLines.pomodoroStage(stage)
     }
 
     private func announce(_ line: String) {

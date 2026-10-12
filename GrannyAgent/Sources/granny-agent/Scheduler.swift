@@ -10,6 +10,10 @@ final class Scheduler {
     let speaker: Speaker
 
     var onGreetingNeeded: (() -> Void)?
+    /// Fires when the day rolls over, before anything looks at the new day:
+    /// the tomato's rounds are counted per day, and a round that was running
+    /// across midnight is yesterday's.
+    var onDayRollover: (() -> Void)?
     /// Fires when a rollover grew or killed a displayed streak.
     var onStreakEvent: ((StreakEvent) -> Void)?
 
@@ -21,6 +25,9 @@ final class Scheduler {
 
     private var timer: Timer?
     private var lastPhase: Phase?
+    /// The day the last tick saw. A rollover is compared by date, not by the
+    /// phase or the tomato's stage - midnight can land on the same ones.
+    private var lastDay: String?
     private var naggedDate: String?
     private var lastBlockAttempt = Date.distantPast
     private var lastClearAttempt = Date.distantPast
@@ -52,6 +59,10 @@ final class Scheduler {
         // midnight; its event waits in the store until this first drain.
         if let event = store.rolloverIfNeeded() ?? store.drainPendingStreakEvent() {
             onStreakEvent?(event)
+        }
+        if lastDay != store.state.date {
+            lastDay = store.state.date
+            onDayRollover?()
         }
         let phase = computePhase(config: config, state: store.state)
         if phase != lastPhase {

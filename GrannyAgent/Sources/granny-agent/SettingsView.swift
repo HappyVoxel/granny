@@ -27,6 +27,7 @@ struct SettingsView: View {
     @State private var speechEnabled: Bool
     @State private var wakeHour: Int
     @State private var bedtimeHour: Int
+    @State private var pomodoro: PomodoroConfig
     @State private var language: String
     @State private var appearance: String
     @State private var entertainmentApps: [String]
@@ -56,6 +57,7 @@ struct SettingsView: View {
         _speechEnabled = State(initialValue: config.speechEnabled)
         _wakeHour = State(initialValue: config.wakeHour)
         _bedtimeHour = State(initialValue: config.bedtimeHour)
+        _pomodoro = State(initialValue: config.pomodoro)
         _language = State(initialValue: (GrannyLanguage(code: config.language) ?? .en).rawValue)
         _appearance = State(initialValue: GrannyAppearance.resolve(config.appearance).rawValue)
         _entertainmentApps = State(initialValue: config.entertainmentApps)
@@ -142,6 +144,32 @@ struct SettingsView: View {
                             in: min(23, wakeHour + 1)...23)
                             .pointingHandOnHover()
                         Toggle(GrannyLines.settingsSpeechToggle, isOn: $speechEnabled)
+                            .pointingHandOnHover()
+                    }
+
+                    card(
+                        GrannyLines.settingsPomodoroGroup,
+                        caption: GrannyLines.settingsPomodoroCaption(every: pomodoro.longBreakEvery)
+                    ) {
+                        Stepper(
+                            "\(GrannyLines.settingsPomodoroWork): \(pomodoro.workMinutes)",
+                            value: $pomodoro.workMinutes,
+                            in: 1...180)
+                            .pointingHandOnHover()
+                        Stepper(
+                            "\(GrannyLines.settingsPomodoroShortBreak): \(pomodoro.shortBreakMinutes)",
+                            value: $pomodoro.shortBreakMinutes,
+                            in: 1...60)
+                            .pointingHandOnHover()
+                        Stepper(
+                            "\(GrannyLines.settingsPomodoroLongBreak): \(pomodoro.longBreakMinutes)",
+                            value: $pomodoro.longBreakMinutes,
+                            in: 1...120)
+                            .pointingHandOnHover()
+                        Stepper(
+                            "\(GrannyLines.settingsPomodoroEvery): \(pomodoro.longBreakEvery)",
+                            value: $pomodoro.longBreakEvery,
+                            in: 1...12)
                             .pointingHandOnHover()
                     }
 
@@ -520,6 +548,7 @@ struct SettingsView: View {
         updated.speechEnabled = speechEnabled
         updated.wakeHour = wakeHour
         updated.bedtimeHour = bedtimeHour
+        updated.pomodoro = pomodoro
         updated.language = language
         updated.appearance = appearance
         updated.entertainmentApps = entertainmentApps

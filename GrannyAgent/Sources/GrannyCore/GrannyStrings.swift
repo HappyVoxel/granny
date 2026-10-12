@@ -119,6 +119,19 @@ public protocol GrannyStrings: Sendable {
     func streakUp(count: Int) -> String
     func streakLost(days: Int) -> String
 
+    // Pomodoro
+    var pomodoroHelp: String { get }
+    /// Stage names, for the line granny says when a stage ends.
+    var pomodoroDeepWork: String { get }
+    var pomodoroShortBreak: String { get }
+    var pomodoroLongBreak: String { get }
+    func pomodoroNext(stage: String, minutes: Int) -> String
+    /// What VoiceOver reads for the tomato: the stage, the round and the
+    /// clock. The colour says the stage to the eye; this says it out loud.
+    func pomodoroState(stage: String, index: Int, clock: String) -> String
+    var pomodoroClickToRun: String { get }
+    var pomodoroClickToPause: String { get }
+
     // Status line
     var statusAwaiting: String { get }
     var statusWorking: String { get }
@@ -187,6 +200,12 @@ public protocol GrannyStrings: Sendable {
     var settingsWakeHour: String { get }
     var settingsBedtime: String { get }
     var settingsSpeechToggle: String { get }
+    var settingsPomodoroGroup: String { get }
+    func settingsPomodoroCaption(every: Int) -> String
+    var settingsPomodoroWork: String { get }
+    var settingsPomodoroShortBreak: String { get }
+    var settingsPomodoroLongBreak: String { get }
+    var settingsPomodoroEvery: String { get }
     var settingsListsGroup: String { get }
     var settingsAppsLabel: String { get }
     var settingsAppsCaption: String { get }
@@ -356,6 +375,22 @@ public struct EnglishStrings: GrannyStrings {
         "The streak stopped at \(days), dear. Start a new one today."
     }
 
+    public var pomodoroHelp: String {
+        "Pomodoro: click the tomato to start or pause. Red is deep work, amber a "
+            + "short break, green the long one; the number beside it counts today's rounds."
+    }
+    public var pomodoroDeepWork: String { "deep work" }
+    public var pomodoroShortBreak: String { "a short break" }
+    public var pomodoroLongBreak: String { "a long break" }
+    public func pomodoroNext(stage: String, minutes: Int) -> String {
+        "\(minutes) minute\(minutes == 1 ? "" : "s") of \(stage), dear. Off you go."
+    }
+    public func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        "\(stage), round \(index), \(clock) left"
+    }
+    public var pomodoroClickToRun: String { "Start the round" }
+    public var pomodoroClickToPause: String { "Pause the round" }
+
     public var statusAwaiting: String { "Today's list isn't written yet." }
     public var statusWorking: String { "Working. Granny lets you play when it's all done." }
     public var statusRewarded: String { "All done. Go play, dear." }
@@ -426,6 +461,16 @@ public struct EnglishStrings: GrannyStrings {
     public var settingsWakeHour: String { "Wake hour" }
     public var settingsBedtime: String { "Bedtime" }
     public var settingsSpeechToggle: String { "Granny speaks (say -v)" }
+    public var settingsPomodoroGroup: String { "Pomodoro" }
+    public func settingsPomodoroCaption(every: Int) -> String {
+        "Deep work earns a break; every \(every)-th round earns the long one. "
+            + "Save, then relaunch granny to apply."
+    }
+
+    public var settingsPomodoroWork: String { "Deep work (minutes)" }
+    public var settingsPomodoroShortBreak: String { "Short break (minutes)" }
+    public var settingsPomodoroLongBreak: String { "Long break (minutes)" }
+    public var settingsPomodoroEvery: String { "Long break every (rounds)" }
     public var settingsListsGroup: String { "Granny's watchlists" }
     public var settingsAppsLabel: String { "Apps closed during work" }
     public var settingsAppsCaption: String {
@@ -611,6 +656,22 @@ public struct VietnameseStrings: GrannyStrings {
         "Streak đứt ở \(days) ngày rồi cháu. Hôm nay làm lại từ đầu nhé."
     }
 
+    public var pomodoroHelp: String {
+        "Pomodoro: bấm quả cà chua để chạy hoặc tạm dừng. Đỏ là làm việc tập trung, "
+            + "vàng là nghỉ ngắn, xanh là nghỉ dài; số bên cạnh là vòng thứ mấy hôm nay."
+    }
+    public var pomodoroDeepWork: String { "làm việc tập trung" }
+    public var pomodoroShortBreak: String { "nghỉ ngắn" }
+    public var pomodoroLongBreak: String { "nghỉ dài" }
+    public func pomodoroNext(stage: String, minutes: Int) -> String {
+        "\(minutes) phút \(stage) nhé cháu. Ngoại canh đồng hồ."
+    }
+    public func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        "\(stage), vòng \(index), còn \(clock)"
+    }
+    public var pomodoroClickToRun: String { "Bắt đầu vòng" }
+    public var pomodoroClickToPause: String { "Tạm dừng vòng" }
+
     public var statusAwaiting: String { "Chưa nhập danh sách hôm nay." }
     public var statusWorking: String { "Đang làm việc. Xong hết ngoại mới cho chơi." }
     public var statusRewarded: String { "Xong việc rồi. Đi chơi đi cháu." }
@@ -681,6 +742,15 @@ public struct VietnameseStrings: GrannyStrings {
     public var settingsWakeHour: String { "Giờ thức" }
     public var settingsBedtime: String { "Giờ ngủ" }
     public var settingsSpeechToggle: String { "Ngoại nói (say -v)" }
+    public var settingsPomodoroGroup: String { "Pomodoro" }
+    public func settingsPomodoroCaption(every: Int) -> String {
+        "Làm việc tập trung rồi nghỉ; cứ \(every) vòng thì nghỉ dài. "
+            + "Lưu xong khởi động lại ngoại để áp dụng."
+    }
+    public var settingsPomodoroWork: String { "Làm việc tập trung (phút)" }
+    public var settingsPomodoroShortBreak: String { "Nghỉ ngắn (phút)" }
+    public var settingsPomodoroLongBreak: String { "Nghỉ dài (phút)" }
+    public var settingsPomodoroEvery: String { "Nghỉ dài mỗi (vòng)" }
     public var settingsListsGroup: String { "Danh sách của ngoại" }
     public var settingsAppsLabel: String { "Ứng dụng bị đóng khi làm việc" }
     public var settingsAppsCaption: String {
@@ -866,6 +936,23 @@ public struct FinnishStrings: GrannyStrings {
         "Putki katkesi \(days) päivän kohdalla, kulta. Aloita uusi tänään."
     }
 
+    public var pomodoroHelp: String {
+        "Pomodoro: napsauta tomaattia aloittaaksesi tai keskeyttääksesi. Punainen on "
+            + "keskittynyttä työtä, keltainen lyhyt tauko, vihreä pitkä tauko; vieressä "
+            + "oleva luku kertoo, monesko kierros tänään on menossa."
+    }
+    public var pomodoroDeepWork: String { "keskittynyttä työtä" }
+    public var pomodoroShortBreak: String { "lyhyttä taukoa" }
+    public var pomodoroLongBreak: String { "pitkää taukoa" }
+    public func pomodoroNext(stage: String, minutes: Int) -> String {
+        "\(minutes) minuutti\(minutes == 1 ? "" : "a") \(stage), kulta. Mummo katsoo kelloa."
+    }
+    public func pomodoroState(stage: String, index: Int, clock: String) -> String {
+        "\(stage), kierros \(index), \(clock) jäljellä"
+    }
+    public var pomodoroClickToRun: String { "Aloita kierros" }
+    public var pomodoroClickToPause: String { "Keskeytä kierros" }
+
     public var statusAwaiting: String { "Tämän päivän listaa ei ole vielä kirjoitettu." }
     public var statusWorking: String { "Työ kesken. Mummo päästää leikkimään, kun kaikki on valmista." }
     public var statusRewarded: String { "Kaikki valmista. Mene leikkimään, kulta." }
@@ -938,6 +1025,15 @@ public struct FinnishStrings: GrannyStrings {
     public var settingsWakeHour: String { "Herätystunti" }
     public var settingsBedtime: String { "Nukkumaanmenoaika" }
     public var settingsSpeechToggle: String { "Mummo puhuu (say -v)" }
+    public var settingsPomodoroGroup: String { "Pomodoro" }
+    public func settingsPomodoroCaption(every: Int) -> String {
+        "Työ ansaitsee tauon; joka \(every). kierroksen jälkeen pitkä tauko. "
+            + "Tallenna ja käynnistä mummo uudelleen."
+    }
+    public var settingsPomodoroWork: String { "Keskittynyt työ (min)" }
+    public var settingsPomodoroShortBreak: String { "Lyhyt tauko (min)" }
+    public var settingsPomodoroLongBreak: String { "Pitkä tauko (min)" }
+    public var settingsPomodoroEvery: String { "Pitkä tauko joka (kierros)" }
     public var settingsListsGroup: String { "Mummon vahtilistat" }
     public var settingsAppsLabel: String { "Työn aikana suljettavat sovellukset" }
     public var settingsAppsCaption: String {

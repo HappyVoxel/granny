@@ -23,6 +23,8 @@ public struct GrannyConfig: Codable, Sendable {
     public var streakModel: String?
     public var wakeHour: Int
     public var bedtimeHour: Int
+    /// The tomato: stage durations and the long-break cadence.
+    public var pomodoro: PomodoroConfig
     public var language: String
     public var appearance: String
     /// Ask GitHub Releases once a day whether a newer granny exists.
@@ -64,6 +66,7 @@ public struct GrannyConfig: Codable, Sendable {
         streakModel: String? = nil,
         wakeHour: Int = 7,
         bedtimeHour: Int = 23,
+        pomodoro: PomodoroConfig = PomodoroConfig(),
         language: String = "en",
         appearance: String = "dark",
         checkForUpdates: Bool = true,
@@ -92,6 +95,7 @@ public struct GrannyConfig: Codable, Sendable {
         self.streakModel = streakModel
         self.wakeHour = wakeHour
         self.bedtimeHour = bedtimeHour
+        self.pomodoro = pomodoro
         self.language = language
         self.appearance = appearance
         self.checkForUpdates = checkForUpdates
@@ -217,6 +221,7 @@ public struct GrannyConfig: Codable, Sendable {
         streakModel = optional(.streakModel)
         wakeHour = value(.wakeHour, d.wakeHour)
         bedtimeHour = value(.bedtimeHour, d.bedtimeHour)
+        pomodoro = value(.pomodoro, d.pomodoro)
         language = value(.language, d.language)
         appearance = value(.appearance, d.appearance)
         checkForUpdates = value(.checkForUpdates, d.checkForUpdates)

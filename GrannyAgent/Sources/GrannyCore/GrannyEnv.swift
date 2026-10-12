@@ -16,4 +16,7 @@ public enum GrannyEnv {
     public static let launchAgent = "GRANNY_LAUNCH_AGENT"
     public static let user = "GRANNY_USER"
     public static let showWindow = "GRANNY_SHOW_WINDOW"
+    /// A command to run instead of playing a system sound (it gets the sound
+    /// name as its argument), the way `osaCmd` replaces osascript.
+    public static let chime = "GRANNY_CHIME"
 }

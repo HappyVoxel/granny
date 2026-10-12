@@ -489,7 +489,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onOpenSettings: { [weak self] in
                 self?.window?.orderOut(nil)
                 self?.showSettings()
-            })
+            },
+            onTogglePomodoro: { [weak self] in self?.context.togglePomodoro() })
         show(view, title: GrannyLines.tasksTitle, styleMask: [.titled, .closable, .miniaturizable, .resizable])
         window?.setContentSize(NSSize(width: 530, height: 500))
         window?.minSize = NSSize(width: 520, height: 420)
