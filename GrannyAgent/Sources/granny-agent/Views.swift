@@ -540,8 +540,8 @@ struct PomodoroTomatoView: View {
     /// The ring is the fruit's outline: the shape is stroked, so the tomato
     /// is `diameter + ringWidth` across and the clock sits in the hole. The
     /// plate is larger again, so the fruit sits *on* something.
-    private static let diameter: CGFloat = 50
-    private static let ringWidth: CGFloat = 8.5
+    private static let diameter: CGFloat = 48
+    private static let ringWidth: CGFloat = 6
     private static var outer: CGFloat { diameter + ringWidth }
     /// The plate is the fruit's own silhouette, a hair larger than the dial,
     /// so the glass reads as the tomato's rim instead of a coaster under it.
@@ -618,13 +618,13 @@ struct PomodoroTomatoView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    GrannyTheme.tomatoShade(stage, towardWhite: 0.5).opacity(0.55),
+                                    GrannyTheme.tomatoShade(stage, towardWhite: 0.5).opacity(0.42),
                                     .clear,
                                 ],
                                 center: .center,
                                 startRadius: 0,
-                                endRadius: 11))
-                        .frame(width: 22, height: 22)
+                                endRadius: 9))
+                        .frame(width: 18, height: 18)
                         .offset(x: tip.x, y: tip.y)
                         .blendMode(.plusLighter)
                         .animation(.linear(duration: 0.25), value: remainingFraction)
@@ -640,7 +640,7 @@ struct PomodoroTomatoView: View {
                             ],
                             startPoint: .top,
                             endPoint: .bottom))
-                    .frame(width: 5.5, height: 5.5)
+                    .frame(width: 4.5, height: 4.5)
                     .shadow(color: fruit.opacity(running ? 0.65 * pulse : 0), radius: 3.5)
                     .offset(x: tip.x, y: tip.y)
                     .animation(.linear(duration: 0.25), value: remainingFraction)
