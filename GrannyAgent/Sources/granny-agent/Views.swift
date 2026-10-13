@@ -1051,6 +1051,11 @@ struct TaskListView: View {
                     total: viewModel.pomodoroTotal,
                     running: viewModel.pomodoroRunning,
                     action: onTogglePomodoro)
+                    // A fruit tall enough to carry a calyx is taller than a
+                    // button, and letting it set the row's height left a
+                    // hand's width of air above "Tell granny I'm done". It
+                    // floats over the row instead; the list gets the room.
+                    .frame(height: 34, alignment: .bottom)
             }
         }
         .padding(26)
