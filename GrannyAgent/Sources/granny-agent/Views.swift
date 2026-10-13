@@ -540,8 +540,8 @@ struct PomodoroTomatoView: View {
     /// The ring is the fruit's outline: the shape is stroked, so the tomato
     /// is `diameter + ringWidth` across and the clock sits in the hole. The
     /// plate is larger again, so the fruit sits *on* something.
-    private static let diameter: CGFloat = 50
-    private static let ringWidth: CGFloat = 8.5
+    private static let diameter: CGFloat = 46
+    private static let ringWidth: CGFloat = 4.5
     private static var outer: CGFloat { diameter + ringWidth }
     /// The plate is the fruit's own silhouette, a hair larger than the dial,
     /// so the glass reads as the tomato's rim instead of a coaster under it.
@@ -618,13 +618,13 @@ struct PomodoroTomatoView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    GrannyTheme.tomatoShade(stage, towardWhite: 0.5).opacity(0.55),
+                                    GrannyTheme.tomatoShade(stage, towardWhite: 0.5).opacity(0.42),
                                     .clear,
                                 ],
                                 center: .center,
                                 startRadius: 0,
-                                endRadius: 11))
-                        .frame(width: 22, height: 22)
+                                endRadius: 8))
+                        .frame(width: 16, height: 16)
                         .offset(x: tip.x, y: tip.y)
                         .blendMode(.plusLighter)
                         .animation(.linear(duration: 0.25), value: remainingFraction)
@@ -640,7 +640,7 @@ struct PomodoroTomatoView: View {
                             ],
                             startPoint: .top,
                             endPoint: .bottom))
-                    .frame(width: 5.5, height: 5.5)
+                    .frame(width: 4, height: 4)
                     .shadow(color: fruit.opacity(running ? 0.65 * pulse : 0), radius: 3.5)
                     .offset(x: tip.x, y: tip.y)
                     .animation(.linear(duration: 0.25), value: remainingFraction)
@@ -1038,6 +1038,12 @@ struct TaskListView: View {
             }
 
             HStack(alignment: .bottom) {
+                Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
+                    .buttonStyle(GrannyPrimaryButtonStyle())
+                    .disabled(viewModel.tasks.isEmpty || viewModel.tasks.allSatisfy { $0.done })
+                Spacer()
+                // The tomato takes the corner granny's own button used to
+                // hold: the reward is the thing the eye lands on last.
                 PomodoroTomatoView(
                     stage: viewModel.pomodoroStage,
                     index: viewModel.pomodoroIndex,
@@ -1045,10 +1051,11 @@ struct TaskListView: View {
                     total: viewModel.pomodoroTotal,
                     running: viewModel.pomodoroRunning,
                     action: onTogglePomodoro)
-                Spacer()
-                Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
-                    .buttonStyle(GrannyPrimaryButtonStyle())
-                    .disabled(viewModel.tasks.isEmpty || viewModel.tasks.allSatisfy { $0.done })
+                    // A fruit tall enough to carry a calyx is taller than a
+                    // button, and letting it set the row's height left a
+                    // hand's width of air above "Tell granny I'm done". It
+                    // floats over the row instead; the list gets the room.
+                    .frame(height: 34, alignment: .bottom)
             }
         }
         .padding(26)
