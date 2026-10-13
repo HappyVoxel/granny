@@ -1038,6 +1038,12 @@ struct TaskListView: View {
             }
 
             HStack(alignment: .bottom) {
+                Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
+                    .buttonStyle(GrannyPrimaryButtonStyle())
+                    .disabled(viewModel.tasks.isEmpty || viewModel.tasks.allSatisfy { $0.done })
+                Spacer()
+                // The tomato takes the corner granny's own button used to
+                // hold: the reward is the thing the eye lands on last.
                 PomodoroTomatoView(
                     stage: viewModel.pomodoroStage,
                     index: viewModel.pomodoroIndex,
@@ -1045,10 +1051,6 @@ struct TaskListView: View {
                     total: viewModel.pomodoroTotal,
                     running: viewModel.pomodoroRunning,
                     action: onTogglePomodoro)
-                Spacer()
-                Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
-                    .buttonStyle(GrannyPrimaryButtonStyle())
-                    .disabled(viewModel.tasks.isEmpty || viewModel.tasks.allSatisfy { $0.done })
             }
         }
         .padding(26)
