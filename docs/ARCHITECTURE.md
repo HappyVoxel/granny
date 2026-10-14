@@ -10,7 +10,10 @@ end.
 Granny Agent is a strict daily task enforcer for macOS. Granny asks for the
 day's tasks, blocks entertainment while they are open, grills you when you
 claim to be done, and unlocks distractions only after she is satisfied. She
-keeps a log and comments on your day offs.
+keeps a log and comments on your day offs. The one other time the block
+lifts is a pomodoro break the user earned by finishing a deep-work round:
+while it runs granny advises instead of enforcing, and the block comes back
+on its own when the break ends.
 
 ## Day cycle
 
@@ -264,3 +267,18 @@ common case and would drown the signal.
   reaches a model tier - one judged loopback a distraction and blocked it.
   The boundary stops at the LAN: private, link-local and `.local` addresses
   are still judged, because a NAS or Plex box there is a real time sink.
+- **A running pomodoro break lifts the block**: enforcement follows the work
+  interval the user chose, not the phase clock. One pure predicate,
+  `blocksEnforced(phase:run:running:)` in `GrannyCore`, is the truth behind
+  the hosts scheduler, the tab janitor, the app killer and `/decide` - which
+  short-circuits to an allow (`source: "break"`) before any rule, cache or
+  model tier, in the same four-key wire format, so the extension needs no
+  change. Only a *running, earned* break lifts: `running` is the live
+  in-memory flag, never persisted, so pausing, a relaunch mid-break and an
+  expiry while granny was down all block; a break stage is unreachable
+  without a finished round, and the night block never lifts. The block
+  returns within one tick of the break's end, because the scheduler's apply
+  path re-applies whenever the hosts are clear. A break clears the hosts, so
+  `killall -x networkserviceproxy` runs once on the lifted -> enforced
+  transition (seam `GRANNY_KILLALL`): a Private Relay tunnel opened during a
+  break cannot outlive the block that follows it.

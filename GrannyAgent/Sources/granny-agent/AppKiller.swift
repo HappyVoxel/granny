@@ -7,6 +7,9 @@ import GrannyCore
 final class AppKiller {
     private let config: GrannyConfig
     private let phaseProvider: () -> Phase
+    /// The enforcement truth, so an app is not killed during a pomodoro
+    /// break. nil keeps the phase alone (the pre-tomato behaviour).
+    private let enforcementProvider: (() -> Bool)?
     var onKill: ((String) -> Void)?
 
     /// Sweep cadence for already-running apps.
@@ -14,9 +17,19 @@ final class AppKiller {
 
     private var timer: Timer?
 
-    init(config: GrannyConfig, phaseProvider: @escaping () -> Phase) {
+    init(
+        config: GrannyConfig,
+        phaseProvider: @escaping () -> Phase,
+        enforcementProvider: (() -> Bool)? = nil
+    ) {
         self.config = config
         self.phaseProvider = phaseProvider
+        self.enforcementProvider = enforcementProvider
+    }
+
+    /// Blocks are enforced now (the phase's verdict, minus a running break).
+    private var enforced: Bool {
+        enforcementProvider?() ?? phaseProvider().blocksActive
     }
 
     func start() {
@@ -28,6 +41,7 @@ final class AppKiller {
             guard let self,
                   let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                   let bundleID = app.bundleIdentifier,
+                  self.enforced,
                   shouldKill(bundleID: bundleID, phase: self.phaseProvider(), entertainmentApps: self.config.entertainmentApps)
             else { return }
             self.close(app)
@@ -41,9 +55,9 @@ final class AppKiller {
         self.timer = timer
     }
 
-    /// Kills every running entertainment app while blocks are active.
+    /// Kills every running entertainment app while blocks are enforced.
     func sweep() {
-        guard phaseProvider().blocksActive else { return }
+        guard enforced else { return }
         for app in NSWorkspace.shared.runningApplications {
             guard let bundleID = app.bundleIdentifier,
                   shouldKill(bundleID: bundleID, phase: phaseProvider(), entertainmentApps: config.entertainmentApps)

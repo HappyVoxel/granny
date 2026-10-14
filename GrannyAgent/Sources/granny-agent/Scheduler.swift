@@ -10,6 +10,14 @@ final class Scheduler {
     let speaker: Speaker
 
     var onGreetingNeeded: (() -> Void)?
+    /// Whether the block is enforced right now - the phase minus a running
+    /// break. nil keeps the phase alone, which is what the CLI wants: a
+    /// second process cannot see the app's live tomato flag.
+    var blockEnforced: (() -> Bool)?
+    /// Fires on the lifted -> enforced transition, and only there: a break
+    /// clears the hosts, so a Private Relay tunnel opened during one would
+    /// outlive the block that returns after it.
+    var onBlockReturned: (() -> Void)?
     /// Fires when the day rolls over, before anything looks at the new day:
     /// the tomato's rounds are counted per day, and a round that was running
     /// across midnight is yesterday's.
@@ -31,6 +39,9 @@ final class Scheduler {
     private var naggedDate: String?
     private var lastBlockAttempt = Date.distantPast
     private var lastClearAttempt = Date.distantPast
+    /// Set while the last tick saw a lifted block, so the tick that returns
+    /// enforcement can be told apart from an ordinary rewarded/day-off run.
+    private var blocksWereLifted = false
     /// BlockController is not thread-safe and an admin dialog can outlive a
     /// tick, so apply/clear run one at a time off the main thread.
     private let blockQueue = DispatchQueue(label: "granny.block")
@@ -69,10 +80,21 @@ final class Scheduler {
             lastPhase = phase
             Task { await engine.clearCache() }
         }
+        let enforced = blockEnforced?() ?? phase.blocksActive
+        // A tick where the phase wants the block and enforcement says no can
+        // only be a running break: that is the lift. Its end - expiry, pause
+        // or a phase change - is where the relay proxy is quashed.
+        if phase.blocksActive, !enforced {
+            blocksWereLifted = true
+        } else if blocksWereLifted, enforced {
+            blocksWereLifted = false
+            onBlockReturned?()
+        }
         // Every tick, not only on phase change: a cancelled authorization
         // dialog or a failed apply must land on the next tick, gated by the
-        // retry throttle inside.
-        applyBlocks(phase)
+        // retry throttle inside. The apply path re-applies when the hosts are
+        // clear, which is how the block returns by itself at the break's end.
+        applyBlocks(enforced)
         if phase == .awaitingTasks {
             onGreetingNeeded?()
         }
@@ -85,9 +107,9 @@ final class Scheduler {
         }
     }
 
-    private func applyBlocks(_ phase: Phase) {
+    private func applyBlocks(_ enforced: Bool) {
         guard !blockWorkInFlight else { return }
-        if phase.blocksActive {
+        if enforced {
             // Retry with a throttle: the authorization dialog may have been
             // cancelled, and the block is the whole point of the app. Also
             // re-applies when the config's domain list changed.

@@ -15,18 +15,25 @@ final class DecisionServer {
     private static let maxRequestChunk = 65536
     private static let maxRequestBytes = 131072
     private let stateProvider: () -> (DayState, Phase)
+    /// The enforcement truth: the phase minus a running pomodoro break. The
+    /// server is the single decision source, so the lift is answered here -
+    /// a break that clears the hosts but leaves Facebook blocked by the
+    /// extension would be incoherent.
+    private let enforcementProvider: () -> Bool
     private var listener: NWListener?
 
     init(
         engine: DecisionEngine,
         token: String,
         port: UInt16,
-        stateProvider: @escaping () -> (DayState, Phase)
+        stateProvider: @escaping () -> (DayState, Phase),
+        enforcementProvider: @escaping () -> Bool
     ) {
         self.engine = engine
         self.token = token
         self.port = port
         self.stateProvider = stateProvider
+        self.enforcementProvider = enforcementProvider
     }
 
     func start() throws {
@@ -124,13 +131,29 @@ final class DecisionServer {
             let (state, phase) = stateProvider()
             send(connection, status: 200, json: [
                 "phase": phase.rawValue,
-                "blocksActive": phase.blocksActive,
+                "blocksActive": enforcementProvider(),
                 "dayOff": state.dayOff,
                 "tasks": state.tasks.map { ["title": $0.title, "done": $0.done] },
             ])
         case ("GET", "/decide"):
-            let query = parseQuery(target)
             let (state, phase) = stateProvider()
+            if !enforcementProvider() {
+                // A running break is a holiday: no rules verdict, no context
+                // dance, no model tier, no cache write - every kind of URL,
+                // shorts included, gets a plain allow, in the same four-key
+                // wire format, so the extension needs no change. When the
+                // phase wants no blocks either, the phase is what lifted
+                // them, and the reason says so exactly as the rules would.
+                let lifted = phase.blocksActive
+                send(connection, status: 200, json: [
+                    "action": DecisionAction.allow.rawValue,
+                    "message": "",
+                    "reason": lifted ? "pomodoro break" : "phase \(phase.rawValue)",
+                    "source": lifted ? "break" : "rules",
+                ])
+                return
+            }
+            let query = parseQuery(target)
             let context = PageContext(
                 url: query["url"] ?? "",
                 title: query["title"],

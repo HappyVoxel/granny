@@ -93,10 +93,19 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   (`GRANNY_CONFIG_FILE`, `GRANNY_STATE_DIR`, `GRANNY_HOSTS_FILE`,
   `GRANNY_ALLOW_NONROOT`, `GRANNY_SUDO`, `GRANNY_OSA_CMD`, `GRANNY_LAUNCHCTL`,
   `GRANNY_LAUNCH_AGENT`, `GRANNY_SKIP_DNS_FLUSH`, `GRANNY_TRACE_DEBUG`,
-  `GRANNY_SHOW_WINDOW`, `GRANNY_OPEN`, `GRANNY_PKILL`, `GRANNY_CHIME`,
+  `GRANNY_SHOW_WINDOW`, `GRANNY_OPEN`, `GRANNY_PKILL` (install-app.sh's kill
+  override - the app itself never shells out to `pkill`), `GRANNY_CHIME`,
+  `GRANNY_KILLALL` (the Private Relay proxy killed when the block returns
+  after a break - the e2e suites point it at a sentinel),
   `GRANNY_POMODORO_AUTOSTART`, and the
   updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
   system calls must get an override or the e2e suites cannot reach them.
+  `GRANNY_HOSTS_FILE` is the one that changes behaviour, not just a path: a run
+  pointed at another file writes *that* file as the user (the local helper, no
+  sudo, no administrator prompt) and never `/etc/hosts` - `isSandboxedHostsRun`
+  decides it, and `--apply-blocks` is the CLI path the suite drives to prove it.
+  A sandboxed write therefore needs `GRANNY_ALLOW_NONROOT=1` too, or the helper
+  refuses and the apply fails loudly instead of escalating.
 - `/etc/hosts` is edited only between the `# GRANNY-BEGIN` / `# GRANNY-END`
   markers. The Swift renderer (`GrannyCore/HostsFile.swift`) is the single
   source of truth; `scripts/proto.sh` carries a legacy copy and must not grow
@@ -114,6 +123,15 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   that way - a truncating write can leave the machine DNS-dead.
 
 ## Gotchas
+
+- A sandboxed run of the **app** (not just the helper) must never reach
+  `sudo`: `GRANNY_HOSTS_FILE` only reaches the helper when the helper is
+  launched directly, and sudo strips the environment. `BlockController`
+  refuses to escalate when the seam points somewhere other than `/etc/hosts`;
+  before that guard, an app run pointed at a sandbox hosts file quietly wrote
+  the real one - and the real app could not repair it, because its own
+  `applied-block.json` still matched its config. `tests/e2e-agent.sh` now
+  hashes `/etc/hosts` around the write path.
 
 - The app target needs Xcode's toolchain: CommandLineTools alone cannot
   build SwiftUI macros. Prefix commands with

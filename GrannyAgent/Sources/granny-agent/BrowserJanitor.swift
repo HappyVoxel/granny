@@ -35,6 +35,9 @@ final class BrowserJanitor {
     private let config: GrannyConfig
     private let tasksProvider: () -> [TaskItem]
     private let phaseProvider: () -> Phase
+    /// The enforcement truth, so no tab is closed during a pomodoro break.
+    /// nil keeps the phase alone (the pre-tomato behaviour).
+    private let enforcementProvider: (() -> Bool)?
     var onSweep: (([String]) -> Void)?
     var onError: ((String) -> Void)?
 
@@ -58,11 +61,13 @@ final class BrowserJanitor {
     init(
         config: GrannyConfig,
         tasksProvider: @escaping () -> [TaskItem],
-        phaseProvider: @escaping () -> Phase
+        phaseProvider: @escaping () -> Phase,
+        enforcementProvider: (() -> Bool)? = nil
     ) {
         self.config = config
         self.tasksProvider = tasksProvider
         self.phaseProvider = phaseProvider
+        self.enforcementProvider = enforcementProvider
     }
 
     func start() {
@@ -81,7 +86,8 @@ final class BrowserJanitor {
         // Read the task list here, on the main thread, before handing the
         // work to a background task.
         let tasks = tasksProvider()
-        guard phase.blocksActive, !sweeping else { return }
+        let enforced = enforcementProvider?() ?? phase.blocksActive
+        guard enforced, !sweeping else { return }
         sweeping = true
         Task { [weak self] in
             guard let self else { return }
@@ -242,7 +248,11 @@ final class BrowserJanitor {
         browserName: String
     ) -> String? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        // `GRANNY_OSA_CMD` replaces osascript, the way it does for the bell: a
+        // sandboxed run can make the janitor inert instead of driving the
+        // machine's real browsers.
+        let tool = ProcessInfo.processInfo.environment[GrannyEnv.osaCmd] ?? "/usr/bin/osascript"
+        process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = ["-l", "JavaScript", "-e", script] + arguments
         let stdout = Pipe()
         let stderr = Pipe()
