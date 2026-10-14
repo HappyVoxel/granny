@@ -114,6 +114,10 @@ public enum GrannyLines {
     public static func pomodoroNext(stage: String, minutes: Int) -> String {
         strings.pomodoroNext(stage: stage, minutes: minutes)
     }
+    /// The break's line: the advice, and when the blocks come back.
+    public static func pomodoroBreakLine(minutes: Int) -> String {
+        strings.pomodoroBreakLine(minutes: minutes)
+    }
     public static func pomodoroState(stage: String, index: Int, clock: String) -> String {
         strings.pomodoroState(stage: stage, index: index, clock: clock)
     }

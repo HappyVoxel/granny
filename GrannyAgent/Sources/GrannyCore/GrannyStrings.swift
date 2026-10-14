@@ -126,6 +126,10 @@ public protocol GrannyStrings: Sendable {
     var pomodoroShortBreak: String { get }
     var pomodoroLongBreak: String { get }
     func pomodoroNext(stage: String, minutes: Int) -> String
+    /// Said when a deep-work round ends and its break starts: the advice -
+    /// off-screen, stand up, move - and when the blocks come back. During
+    /// the break nothing is enforced, so the line has to say both.
+    func pomodoroBreakLine(minutes: Int) -> String
     /// What VoiceOver reads for the tomato: the stage, the round and the
     /// clock. The colour says the stage to the eye; this says it out loud.
     func pomodoroState(stage: String, index: Int, clock: String) -> String
@@ -384,6 +388,10 @@ public struct EnglishStrings: GrannyStrings {
     public var pomodoroLongBreak: String { "a long break" }
     public func pomodoroNext(stage: String, minutes: Int) -> String {
         "\(minutes) minute\(minutes == 1 ? "" : "s") of \(stage), dear. Off you go."
+    }
+    public func pomodoroBreakLine(minutes: Int) -> String {
+        "Go on, take a real break, dear - off-screen, stand up, move about. "
+            + "I'll watch the door; in \(minutes) minute\(minutes == 1 ? "" : "s") the blocks come back."
     }
     public func pomodoroState(stage: String, index: Int, clock: String) -> String {
         "\(stage), round \(index), \(clock) left"
@@ -666,6 +674,10 @@ public struct VietnameseStrings: GrannyStrings {
     public func pomodoroNext(stage: String, minutes: Int) -> String {
         "\(minutes) phút \(stage) nhé cháu. Ngoại canh đồng hồ."
     }
+    public func pomodoroBreakLine(minutes: Int) -> String {
+        "Ngoại cho cháu nghỉ xứng đáng - rời màn hình, đứng lên, đi lại chút. "
+            + "Ngoại canh cửa; hết \(minutes) phút là ngoại khóa lại."
+    }
     public func pomodoroState(stage: String, index: Int, clock: String) -> String {
         "\(stage), vòng \(index), còn \(clock)"
     }
@@ -946,6 +958,10 @@ public struct FinnishStrings: GrannyStrings {
     public var pomodoroLongBreak: String { "pitkää taukoa" }
     public func pomodoroNext(stage: String, minutes: Int) -> String {
         "\(minutes) minuutti\(minutes == 1 ? "" : "a") \(stage), kulta. Mummo katsoo kelloa."
+    }
+    public func pomodoroBreakLine(minutes: Int) -> String {
+        "Nyt kunnon tauko, kulta - pois näytöltä, ylös ja liikettä. "
+            + "Minä vahdin ovea; \(minutes) minuutin päästä lukot palaavat."
     }
     public func pomodoroState(stage: String, index: Int, clock: String) -> String {
         "\(stage), kierros \(index), \(clock) jäljellä"

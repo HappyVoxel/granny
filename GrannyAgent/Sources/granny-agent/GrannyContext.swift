@@ -43,6 +43,11 @@ final class GrannyContext {
         self.trace = TraceClient(config: config.langfuse)
         self.engine = DecisionEngine(config: config, trace: trace)
         self.scheduler = Scheduler(config: config, store: store, engine: engine, block: block, speaker: speaker)
+        // The block follows the work interval, not the clock: the scheduler
+        // asks this every tick, and the tick that returns enforcement quashes
+        // the relay tunnels a cleared-hosts break made possible.
+        self.scheduler.blockEnforced = { [unowned self] in self.blocksEnforced() }
+        self.scheduler.onBlockReturned = { [weak self] in self?.quashRelayTunnels() }
         speaker.enabled = config.speechEnabled
         speaker.voice = GrannyVoice.resolve(
             configured: config.voiceIdentifier,
@@ -90,6 +95,24 @@ final class GrannyContext {
 
     func phase() -> Phase {
         computePhase(config: config, state: store.state)
+    }
+
+    /// The enforcement truth the four ends share: the phase, minus a running
+    /// pomodoro break. Reads live state only - `pomodoroRunning` is never
+    /// persisted - so a relaunch mid-break or an expiry while granny was down
+    /// cannot inherit the holiday.
+    func blocksEnforced() -> Bool {
+        // The server, killer and janitor ask from their own queues; the store
+        // and the tomato flag are main-thread-only.
+        if Thread.isMainThread { return blocksEnforcedNow() }
+        return DispatchQueue.main.sync { blocksEnforcedNow() }
+    }
+
+    private func blocksEnforcedNow() -> Bool {
+        GrannyCore.blocksEnforced(
+            phase: phase(),
+            run: store.state.pomodoro,
+            running: pomodoroRunning)
     }
 
     // MARK: - Mutations
@@ -546,8 +569,15 @@ final class GrannyContext {
         mutate { $0.pomodoro = next }
         // The bell first: it is the part that has to work with the window
         // behind another app or the screen asleep.
-        if over == .deepWork { chime.breakTime() } else { chime.backToWork() }
-        announce(GrannyLines.pomodoroNext(stage: stageName(next.stage), minutes: minutes))
+        if over == .deepWork {
+            chime.breakTime()
+            // The break lifts the block: the line says what to do with it,
+            // and when the door closes again.
+            announce(GrannyLines.pomodoroBreakLine(minutes: minutes))
+        } else {
+            chime.backToWork()
+            announce(GrannyLines.pomodoroNext(stage: stageName(next.stage), minutes: minutes))
+        }
     }
 
     /// Pushes the clock into the view.
@@ -575,6 +605,24 @@ final class GrannyContext {
         GrannyLines.pomodoroStage(stage)
     }
 
+    /// Private Relay is the classic bypass: blocking the ingress hostnames
+    /// only stops *new* tunnels, so a tunnel opened during a break (when the
+    /// hosts are clear) would outlive the block that comes back. Best effort
+    /// and no sudo; macOS restarts the proxy on demand.
+    private func quashRelayTunnels() {
+        let tool = ProcessInfo.processInfo.environment[GrannyEnv.killall] ?? "/usr/bin/killall"
+        guard FileManager.default.isExecutableFile(atPath: tool) else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: tool)
+            process.arguments = ["-x", "networkserviceproxy"]
+            process.standardOutput = Pipe()
+            process.standardError = Pipe()
+            guard (try? process.run()) != nil else { return }
+            process.waitUntilExit()
+        }
+    }
+
     private func announce(_ line: String) {
         speaker.say(line)
         postNotification(body: line)
@@ -591,7 +639,8 @@ final class GrannyContext {
                     // mutated on main, so take the snapshot there.
                     if Thread.isMainThread { return self.snapshot() }
                     return DispatchQueue.main.sync { self.snapshot() }
-                })
+                },
+                enforcementProvider: { [unowned self] in self.blocksEnforced() })
             try server.start()
             self.server = server
         } catch {
@@ -603,7 +652,8 @@ final class GrannyContext {
         let janitor = BrowserJanitor(
             config: config,
             tasksProvider: { [unowned self] in self.store.state.tasks },
-            phaseProvider: { [unowned self] in self.phase() })
+            phaseProvider: { [unowned self] in self.phase() },
+            enforcementProvider: { [unowned self] in self.blocksEnforced() })
         janitor.onSweep = { [weak self] urls in
             guard let self, let first = urls.first else { return }
             self.announce(GrannyLines.closedTab(url: first))
@@ -618,7 +668,10 @@ final class GrannyContext {
     }
 
     private func startAppKiller() {
-        let killer = AppKiller(config: config, phaseProvider: { [unowned self] in self.phase() })
+        let killer = AppKiller(
+            config: config,
+            phaseProvider: { [unowned self] in self.phase() },
+            enforcementProvider: { [unowned self] in self.blocksEnforced() })
         killer.onKill = { [weak self] name in
             guard let self else { return }
             let task = self.store.state.tasks.first(where: { !$0.done })?.title

@@ -22,4 +22,9 @@ public enum GrannyEnv {
     /// A command to run instead of playing a system sound (it gets the sound
     /// name as its argument), the way `osaCmd` replaces osascript.
     public static let chime = "GRANNY_CHIME"
+    /// The tool that kills the Private Relay proxy when the block returns
+    /// after a break. A separate seam from the e2e suites' `GRANNY_PKILL`
+    /// (install-app.sh's shell override), and the one the suites point at a
+    /// sentinel so no run can ever signal the real proxy.
+    public static let killall = "GRANNY_KILLALL"
 }

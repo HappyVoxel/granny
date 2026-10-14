@@ -105,4 +105,26 @@ extension GrannyLinesTests {
         GrannyLines.language = "vi"
         XCTAssertTrue(GrannyLines.pomodoroStage(.longBreak) == "nghỉ dài")
     }
+
+    /// The break's line has to carry both facts the lift makes necessary:
+    /// what to do with the break, and when the blocks come back - in every
+    /// language granny speaks.
+    func testPomodoroBreakLineNamesTheAdviceAndTheReturn() {
+        GrannyLines.language = "en"
+        let english = GrannyLines.pomodoroBreakLine(minutes: 5)
+        XCTAssertTrue(english.contains("off-screen"))
+        XCTAssertTrue(english.contains("stand up"))
+        XCTAssertTrue(english.contains("in 5 minutes"))
+        XCTAssertTrue(GrannyLines.pomodoroBreakLine(minutes: 1).contains("in 1 minute "))
+
+        GrannyLines.language = "vi"
+        let vietnamese = GrannyLines.pomodoroBreakLine(minutes: 5)
+        XCTAssertTrue(vietnamese.contains("rời màn hình"))
+        XCTAssertTrue(vietnamese.contains("5 phút"))
+
+        GrannyLines.language = "fi"
+        let finnish = GrannyLines.pomodoroBreakLine(minutes: 5)
+        XCTAssertTrue(finnish.contains("pois näytöltä"))
+        XCTAssertTrue(finnish.contains("5 minuutin"))
+    }
 }

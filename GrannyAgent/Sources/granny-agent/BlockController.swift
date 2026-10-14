@@ -65,8 +65,19 @@ final class BlockController {
     }
 
     private func run(_ arguments: [String]) -> Bool {
+        // A sandboxed run writes the file it was pointed at, as the user, and
+        // stops there: sudo does not pass GRANNY_HOSTS_FILE through, so the
+        // installed root helper would write the real /etc/hosts, and the
+        // administrator fallback below exists for no other purpose.
+        if sandboxedHostsRun {
+            guard let bundled = bundledHelperPath else {
+                warnMissingHelper()
+                return false
+            }
+            return runProcess(bundled, arguments)
+        }
         if FileManager.default.isExecutableFile(atPath: Self.installedHelperPath) {
-            if runProcess("/usr/bin/sudo", ["-n", Self.installedHelperPath] + arguments) {
+            if runProcess(sudoTool, ["-n", Self.installedHelperPath] + arguments) {
                 return true
             }
         }
@@ -77,11 +88,23 @@ final class BlockController {
                 return true
             }
         }
-        if !warnedMissing {
-            warnedMissing = true
-            onError?(GrannyLines.helperMissing)
-        }
+        warnMissingHelper()
         return false
+    }
+
+    private var sandboxedHostsRun: Bool {
+        isSandboxedHostsRun(override: ProcessInfo.processInfo.environment[GrannyEnv.hostsFile])
+    }
+
+    /// `GRANNY_SUDO` replaces the tool, the way the other seams replace theirs.
+    private var sudoTool: String {
+        ProcessInfo.processInfo.environment[GrannyEnv.sudo] ?? "/usr/bin/sudo"
+    }
+
+    private func warnMissingHelper() {
+        guard !warnedMissing else { return }
+        warnedMissing = true
+        onError?(GrannyLines.helperMissing)
     }
 
     private func runProcess(_ tool: String, _ arguments: [String]) -> Bool {
