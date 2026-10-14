@@ -37,3 +37,6 @@ extension/safari/app/
 
 # Local reference notes (kept on disk, never committed)
 docs/refer/
+
+# Agent working state: plans and session scratch, never part of the product
+.pi/
