@@ -242,10 +242,14 @@ out="$(GRANNY_CONFIG_FILE="$BREAK_DIR/config.json" GRANNY_STATE_DIR="$BREAK_DIR/
 contains "$out" '"action" : "block"' "break window: stale break state blocks a fresh launch"
 
 # --- The sandbox hosts seam: a run pointed at a sandbox hosts file writes
-# that file and never the real one. It used to escalate through sudo to the
-# installed root helper, which writes /etc/hosts whatever the override says -
-# sudo does not pass GRANNY_HOSTS_FILE through. The hash is the assertion: no
-# suite may edit the machine's own hosts file.
+# that file and never the real one. It used to escalate through the privileged
+# helper tool to the installed root helper, which writes /etc/hosts whatever
+# the override says - that tool does not pass GRANNY_HOSTS_FILE through. The
+# hash is the assertion: no suite may edit the machine's own hosts file.
+HELPER="$REPO/GrannyAgent/.build/debug/granny-helper"
+if [ ! -x "$HELPER" ]; then
+  (cd "$REPO/GrannyAgent" && swift build --product granny-helper)
+fi
 hosts_before="$(shasum -a 256 /etc/hosts | awk '{print $1}')"
 : >"$SANDBOX/hosts"
 : >"$SANDBOX/sudo-sentinel.log"
@@ -286,19 +290,24 @@ CHECKS=$((CHECKS + 1))
 CHECKS=$((CHECKS + 1))
 
 # The sentinel is not vacuous: with no override at all the run *does* go
-# through the sudo tool, and with that tool replaced by the sentinel - which
-# exits 0 without running the helper - the real file is still untouched. So a
-# sandboxed escalation would have been recorded rather than silently passing.
-: >"$SANDBOX/sudo-sentinel.log"
-GRANNY_CONFIG_FILE="$SANDBOX/config.json" GRANNY_STATE_DIR="$SANDBOX/state" \
-  GRANNY_SUDO="$SANDBOX/sudo-sentinel" GRANNY_ALLOW_NONROOT=1 GRANNY_SKIP_DNS_FLUSH=1 \
-  "$AGENT" --apply-blocks >"$SANDBOX/apply3.log" 2>&1 \
-  || fail "unsandboxed apply with a sentinel sudo failed: $(cat "$SANDBOX/apply3.log")"
-[ -s "$SANDBOX/sudo-sentinel.log" ] \
-  || fail "the sudo sentinel was never called, so it cannot catch an escalation"
-CHECKS=$((CHECKS + 1))
-[ "$(shasum -a 256 /etc/hosts | awk '{print $1}')" = "$hosts_before" ] \
-  || fail "the sentinel run wrote the real /etc/hosts"
-CHECKS=$((CHECKS + 1))
+# through the escalation tool, and with that tool replaced by the sentinel --
+# which exits 0 without running the helper -- the real file is still
+# untouched. So a sandboxed escalation would have been recorded rather than
+# silently passing. Only where the installed helper exists: without it the
+# escalation path falls through to an administrator prompt, which has no
+# answer on a CI runner.
+if [ -x /usr/local/libexec/granny/granny-helper ]; then
+  : >"$SANDBOX/sudo-sentinel.log"
+  GRANNY_CONFIG_FILE="$SANDBOX/config.json" GRANNY_STATE_DIR="$SANDBOX/state" \
+    GRANNY_SUDO="$SANDBOX/sudo-sentinel" GRANNY_ALLOW_NONROOT=1 GRANNY_SKIP_DNS_FLUSH=1 \
+    "$AGENT" --apply-blocks >"$SANDBOX/apply3.log" 2>&1 \
+    || fail "unsandboxed apply with a sentinel sudo failed: $(cat "$SANDBOX/apply3.log")"
+  [ -s "$SANDBOX/sudo-sentinel.log" ] \
+    || fail "the sudo sentinel was never called, so it cannot catch an escalation"
+  CHECKS=$((CHECKS + 1))
+  [ "$(shasum -a 256 /etc/hosts | awk '{print $1}')" = "$hosts_before" ] \
+    || fail "the sentinel run wrote the real /etc/hosts"
+  CHECKS=$((CHECKS + 1))
+fi
 
 echo "e2e-agent OK ($CHECKS checks)"
