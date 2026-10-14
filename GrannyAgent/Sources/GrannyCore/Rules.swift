@@ -74,8 +74,29 @@ public struct RulesEngine: Sendable {
         return false
     }
 
+    /// Loopback is the grandchild's own machine: dev servers, local apps,
+    /// granny's own endpoints. It cannot be a distraction in any phase, so it
+    /// never reaches a model tier. A LAN address (NAS, Plex) can be, so the
+    /// gate stops at the LAN.
+    private static func isLoopbackHost(_ host: String) -> Bool {
+        // URL.host keeps the brackets on an IPv6 literal ("[::1]").
+        let bare = host.hasPrefix("[") && host.hasSuffix("]")
+            ? String(host.dropFirst().dropLast())
+            : host
+        if bare == "localhost" || bare.hasSuffix(".localhost") { return true }
+        if bare == "::1" || bare == "0.0.0.0" { return true }
+        // 127.0.0.0/8, first octet only: the dotted-quad shape rejects
+        // look-alikes like 127.0.0.1.evil.com.
+        let octets = bare.split(separator: ".", omittingEmptySubsequences: false)
+        return octets.count == 4 && octets[0] == "127"
+            && octets.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isNumber) }
+    }
+
     public func evaluate(urlString: String, tasks: [TaskItem], phase: Phase) -> Decision? {
         guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return nil }
+        if Self.isLoopbackHost(host) {
+            return Decision(.allow, reason: "loopback host", source: "rules")
+        }
         if !phase.blocksActive {
             return Decision(.allow, reason: "phase \(phase.rawValue)", source: "rules")
         }

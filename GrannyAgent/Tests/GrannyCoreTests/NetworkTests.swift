@@ -237,6 +237,28 @@ final class NetworkTests: XCTestCase {
 
     // MARK: - Engine tier chain
 
+    /// The pin for the loopback bug: the classifier is stubbed to return a
+    /// confident block, yet the rules tier must resolve a loopback URL before
+    /// any tier is asked - and no request may leave the machine.
+    func testEngineAllowsLoopbackWithoutConsultingTiers() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 200, json: [
+                "answers": ["action": ["type": "choice", "choice": "block", "answer_confidence": 0.99]],
+            ])
+        }
+        var config = GrannyConfig()
+        config.layaURL = "https://laya.example/v1"
+        config.layaKey = "laya-key"
+        let engine = DecisionEngine(config: config, trace: TraceClient(config: nil), session: mockSession())
+        let decision = await engine.decide(
+            context: PageContext(url: "http://localhost:5173/", title: "Vite + React"),
+            tasks: [], phase: .working)
+        XCTAssertEqual(decision.action, .allow)
+        XCTAssertEqual(decision.reason, "loopback host")
+        XCTAssertEqual(decision.source, "rules")
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "loopback never reaches a model tier")
+    }
+
     func testEngineUsesJevViaOpenRouterWhenLayaMissing() async {
         MockURLProtocol.handler = { [self] request in
             response(request.url!, status: 200, json: openRouterOK(
