@@ -258,3 +258,9 @@ common case and would drown the signal.
   rings three times (one system sound vanishes under music or a meeting), the
   click that answers it silences it, and the banner behind it opens granny at
   the notebook - the tomato is what the click is for.
+- **Loopback is allowed unconditionally**: the rules tier answers
+  `localhost` (and `*.localhost`), `127.0.0.0/8`, `::1` and `0.0.0.0` with
+  an allow before any phase or allowlist check, so a dev server never
+  reaches a model tier - one judged loopback a distraction and blocked it.
+  The boundary stops at the LAN: private, link-local and `.local` addresses
+  are still judged, because a NAS or Plex box there is a real time sink.

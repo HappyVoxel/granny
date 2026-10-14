@@ -83,6 +83,39 @@ final class RulesTests: XCTestCase {
         XCTAssertNil(engine.evaluate(urlString: "https://vnexpress.net/tin-tuc", tasks: [], phase: .working))
     }
 
+    func testLoopbackHostsAllowedInEveryPhase() {
+        let urls = [
+            "http://localhost:5173/deep/path?q=1#frag",
+            "http://foo.localhost:3000/app",
+            "http://127.0.0.1:8080/health",
+            "http://127.0.0.2/",
+            "http://127.1.2.3/",
+            "http://[::1]:5173/",
+            "http://0.0.0.0:1234/",
+        ]
+        for phase in [Phase.working, .night, .rewarded, .dayOff] {
+            for url in urls {
+                let decision = engine.evaluate(urlString: url, tasks: [], phase: phase)
+                XCTAssertEqual(decision?.action, .allow, url)
+                XCTAssertEqual(decision?.reason, "loopback host", url)
+                XCTAssertEqual(decision?.source, "rules", url)
+            }
+        }
+    }
+
+    func testLanAndLookalikeHostsGetNoRulesVerdict() {
+        // A NAS, a Plex box or an mDNS name is a real time sink: still judged.
+        XCTAssertNil(engine.evaluate(urlString: "http://192.168.1.50/", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "http://10.0.0.5:32400/web", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "http://172.16.4.2/", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "http://169.254.1.1/", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "http://nas.local/", tasks: [], phase: .working))
+        // Merely containing the string must not ride the allow rule.
+        XCTAssertNil(engine.evaluate(urlString: "http://localhost.evil.com/", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "http://127.0.0.1.evil.com/", tasks: [], phase: .working))
+        XCTAssertNil(engine.evaluate(urlString: "http://notlocalhost/", tasks: [], phase: .working))
+    }
+
     func testAdultSitesBlocked() {
         XCTAssertEqual(engine.evaluate(urlString: "https://www.pornhub.com/", tasks: [], phase: .working)?.action, .block)
         XCTAssertEqual(engine.evaluate(urlString: "https://xvideos.com/", tasks: [], phase: .working)?.action, .block)
