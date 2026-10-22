@@ -1,5 +1,16 @@
 import Foundation
 
+/// A week: long enough to show a pattern, short enough to act on.
+public let rhythmWindowDays = 7
+
+/// Below this many logged days there is nothing to say.
+public let rhythmMinimumDays = 3
+
+/// A spread needs two starts - one point has none.
+private let minimumStartsForSpread = 2
+
+private let minutesPerHour = 60
+
 /// One finished day, one line of the day log beside the state file.
 ///
 /// The state file holds only today, so granny forgets everything the moment
@@ -51,7 +62,7 @@ public struct RhythmDay: Codable, Sendable, Equatable {
         guard parts.count == 2, let hour = Int(parts[0]), let minute = Int(parts[1]) else {
             return nil
         }
-        return hour * 60 + minute
+        return hour * minutesPerHour + minute
     }
 
     // Hand-rolled like `TaskItem`: the log is append-only, so a field added
@@ -78,7 +89,7 @@ public enum RhythmLog {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         guard var data = try? encoder.encode(day) else { return }
-        data.append(0x0A)
+        data.append(UInt8(ascii: "\n"))
         try? FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: url.path) {
@@ -96,7 +107,7 @@ public enum RhythmLog {
 
     /// The newest `limit` days. Unreadable lines are skipped rather than
     /// failing the load - the log is a nicety, never a gate.
-    public static func read(_ url: URL, limit: Int = 30) -> [RhythmDay] {
+    public static func read(_ url: URL, limit: Int = .max) -> [RhythmDay] {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         let decoder = JSONDecoder()
         let days: [RhythmDay] = text.split(separator: "\n").compactMap { line in
@@ -122,8 +133,8 @@ public struct RhythmReport: Sendable, Equatable {
     }
 }
 
-/// Nil until three days are logged: one bad morning is not a pattern, and
-/// granny does not diagnose on one data point.
+/// Nil until `rhythmMinimumDays` are logged: one bad morning is not a pattern,
+/// and granny does not diagnose on one data point.
 ///
 /// The window is calendar days, not the last n rows: a day granny never saw
 /// left no row, and it is a day with no first round - counting it is the
@@ -132,13 +143,13 @@ public func weeklyRhythm(
     _ days: [RhythmDay],
     now: Date = Date(),
     calendar: Calendar = .current,
-    limit: Int = 7
+    limit: Int = rhythmWindowDays
 ) -> RhythmReport? {
     let start = calendar.date(byAdding: .day, value: -limit, to: now) ?? now
     let from = dayString(start, calendar: calendar)
     let until = dayString(now, calendar: calendar)
     let recent = days.filter { $0.date >= from && $0.date < until }
-    guard recent.count >= 3 else { return nil }
+    guard recent.count >= rhythmMinimumDays else { return nil }
     let starts = recent.compactMap(\.firstRoundMinute)
     // At most `limit` days, but the window starts where the log does: a
     // three-day-old install must not read as four skipped days.
@@ -152,13 +163,15 @@ public func weeklyRhythm(
     return RhythmReport(
         days: span,
         started: starts.count,
-        spreadMinutes: starts.count >= 2 ? (starts.max() ?? 0) - (starts.min() ?? 0) : nil)
+        spreadMinutes: starts.count >= minimumStartsForSpread
+            ? (starts.max() ?? 0) - (starts.min() ?? 0)
+            : nil)
 }
 
 /// "2h05", "45m" - a clock distance, not a duration, so it never says "0h".
 public func clockSpread(_ minutes: Int) -> String {
-    let hours = minutes / 60
-    let rest = minutes % 60
+    let hours = minutes / minutesPerHour
+    let rest = minutes % minutesPerHour
     if hours == 0 { return "\(rest)m" }
     return rest == 0 ? "\(hours)h" : "\(hours)h\(String(format: "%02d", rest))"
 }

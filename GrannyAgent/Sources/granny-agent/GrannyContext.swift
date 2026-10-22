@@ -588,7 +588,7 @@ final class GrannyContext {
             // and when the door closes again. Only the round that first paid
             // the day says "go play" - every later round is a break again,
             // and nothing else would announce the reward.
-            announce(store.state.rewarded && store.state.pomodoro.finished == 1
+            announce(store.state.paidThisRound
                 ? GrannyLines.reward(bedtime: config.bedtimeHour)
                 : GrannyLines.pomodoroBreakLine(minutes: minutes))
         } else {

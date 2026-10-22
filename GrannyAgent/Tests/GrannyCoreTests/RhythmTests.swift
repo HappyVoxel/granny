@@ -106,6 +106,7 @@ final class RhythmTests: XCTestCase {
             RhythmLog.append(day(-index, rounds: index), to: log)
         }
         XCTAssertEqual(RhythmLog.read(log, limit: 3).map(\.rounds), [7, 8, 9])
+        XCTAssertEqual(RhythmLog.read(log).count, 9, "no limit reads the whole log")
     }
 
     func testNoReportBelowThreeDays() {

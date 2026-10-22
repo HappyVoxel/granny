@@ -104,6 +104,10 @@ public struct DayState: Codable, Sendable {
     /// it buys nothing - that is the whole rule.
     public var rewarded: Bool { allDone && paid }
 
+    /// The round that paid for the day is the first one; the ones after it are
+    /// just more work, and telling the user to go play again would be a lie.
+    public var paidThisRound: Bool { rewarded && pomodoro.finished == 1 }
+
     /// Records the day's first finished round. Later rounds leave it alone:
     /// the log wants when you sat down, not when you stopped.
     public mutating func markFirstRound(now: Date = Date(), calendar: Calendar = .current) {
@@ -165,10 +169,12 @@ public final class StateStore {
     /// never appends to a path shared with another one.
     public let logURL: URL
 
+    private static let dayLogExtension = "log"
+
     public init(url: URL = GrannyPaths.stateURL, calendar: Calendar = .current, logURL: URL? = nil) {
         self.url = url
         self.calendar = calendar
-        self.logURL = logURL ?? url.appendingPathExtension("log")
+        self.logURL = logURL ?? url.appendingPathExtension(StateStore.dayLogExtension)
         GrannyPaths.ensureDirectories()
         if let data = try? Data(contentsOf: url), let saved = JSON.decode(DayState.self, from: data) {
             self.state = saved
@@ -187,7 +193,7 @@ public final class StateStore {
 
     /// The coach's reading of the last `limit` logged days, nil until there
     /// are enough of them to be worth saying.
-    public func rhythm(days limit: Int = 7) -> RhythmReport? {
+    public func rhythm(days limit: Int = rhythmWindowDays) -> RhythmReport? {
         // The log is one line a day, so reading all of it is cheap; the window
         // is the report's job, not the read's.
         weeklyRhythm(RhythmLog.read(logURL, limit: .max), now: Date(), calendar: calendar, limit: limit)

@@ -70,6 +70,18 @@ final class PhaseTests: XCTestCase {
         today.pomodoro = PomodoroRun(stage: .shortBreak, finished: 1)
         XCTAssertTrue(today.paid)
         XCTAssertTrue(today.rewarded)
+        XCTAssertTrue(today.paidThisRound, "the first round is the one that paid")
+
+        today.pomodoro = PomodoroRun(stage: .shortBreak, finished: 2)
+        XCTAssertFalse(today.paidThisRound, "later rounds are just more work")
+    }
+
+    func testPaidThisRoundNeedsTheReward() {
+        var open = state(tasks: [TaskItem(title: "a")], rounds: 1)
+        XCTAssertTrue(open.paid)
+        XCTAssertFalse(open.paidThisRound)
+        open.tasks[0].done = true
+        XCTAssertTrue(open.paidThisRound)
     }
 
     func testMarkFirstRoundKeepsTheFirst() {

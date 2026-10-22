@@ -129,25 +129,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        // The mark, not the word. Drawn as a template - the bar paints it white
-        // or ink - because the app icon is a pastel bust that turns into a pale
-        // blob at bar size, and any redraw of its face loses the face.
+        let label = "granny"
         item.button?.image = statusMark()
-        item.button?.toolTip = "granny"
-        item.button?.setAccessibilityLabel("granny")
+        item.button?.toolTip = label
+        item.button?.setAccessibilityLabel(label)
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
         statusItem = item
     }
 
+    /// The drawing grid the mark is laid out on; `statusMarkSize` scales it.
+    private static let markGrid: CGFloat = 18
+    /// 22pt, the height the neighbours in the bar sit at.
+    private static let statusMarkSize: CGFloat = 22
+
     /// granny's face in the bar: a round head with the bob and the bun, the
     /// glasses and the smile low. The glasses are what make her old rather
     /// than an auntie - a bun alone reads young at any size. Drawn black and
     /// marked as a template, so the bar paints it white or ink.
-    private func statusMark(size: CGFloat = 22) -> NSImage {
+    private func statusMark(size: CGFloat = AppDelegate.statusMarkSize) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
-            let scale = size / 18
+            let scale = size / AppDelegate.markGrid
+            let centre = AppDelegate.markGrid / 2
+            let headY: CGFloat = 7
+            let head = NSPoint(x: centre, y: headY)
+            let headRadius: CGFloat = 5.4
+            let headStroke: CGFloat = 1.4
+            let bobRadius: CGFloat = 4.7
+            let bobStroke: CGFloat = 1.9
+            let bunSize: CGFloat = 4.2
+            let bunY: CGFloat = 11.1
+            let lensSize: CGFloat = 3
+            let lensOffset: CGFloat = 2.3
+            let lensY: CGFloat = 5.1
+            let lensStroke: CGFloat = 1
+            let bridgeStroke: CGFloat = 0.9
+            let mouthY: CGFloat = 3.6
+            let mouthRadius: CGFloat = 1.2
+            let mouthStroke: CGFloat = 1.1
+            // A smile is a circle's lower arc.
+            let smile: (from: CGFloat, to: CGFloat) = (200, 340)
+            // The bob runs over the crown only, leaving the face open.
+            let bob: (from: CGFloat, to: CGFloat) = (160, 20)
+
             NSColor.black.setFill()
             NSColor.black.setStroke()
 
@@ -165,34 +190,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 path.stroke()
             }
             func arc(
-                _ x: CGFloat, _ y: CGFloat, _ radius: CGFloat,
+                _ centre: NSPoint, _ radius: CGFloat,
                 _ from: CGFloat, _ to: CGFloat, width: CGFloat, clockwise: Bool = false
             ) {
                 let path = NSBezierPath()
                 path.appendArc(
-                    withCenter: NSPoint(x: x * scale, y: y * scale), radius: radius * scale,
+                    withCenter: NSPoint(x: centre.x * scale, y: centre.y * scale),
+                    radius: radius * scale,
                     startAngle: from, endAngle: to, clockwise: clockwise)
                 path.lineWidth = width * scale
                 path.lineCapStyle = .round
                 path.stroke()
             }
 
-            // The head fills the box, so the mark sits level with the other
-            // items in the bar instead of looking small.
-            arc(9, 7, 5.4, 0, 360, width: 1.4)
-            // The bob: a thick band across the crown, not a helmet.
-            arc(9, 7, 4.7, 160, 20, width: 1.9, clockwise: true)
-            // The bun on the crown.
-            oval(6.9, 11.1, 4.2, 4.2)
+            // The head fills the box, or the mark sits small beside its
+            // neighbours in the bar.
+            arc(head, headRadius, 0, 360, width: headStroke)
+            // A thick band, short enough that the face stays open - a helmet
+            // hides the face at this size.
+            arc(head, bobRadius, bob.from, bob.to, width: bobStroke, clockwise: true)
+            oval(centre - bunSize / 2, bunY, bunSize, bunSize)
 
-            ring(5.2, 5.1, 3.0, 3.0, width: 1.0)
-            ring(9.8, 5.1, 3.0, 3.0, width: 1.0)
+            ring(centre - lensOffset - lensSize / 2, lensY, lensSize, lensSize,
+                 width: lensStroke)
+            ring(centre + lensOffset - lensSize / 2, lensY, lensSize, lensSize,
+                 width: lensStroke)
             let bridge = NSBezierPath()
-            bridge.move(to: NSPoint(x: 8.2 * scale, y: 6.6 * scale))
-            bridge.line(to: NSPoint(x: 9.8 * scale, y: 6.6 * scale))
-            bridge.lineWidth = 0.9 * scale
+            bridge.move(to: NSPoint(
+                x: (centre - lensOffset + lensSize / 2) * scale,
+                y: (lensY + lensSize / 2) * scale))
+            bridge.line(to: NSPoint(
+                x: (centre + lensOffset - lensSize / 2) * scale,
+                y: (lensY + lensSize / 2) * scale))
+            bridge.lineWidth = bridgeStroke * scale
             bridge.stroke()
-            arc(9, 3.6, 1.2, 200, 340, width: 1.1)
+
+            arc(NSPoint(x: centre, y: mouthY), mouthRadius, smile.from, smile.to,
+                width: mouthStroke)
             return true
         }
         image.isTemplate = true
