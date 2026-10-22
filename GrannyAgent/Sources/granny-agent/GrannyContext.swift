@@ -17,6 +17,14 @@ final class GrannyContext {
     /// Set when GitHub reports a newer release; the menu offers the link.
     private(set) var availableUpdate: ReleaseInfo?
 
+    /// The timetable the running app honours. Settings and the timetable
+    /// window write the file; this copy is what the ticks read until the next
+    /// save, so an edit lands without a relaunch.
+    private(set) var schedule: Schedule
+
+    /// The tags the slots point at: the colours and names of the day.
+    private(set) var tags: [SlotTag]
+
     /// The coach's line about the last days, read once at launch and once per
     /// rollover - the log only grows at midnight, so there is nothing to
     /// re-read in between.
@@ -46,9 +54,12 @@ final class GrannyContext {
         GrannyTheme.configure(appearance: config.appearance)
         self.store = StateStore()
         self.rhythmReport = store.rhythm()
+        self.schedule = Schedule(slots: config.schedule)
+        self.tags = config.tags
         self.trace = TraceClient(config: config.langfuse)
         self.engine = DecisionEngine(config: config, trace: trace)
         self.scheduler = Scheduler(config: config, store: store, engine: engine, block: block, speaker: speaker)
+        self.scheduler.schedule = schedule
         // The block follows the work interval, not the clock: the scheduler
         // asks this every tick, and the tick that returns enforcement quashes
         // the relay tunnels a cleared-hosts break made possible.
@@ -139,6 +150,7 @@ final class GrannyContext {
         }
         scheduler.tick()
         announce(resumed ? GrannyLines.dayOffCancelled : GrannyLines.saved)
+        assignSlots()
 
         Task { [weak self] in
             guard let self, let intake = await self.engine.parseIntake(text: text), !intake.tasks.isEmpty else { return }
@@ -154,6 +166,7 @@ final class GrannyContext {
                           stillThere.allSatisfy({ !$0.done }) else { return }
                     state.tasks = state.tasks.filter(\.carriedOver) + intake.tasks
                 }
+                self.assignSlots()
                 if let question = intake.question {
                     self.challengeTaskID = self.challengeTarget(in: intake.tasks)?.id
                     onChallenge(question)
@@ -229,6 +242,7 @@ final class GrannyContext {
         }
         scheduler.tick()
         announce(resumed ? GrannyLines.dayOffCancelled : GrannyLines.taskAdded)
+        assignSlots()
 
         Task { [weak self] in
             guard let self,
@@ -253,19 +267,92 @@ final class GrannyContext {
             state.tasks.removeAll { naiveIDs.contains($0.id) }
             state.tasks.append(contentsOf: refined)
         }
+        assignSlots()
     }
 
     func toggle(taskID: String) {
+        var refused = false
         mutate { state in
             if let index = state.tasks.firstIndex(where: { $0.id == taskID }) {
                 state.tasks[index].done.toggle()
             }
+            refused = state.refuseUnpaidTicks()
         }
         scheduler.tick()
+        if refused {
+            announce(GrannyLines.unpaidNudge)
+            return
+        }
+        if let task = store.state.tasks.first(where: { $0.id == taskID }), task.done {
+            nudgeOffSlot(task)
+        }
         if store.state.allDone {
-            announce(store.state.paid
-                ? GrannyLines.reward(bedtime: config.bedtimeHour)
-                : GrannyLines.unpaidNudge)
+            announce(GrannyLines.reward(bedtime: config.bedtimeHour))
+        }
+    }
+
+    /// Finishing something at the wrong hour still counts - granny is strict,
+    /// not petty - but she says so, once per task: repeating it is how a coach
+    /// becomes a nag.
+    private func nudgeOffSlot(_ task: TaskItem) {
+        guard let slot = schedule.slot(id: task.slotID),
+              let current = schedule.current(), current.id != slot.id,
+              !store.state.nudgedOffSlot.contains(task.id)
+        else { return }
+        mutate { $0.nudgedOffSlot.append(task.id) }
+        announce(GrannyLines.offSlot(task: task.title, slot: slot.time))
+    }
+
+    /// Saves the day to the config and adopts it at once: the next tick
+    /// announces from the new hours, no relaunch. The file on disk is
+    /// re-read first and only `schedule` is merged into it - this context's
+    /// `config` is the launch-time copy, and writing that back would undo a
+    /// Settings save the user declined to relaunch for.
+    func saveSchedule(_ slots: [ScheduleSlot], tags newTags: [SlotTag]) throws {
+        var onDisk = GrannyConfig.load()
+        onDisk.schedule = slots
+        onDisk.tags = newTags
+        try onDisk.save()
+        tags = newTags
+        admit(slots)
+    }
+
+    /// Adopts a timetable that is already on disk. The failed-save path must
+    /// not reach here: the window would behave as if the hours were saved
+    /// while the next launch quietly reverted them.
+    private func admit(_ slots: [ScheduleSlot]) {
+        schedule = Schedule(slots: slots)
+        scheduler.schedule = schedule
+        mutate { state in
+            state.tasks = droppingUnknownSlots(state.tasks, in: schedule)
+            state.carried = droppingUnknownSlots(state.carried, in: schedule)
+        }
+        assignSlots()
+    }
+
+    /// The user moving a task off its proposed hour, or onto one.
+    func assignSlot(taskID: String, slotID: String?) {
+        mutate { state in
+            guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else { return }
+            state.tasks[index].slotID = slotID
+        }
+    }
+
+    /// Granny's read of the day, as a proposal: same kind of hour first, one
+    /// task per slot, in the order the list was written. Stored so the hour
+    /// cannot drift under the task - a task granny already placed keeps its
+    /// slot even if the wording changes.
+    private func assignSlots() {
+        guard !schedule.slots.isEmpty else { return }
+        let pending = store.state.tasks.filter { !$0.done && $0.slotID == nil }
+        let proposal = proposeSlots(for: pending, in: schedule)
+        guard !proposal.isEmpty else { return }
+        mutate { state in
+            for index in state.tasks.indices {
+                if let slot = proposal[state.tasks[index].id] {
+                    state.tasks[index].slotID = slot
+                }
+            }
         }
     }
 
@@ -349,6 +436,9 @@ final class GrannyContext {
     func markAllDone() {
         mutate { state in
             for index in state.tasks.indices { state.tasks[index].done = true }
+            // The same refusal as a manual tick: the button is one more way to
+            // claim the day, and a claim with no round behind it comes off.
+            state.refuseUnpaidTicks()
         }
         scheduler.tick()
         announce(store.state.paid

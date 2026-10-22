@@ -238,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, "\(GrannyLines.tasksTitle)…", #selector(showTasks), "t")
         add(menu, GrannyLines.menuTodayList, #selector(showGreeting), "n")
+        add(menu, GrannyLines.menuSchedule, #selector(showSchedule), "h")
         if state.dayOff {
             add(menu, GrannyLines.menuBackToWork, #selector(resumeWork), "d")
         } else {
@@ -393,24 +394,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showSettings() {
-        let view = SettingsView(
-            config: context.config,
-            onSave: { [weak self] updated in
-                do {
-                    try updated.save()
-                    GrannyLines.language = updated.language
-                    GrannyTheme.configure(appearance: updated.appearance)
-                    self?.window?.close()
-                    self?.offerRelaunch()
-                } catch {
-                    self?.showAlert(title: GrannyLines.configSaveFailed, body: error.localizedDescription)
-                }
-            },
-            onCancel: { [weak self] in self?.presentInitialWindow() })
-        show(view, title: GrannyLines.settingsTitle, styleMask: [.titled, .closable, .resizable, .miniaturizable])
-        window?.setContentSize(NSSize(width: 520, height: 580))
-        window?.minSize = NSSize(width: 480, height: 400)
-        windowKind = .settings
+        openMain(on: .settings)
+    }
+
+    @objc private func showSchedule() {
+        openMain(on: .timetable)
+    }
+
+    /// One window, opened straight onto a tab: a second window meant leaving
+    /// the notebook behind every time a key was pasted.
+    private func openMain(on tab: GrannyTab) {
+        if windowKind == .main, let window, window.isVisible {
+            tabs.current = tab
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        presentTasks()
+        tabs.current = tab
+    }
+
+    private func presentChallenge(_ question: String) {
+        let alert = NSAlert()
+        alert.messageText = GrannyLines.challengeTitle
+        alert.informativeText = question
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        alert.accessoryView = field
+        alert.addButton(withTitle: GrannyLines.answerButton)
+        alert.addButton(withTitle: GrannyLines.cancelButton)
+        guard alert.runModal() == .alertFirstButtonReturn, !field.stringValue.isEmpty else { return }
+        context.answerChallenge(field.stringValue)
+    }
+
+    private func confirmDayOff() {
+        let alert = NSAlert()
+        alert.messageText = GrannyLines.grannyAsks
+        alert.informativeText = GrannyLines.dayOffConfirm()
+        alert.addButton(withTitle: GrannyLines.agreeButton)
+        alert.addButton(withTitle: GrannyLines.backButton)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        context.setDayOff()
     }
 
     private func offerRelaunch() {
@@ -474,12 +496,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private enum WindowKind {
         case greeting
-        case tasks
-        case settings
+        /// The one window: notebook, timetable and settings are tabs.
+        case main
     }
 
+    /// Which tab the window is on, so the menu can open it in the right place.
+    private let tabs = GrannyTabs()
+
     /// What the current window holds. The intake lock needs it: a visible
-    /// window is only proof of the notebook when it *is* the notebook.
+    /// window only counts as the notebook when it is the notebook tab.
     private var windowKind: WindowKind?
 
     /// How long the yellow button buys before the intake reminder returns.
@@ -515,7 +540,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         intakeSnoozeUntil = nil
-        if windowKind != .greeting, windowKind != .settings {
+        // A window on the timetable is still a window with no list, but
+        // replacing it would take an unsaved timetable with it: bring the
+        // notebook tab forward instead.
+        if windowKind == .main, tabs.current != .notebook {
+            tabs.current = .notebook
+            return
+        }
+        if windowKind != .greeting, windowKind != .main {
             presentGreeting(force: true)
         }
     }
@@ -528,10 +560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             needsHelper: !context.helperInstalled,
             carried: context.store.state.carried.map(\.title),
             streak: displayStreak(state: context.store.state),
-            onOpenSettings: { [weak self] in
-                self?.window?.orderOut(nil)
-                self?.showSettings()
-            },
+            onOpenSettings: { [weak self] in self?.openMain(on: .settings) },
             onInstallHelper: { [weak self] in self?.context.installHelper() },
             onSave: { [weak self] text in
                 self?.window?.close()
@@ -563,51 +592,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func presentTasks() {
         context.viewModel.refresh(from: context)
-        let view = TaskListView(
+        let view = GrannyRootView(
+            context: context,
+            tabs: tabs,
             viewModel: context.viewModel,
-            onToggle: { [weak self] id in self?.context.toggle(taskID: id) },
-            onMarkAllDone: { [weak self] in self?.context.markAllDone() },
-            onAdd: { [weak self] text in self?.context.addTask(text) },
-            onUpdateTask: { [weak self] id, title, purpose, surfaces in
-                self?.context.updateTask(
-                    taskID: id, title: title, purpose: purpose, surfaces: surfaces)
+            onScheduleSave: { [weak self] slots, tags in
+                guard let self else { return }
+                do {
+                    try self.context.saveSchedule(slots, tags: tags)
+                    self.tabs.current = .notebook
+                } catch {
+                    self.showAlert(title: GrannyLines.configSaveFailed,
+                                   body: error.localizedDescription)
+                }
             },
-            onElaborate: { [weak self] title, purpose in
-                await self?.context.elaboratePurpose(title: title, purpose: purpose) ?? nil
-            },
-            onRemove: { [weak self] id in self?.context.removeTask(taskID: id) },
-            onResumeWork: { [weak self] in self?.context.clearDayOff() },
-            onOpenSettings: { [weak self] in
-                self?.window?.orderOut(nil)
-                self?.showSettings()
-            },
-            onTogglePomodoro: { [weak self] in self?.context.togglePomodoro() })
-        show(view, title: GrannyLines.tasksTitle, styleMask: [.titled, .closable, .miniaturizable, .resizable])
-        window?.setContentSize(NSSize(width: 530, height: 580))
-        window?.minSize = NSSize(width: 520, height: 470)
-        windowKind = .tasks
-    }
-
-    private func presentChallenge(_ question: String) {
-        let alert = NSAlert()
-        alert.messageText = GrannyLines.challengeTitle
-        alert.informativeText = question
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        alert.accessoryView = field
-        alert.addButton(withTitle: GrannyLines.answerButton)
-        alert.addButton(withTitle: GrannyLines.cancelButton)
-        guard alert.runModal() == .alertFirstButtonReturn, !field.stringValue.isEmpty else { return }
-        context.answerChallenge(field.stringValue)
-    }
-
-    private func confirmDayOff() {
-        let alert = NSAlert()
-        alert.messageText = GrannyLines.grannyAsks
-        alert.informativeText = GrannyLines.dayOffConfirm()
-        alert.addButton(withTitle: GrannyLines.agreeButton)
-        alert.addButton(withTitle: GrannyLines.backButton)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        context.setDayOff()
+            onSettingsSave: { [weak self] updated in
+                // Settings edits a launch-time copy and writes it whole; the
+                // timetable it holds is that same old copy, so the live one
+                // wins - otherwise saving a key would revert the day.
+                var updated = updated
+                updated.schedule = self?.context.schedule.slots ?? updated.schedule
+                updated.tags = self?.context.tags ?? updated.tags
+                do {
+                    try updated.save()
+                    GrannyLines.language = updated.language
+                    GrannyTheme.configure(appearance: updated.appearance)
+                    self?.offerRelaunch()
+                } catch {
+                    self?.showAlert(title: GrannyLines.configSaveFailed,
+                                    body: error.localizedDescription)
+                }
+            })
+        show(view, title: GrannyLines.windowTitle,
+             styleMask: [.titled, .closable, .miniaturizable, .resizable])
+        window?.setContentSize(NSSize(width: 760, height: 620))
+        window?.minSize = NSSize(width: 640, height: 520)
+        windowKind = .main
+        tabs.current = .notebook
     }
 
     private func show<Content: View>(_ view: Content, title: String, styleMask: NSWindow.StyleMask) {
@@ -629,6 +650,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // scroll view passes under it, and a fully transparent bar would let
         // the text collide with the title.
         newWindow.titlebarAppearsTransparent = false
+        // No title: the window is the day, and the pill below says which
+        // page of it. The mark lives in that pill, not up here.
+        newWindow.titleVisibility = .hidden
         newWindow.contentView = NSHostingView(rootView: view)
         newWindow.setContentSize(newWindow.contentView?.fittingSize ?? NSSize(width: 560, height: 420))
         newWindow.center()

@@ -9,8 +9,6 @@ public let rhythmMinimumDays = 3
 /// A spread needs two starts - one point has none.
 private let minimumStartsForSpread = 2
 
-private let minutesPerHour = 60
-
 /// One finished day, one line of the day log beside the state file.
 ///
 /// The state file holds only today, so granny forgets everything the moment
@@ -125,7 +123,6 @@ public struct RhythmReport: Sendable, Equatable {
     /// Latest minus earliest first round, in minutes. Nil below two started
     /// days: a single point has no spread.
     public var spreadMinutes: Int?
-
     public init(days: Int, started: Int, spreadMinutes: Int? = nil) {
         self.days = days
         self.started = started

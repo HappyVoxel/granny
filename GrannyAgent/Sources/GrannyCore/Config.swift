@@ -12,6 +12,17 @@ public struct LangfuseConfig: Codable, Sendable {
     }
 }
 
+/// Decodes an array one element at a time: a broken element is skipped, the
+/// rest survive. `try?` around a whole array turns one bad entry into "the
+/// user has no timetable at all".
+private struct Lossy<T: Decodable>: Decodable {
+    let value: T?
+
+    init(from decoder: Decoder) throws {
+        value = try? T(from: decoder)
+    }
+}
+
 public struct GrannyConfig: Codable, Sendable {
     public var openRouterKey: String?
     public var model: String
@@ -58,6 +69,12 @@ public struct GrannyConfig: Codable, Sendable {
     public var contextHosts: [String]
     public var alwaysAllowedURLPrefixes: [String]
     public var entertainmentApps: [String]
+    /// The user's own day: the hours granny nudges against. Empty until they
+    /// write one.
+    public var schedule: [ScheduleSlot]
+    /// The colours and names of the hours. The seven built-ins are the seed;
+    /// a user may recolour, rename or add to them.
+    public var tags: [SlotTag]
 
     public init(
         openRouterKey: String? = nil,
@@ -87,7 +104,9 @@ public struct GrannyConfig: Codable, Sendable {
         dohDomains: [String] = GrannyConfig.defaultDOHDomains,
         contextHosts: [String] = GrannyConfig.defaultContextHosts,
         alwaysAllowedURLPrefixes: [String] = GrannyConfig.defaultAlwaysAllowedPrefixes,
-        entertainmentApps: [String] = GrannyConfig.defaultEntertainmentApps
+        entertainmentApps: [String] = GrannyConfig.defaultEntertainmentApps,
+        schedule: [ScheduleSlot] = [],
+        tags: [SlotTag] = SlotTag.defaults
     ) {
         self.openRouterKey = openRouterKey
         self.model = model
@@ -117,6 +136,8 @@ public struct GrannyConfig: Codable, Sendable {
         self.contextHosts = contextHosts
         self.alwaysAllowedURLPrefixes = alwaysAllowedURLPrefixes
         self.entertainmentApps = entertainmentApps
+        self.schedule = schedule
+        self.tags = tags
     }
 
     public static let defaultBlockedDomains = [
@@ -243,6 +264,12 @@ public struct GrannyConfig: Codable, Sendable {
         contextHosts = value(.contextHosts, d.contextHosts)
         alwaysAllowedURLPrefixes = value(.alwaysAllowedURLPrefixes, d.alwaysAllowedURLPrefixes)
         entertainmentApps = value(.entertainmentApps, d.entertainmentApps)
+        // Element by element: one unreadable slot or tag is skipped, the rest
+        // of the user's day and palette survive.
+        let slots: [Lossy<ScheduleSlot>]? = (try? c.decodeIfPresent([Lossy<ScheduleSlot>].self, forKey: .schedule)) ?? nil
+        let palette: [Lossy<SlotTag>]? = (try? c.decodeIfPresent([Lossy<SlotTag>].self, forKey: .tags)) ?? nil
+        schedule = slots?.compactMap(\.value) ?? d.schedule
+        tags = palette?.compactMap(\.value) ?? d.tags
     }
 
     public static func load(from url: URL = GrannyPaths.configURL) -> GrannyConfig {

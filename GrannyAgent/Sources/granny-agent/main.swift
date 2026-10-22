@@ -89,6 +89,7 @@ func runStatus() {
     print("phase: \(phase.rawValue)")
     print("blocks active: \(phase.blocksActive)")
     print("rounds: \(store.state.pomodoro.finished)")
+    print("schedule: \(config.schedule.count) slots")
     print("first round: \(store.state.firstRoundAt ?? "-")")
     print("hosts block present: \(HostsFile.isBlocked(current: hosts)) (\(HostsFile.blockedDomainCount(current: hosts)) domains)")
     print("openrouter: \(config.openRouterKey == nil ? "not configured" : "configured")")
@@ -134,6 +135,9 @@ if arguments.contains("--serve") {
             enforcementProvider: { onMain { pomodoro.enforced } })
         try server.start()
         print("granny-agent serving on 127.0.0.1:\(config.decidePortNumber)")
+        // A redirected stdout is block-buffered: a script waiting for the
+        // server would read an empty file and call it a crash.
+        fflush(stdout)
         RunLoop.main.run()
     } catch {
         FileHandle.standardError.write(Data("serve failed: \(error.localizedDescription)\n".utf8))

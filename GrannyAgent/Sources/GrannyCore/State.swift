@@ -7,13 +7,18 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
     public var allowedSurfaces: [String]
     public var done: Bool
     public var carriedOver: Bool
+    /// The slot of the user's timetable this task belongs to. A proposal
+    /// granny makes at intake and the user can move: stored, never recomputed,
+    /// so the hour cannot drift under the task.
+    public var slotID: String?
 
     public init(
         title: String,
         purpose: String? = nil,
         allowedSurfaces: [String] = [],
         done: Bool = false,
-        carriedOver: Bool = false
+        carriedOver: Bool = false,
+        slotID: String? = nil
     ) {
         self.id = UUID().uuidString
         self.title = title
@@ -21,6 +26,7 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
         self.allowedSurfaces = allowedSurfaces
         self.done = done
         self.carriedOver = carriedOver
+        self.slotID = slotID
     }
 
     // Hand-rolled so a state file written before `carriedOver` existed still
@@ -33,6 +39,7 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
         allowedSurfaces = try c.decodeIfPresent([String].self, forKey: .allowedSurfaces) ?? []
         done = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
         carriedOver = try c.decodeIfPresent(Bool.self, forKey: .carriedOver) ?? false
+        slotID = try c.decodeIfPresent(String.self, forKey: .slotID)
     }
 }
 
@@ -53,6 +60,9 @@ public struct DayState: Codable, Sendable {
     public var streak: Int
     public var streakDay: String?
     public var firstRoundAt: String?
+    /// Task ids granny already scolded for finishing off-slot today, so the
+    /// line lands once and does not repeat on a re-tick.
+    public var nudgedOffSlot: [String]
 
     public init(
         date: String,
@@ -63,7 +73,8 @@ public struct DayState: Codable, Sendable {
         pomodoro: PomodoroRun = .fresh,
         streak: Int = 0,
         streakDay: String? = nil,
-        firstRoundAt: String? = nil
+        firstRoundAt: String? = nil,
+        nudgedOffSlot: [String] = []
     ) {
         self.date = date
         self.dayOff = dayOff
@@ -74,6 +85,7 @@ public struct DayState: Codable, Sendable {
         self.streak = streak
         self.streakDay = streakDay
         self.firstRoundAt = firstRoundAt
+        self.nudgedOffSlot = nudgedOffSlot
     }
 
     public static func fresh(date: String) -> DayState {
@@ -103,6 +115,16 @@ public struct DayState: Codable, Sendable {
         firstRoundAt = clockString(now, calendar: calendar)
     }
 
+    /// "The list is done" with no round behind it is a claim granny refuses -
+    /// and she does not keep a tick she refuses to count. Returns true when it
+    /// fired, so the caller says why the boxes came back off.
+    @discardableResult
+    public mutating func refuseUnpaidTicks() -> Bool {
+        guard allDone, !paid else { return false }
+        for index in tasks.indices { tasks[index].done = false }
+        return true
+    }
+
     /// Writing a task cancels the day off: a day off has no tasks by
     /// definition, so new work means the user is back on duty. Returns true
     /// when the flag flipped, so the caller announces it once.
@@ -126,6 +148,7 @@ public struct DayState: Codable, Sendable {
         streak = try c.decodeIfPresent(Int.self, forKey: .streak) ?? 0
         streakDay = try c.decodeIfPresent(String.self, forKey: .streakDay)
         firstRoundAt = try c.decodeIfPresent(String.self, forKey: .firstRoundAt)
+        nudgedOffSlot = try c.decodeIfPresent([String].self, forKey: .nudgedOffSlot) ?? []
     }
 }
 

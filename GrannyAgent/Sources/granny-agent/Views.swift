@@ -65,6 +65,19 @@ enum GrannyTheme {
         return card
     }
     static var text: Color { Color(nsColor: textNS) }
+
+    /// A tag owns its colour - the built-ins ship with one, the user may
+    /// change it or invent a tag. At chip size the colour is read before the
+    /// word, which is why it lives in the tag and not in the theme.
+    static func tagColor(_ tag: SlotTag?) -> Color {
+        guard let tag, let rgb = tag.rgb else { return text.opacity(0.4) }
+        return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue)
+    }
+
+    /// The one warning tone: the tomato's brick, so an error already belongs
+    /// to the palette instead of a system red dropped into it.
+    static var warning: Color { Color(nsColor: tomatoDeepNS) }
+
     static var gold: Color { Color(nsColor: goldNS) }
     static var hairline: Color { Color(nsColor: hairlineNS) }
 
@@ -376,8 +389,14 @@ final class GrannyViewModel: ObservableObject {
     /// Every box ticked, not one round paid: the status line has to say why
     /// the door is still shut.
     @Published var allTicked = false
+    /// Deep-work rounds finished today, so the notebook can say "not yet"
+    /// instead of offering a button that cannot pay.
+    @Published var rounds = 0
     /// The coach's line about the last days; nil until there are enough.
     @Published var rhythm: RhythmReport?
+    /// The timetable, for the hour chip on each task.
+    @Published var slots: [ScheduleSlot] = []
+    @Published var tags: [SlotTag] = []
 
     func refresh(from context: GrannyContext) {
         tasks = context.store.state.tasks
@@ -385,7 +404,10 @@ final class GrannyViewModel: ObservableObject {
         dayOff = context.store.state.dayOff
         streak = displayStreak(state: context.store.state)
         allTicked = context.store.state.allDone && !context.store.state.paid
+        rounds = context.store.state.pomodoro.finished
         rhythm = context.rhythmReport
+        slots = context.schedule.sorted
+        tags = context.tags
     }
 }
 
@@ -881,14 +903,14 @@ struct TaskListView: View {
     var onUpdateTask: (String, String, String?, [String]) -> Void
     var onElaborate: (String, String?) async -> String?
     var onRemove: (String) -> Void
+    /// Move a task to another hour of the timetable, or off the timetable.
+    var onAssignSlot: (String, String?) -> Void
     var onResumeWork: () -> Void
-    var onOpenSettings: () -> Void
     var onTogglePomodoro: () -> Void
 
     @State private var adding = false
     @State private var newTask = ""
     @State private var editing: TaskItem?
-    @State private var settingsHover = false
     @FocusState private var addFocused: Bool
 
     var body: some View {
@@ -924,7 +946,6 @@ struct TaskListView: View {
                 if viewModel.streak >= 2 {
                     StreakBadge(count: viewModel.streak)
                 }
-                settingsButton
             }
 
             Rectangle()
@@ -968,6 +989,9 @@ struct TaskListView: View {
                         }
                     }
                     Spacer()
+                    if !viewModel.slots.isEmpty {
+                        slotChip(task)
+                    }
                     Button {
                         editing = task
                     } label: {
@@ -1054,9 +1078,24 @@ struct TaskListView: View {
             }
 
             HStack(alignment: .bottom) {
-                Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
-                    .buttonStyle(GrannyPrimaryButtonStyle())
-                    .disabled(viewModel.tasks.isEmpty || viewModel.tasks.allSatisfy { $0.done })
+                VStack(alignment: .leading, spacing: 4) {
+                    Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
+                        .buttonStyle(GrannyPrimaryButtonStyle())
+                        // "I'm done" claims the day, and the day is only paid
+                        // for by a round: without one the click could only be
+                        // refused, and a disabled control has no tooltip.
+                        .disabled(
+                            viewModel.tasks.isEmpty
+                                || viewModel.tasks.allSatisfy { $0.done }
+                                || viewModel.rounds == 0)
+                    if viewModel.rounds == 0, !viewModel.tasks.isEmpty,
+                       !viewModel.tasks.allSatisfy({ $0.done }) {
+                        Text(GrannyLines.markAllNeedsRound)
+                            .font(.system(size: 11, design: .serif))
+                            .italic()
+                            .foregroundStyle(GrannyTheme.text.opacity(0.5))
+                    }
+                }
                 Spacer()
                 // The tomato takes the corner granny's own button used to
                 // hold: the reward is the thing the eye lands on last.
@@ -1080,29 +1119,45 @@ struct TaskListView: View {
         .preferredColorScheme(GrannyTheme.colorScheme)
     }
 
-    /// Quiet gear in the notebook's corner: granny's Settings, one click away.
-    private var settingsButton: some View {
-        Button(action: onOpenSettings) {
-            Image(systemName: "gearshape")
-                .font(.system(size: 15))
-                .foregroundStyle(GrannyTheme.gold.opacity(settingsHover ? 1 : 0.55))
-                .padding(6)
-                .background(Circle().fill(GrannyTheme.gold.opacity(settingsHover ? 0.14 : 0)))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help(GrannyLines.menuSettings)
-        .onHover { settingsHover = $0 }
-        .pointingHandOnHover()
-        .animation(.easeOut(duration: 0.15), value: settingsHover)
-    }
-
     private func commitAdd() {
         let text = newTask.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         onAdd(text)
         newTask = ""
         adding = false
+    }
+
+    /// The hour this task belongs to. A menu, not a label: the proposal is
+    /// granny's, and moving it is one click.
+    private func slotChip(_ task: TaskItem) -> some View {
+        let slot = viewModel.slots.first { $0.id == task.slotID }
+        return Menu {
+            ForEach(viewModel.slots) { option in
+                Button("\(option.time) · \(option.label)") {
+                    onAssignSlot(task.id, option.id)
+                }
+            }
+            if task.slotID != nil {
+                Divider()
+                Button(GrannyLines.slotClear) { onAssignSlot(task.id, nil) }
+            }
+        } label: {
+            let tone = slot.flatMap { slot in
+                viewModel.tags.first { $0.id == slot.tag }
+            }.map(GrannyTheme.tagColor) ?? GrannyTheme.text.opacity(0.35)
+            Text(slot?.time ?? "—")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(tone)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(tone.opacity(slot == nil ? 0.7 : 0.6), lineWidth: 1))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(GrannyLines.slotAssignHelp)
     }
 
     private var status: String {
@@ -1305,5 +1360,18 @@ struct TaskEditorView: View {
                 elaborating = false
             }
         }
+    }
+}
+
+extension Color {
+    /// "#RRGGBB" for the config, through sRGB so the value survives the round
+    /// trip back into `SlotTag.rgb`.
+    var hexString: String {
+        guard let rgb = NSColor(self).usingColorSpace(.sRGB) else { return "#000000" }
+        return String(
+            format: "#%02X%02X%02X",
+            Int((rgb.redComponent * 255).rounded()),
+            Int((rgb.greenComponent * 255).rounded()),
+            Int((rgb.blueComponent * 255).rounded()))
     }
 }

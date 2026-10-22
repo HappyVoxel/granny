@@ -84,6 +84,17 @@ final class PhaseTests: XCTestCase {
         XCTAssertTrue(open.paidThisRound)
     }
 
+    func testUnpaidTicksAreRefused() {
+        var unpaid = state(tasks: [TaskItem(title: "a", done: true), TaskItem(title: "b", done: true)])
+        XCTAssertTrue(unpaid.refuseUnpaidTicks())
+        XCTAssertTrue(unpaid.tasks.allSatisfy { !$0.done }, "a claim with no round comes back off")
+        XCTAssertFalse(unpaid.refuseUnpaidTicks(), "an open list has nothing to refuse")
+
+        var paid = state(tasks: [TaskItem(title: "a", done: true)], rounds: 1)
+        XCTAssertFalse(paid.refuseUnpaidTicks())
+        XCTAssertTrue(paid.tasks[0].done, "a paid day keeps its ticks")
+    }
+
     func testMarkFirstRoundKeepsTheFirst() {
         var today = state()
         today.markFirstRound(now: date(hour: 8, minute: 41), calendar: calendar)
