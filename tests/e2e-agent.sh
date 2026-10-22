@@ -97,6 +97,10 @@ SERVER_PID=$!
 
 ready=0
 for _ in $(seq 1 40); do
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    cat "$SANDBOX/serve.log" >&2
+    fail "server exited before answering"
+  fi
   if curl -s -o /dev/null "http://127.0.0.1:$PORT/health" 2>/dev/null; then
     ready=1
     break
@@ -180,7 +184,9 @@ contains "$out" "phase: dayOff" "status day off"
 # to make that faster.
 BREAK_DIR="$SANDBOX/break"
 mkdir -p "$BREAK_DIR/state"
-BREAK_PORT=$((49000 + RANDOM % 1000))
+# Below 49152: that is where macOS starts handing out ephemeral ports, and a
+# collision there reads as "server did not come up" with no error to show.
+BREAK_PORT=$((45000 + RANDOM % 1000))
 cat >"$BREAK_DIR/config.json" <<JSON
 {"token":"$TOKEN","decidePort":$BREAK_PORT,"wakeHour":0,"bedtimeHour":24,"pomodoro":{"workMinutes":1,"shortBreakMinutes":1,"longBreakMinutes":1}}
 JSON
@@ -199,6 +205,10 @@ SERVER_PID=$!
 
 ready=0
 for _ in $(seq 1 40); do
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    cat "$BREAK_DIR/serve.log" >&2
+    fail "break-window server exited before answering"
+  fi
   if curl -s -o /dev/null -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$BREAK_PORT/health" 2>/dev/null; then
     ready=1
     break
