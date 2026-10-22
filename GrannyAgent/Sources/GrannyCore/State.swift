@@ -6,7 +6,6 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
     public var purpose: String?
     public var allowedSurfaces: [String]
     public var done: Bool
-    /// Unfinished yesterday: the notebook marks it with a frog.
     public var carriedOver: Bool
 
     public init(
@@ -49,21 +48,10 @@ public struct DayState: Codable, Sendable {
     public var dayOff: Bool
     public var greeted: Bool
     public var tasks: [TaskItem]
-    /// Today's tomato. It lives here so the midnight rollover resets the
-    /// round counters with the day, the way the notebook does.
     public var pomodoro: PomodoroRun
-    /// Unfinished tasks from yesterday, waiting for the morning intake to
-    /// merge them into the new notebook.
     public var carried: [TaskItem]
-    /// Clean days banked by rollover: a day counts once it ends with tasks
-    /// all done; a day off freezes the chain without breaking it.
     public var streak: Int
-    /// Last calendar day in the current chain (clean or frozen). Lets the
-    /// next rollover tell a continued chain from a fresh start.
     public var streakDay: String?
-    /// Clock time ("HH:mm") today's first deep-work round finished. The reward
-    /// is paid with a round, and the day log records when it landed - that is
-    /// the "rhythm" granny measures, not how many hours were worked.
     public var firstRoundAt: String?
 
     public init(
@@ -194,8 +182,6 @@ public final class StateStore {
     /// The coach's reading of the last `limit` logged days, nil until there
     /// are enough of them to be worth saying.
     public func rhythm(days limit: Int = rhythmWindowDays) -> RhythmReport? {
-        // The log is one line a day, so reading all of it is cheap; the window
-        // is the report's job, not the read's.
         weeklyRhythm(RhythmLog.read(logURL, limit: .max), now: Date(), calendar: calendar, limit: limit)
     }
 
@@ -213,8 +199,6 @@ public final class StateStore {
         let twoDaysAgo = dayString(
             calendar.date(byAdding: .day, value: -2, to: now) ?? now, calendar: calendar)
 
-        // Yesterday's carried frogs that the intake never merged must ride
-        // along, not be overwritten by the next rollover.
         let unfinished = old.carried + old.tasks.filter { !$0.done }
         state = .fresh(date: today)
         state.carried = unfinished.map { task in
@@ -225,10 +209,8 @@ public final class StateStore {
 
         var event: StreakEvent?
         if old.date != yesterday {
-            // A calendar day passed without granny: the chain is dead.
             if old.streak >= 2 { event = .lost(old.streak) }
         } else if old.dayOff {
-            // Day off freezes the chain: no day added, none lost.
             state.streak = old.streak
             state.streakDay = old.date
         } else if old.rewarded {
@@ -239,8 +221,6 @@ public final class StateStore {
         } else if old.streak >= 2 {
             event = .lost(old.streak)
         }
-        // The day is over and nothing will read it again: this line is the
-        // only thing carrying it forward.
         RhythmLog.append(RhythmDay(old), to: logURL)
         save()
         return event
