@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import GrannyCore
 
-/// The four surfaces of the one window. Settings is a tab, not a window: it
+/// The three surfaces of the one window. Settings is a tab, not a window: it
 /// is still the same day being tuned, and a second window meant leaving the
 /// notebook behind every time a key was pasted.
 enum GrannyTab: String, CaseIterable {
@@ -33,16 +33,35 @@ struct GrannyRootView: View {
     @ObservedObject var viewModel: GrannyViewModel
     var onScheduleSave: ([ScheduleSlot], [SlotTag]) -> Void
     var onSettingsSave: (GrannyConfig) -> Void
-    var onSettingsCancel: () -> Void
+
+    /// A tab is built the first time it is opened and then stays mounted,
+    /// hidden: both editors keep their edits in `@State`, and a one-click tab
+    /// switch must not throw away a timetable half-typed.
+    @State private var visited: Set<GrannyTab> = [.notebook]
 
     var body: some View {
         VStack(spacing: 0) {
             tabBar
-            content
+            ZStack {
+                notebookTab
+                    .opacity(tabs.current == .notebook ? 1 : 0)
+                    .allowsHitTesting(tabs.current == .notebook)
+                if visited.contains(.timetable) {
+                    timetableTab
+                        .opacity(tabs.current == .timetable ? 1 : 0)
+                        .allowsHitTesting(tabs.current == .timetable)
+                }
+                if visited.contains(.settings) {
+                    settingsTab
+                        .opacity(tabs.current == .settings ? 1 : 0)
+                        .allowsHitTesting(tabs.current == .settings)
+                }
+            }
         }
         .grannyWindowBackdrop()
         .foregroundStyle(GrannyTheme.text)
         .frame(minWidth: 640, idealWidth: 760, minHeight: 520, idealHeight: 660)
+        .onChange(of: tabs.current) { _, tab in visited.insert(tab) }
     }
 
     /// A capsule of tabs, the way a utility app wears them: the mark at the
@@ -102,41 +121,42 @@ struct GrannyRootView: View {
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch tabs.current {
-        case .notebook:
-            TaskListView(
-                viewModel: viewModel,
-                onToggle: { [weak context] id in context?.toggle(taskID: id) },
-                onMarkAllDone: { [weak context] in context?.markAllDone() },
-                onAdd: { [weak context] text in context?.addTask(text) },
-                onUpdateTask: { [weak context] id, title, purpose, surfaces in
-                    context?.updateTask(taskID: id, title: title, purpose: purpose, surfaces: surfaces)
-                },
-                onElaborate: { [weak context] title, purpose in
-                    await context?.elaboratePurpose(title: title, purpose: purpose) ?? nil
-                },
-                onRemove: { [weak context] id in context?.removeTask(taskID: id) },
-                onAssignSlot: { [weak context] id, slot in
-                    context?.assignSlot(taskID: id, slotID: slot)
-                },
-                onResumeWork: { [weak context] in context?.clearDayOff() },
-                onTogglePomodoro: { [weak context] in context?.togglePomodoro() })
-        case .timetable:
-            ScheduleView(
-                initial: context.schedule.slots,
-                tags: context.tags,
-                today: context.store.state.tasks,
-                onSave: { slots, tags in onScheduleSave(slots, tags) },
-                onCancel: { tabs.current = .notebook })
-        case .settings:
-            SettingsView(
-                config: context.config,
-                onSave: onSettingsSave,
-                onCancel: {
-                    tabs.current = .notebook
-                    onSettingsCancel()
-                })
-        }
+    private var notebookTab: some View {
+        TaskListView(
+            viewModel: viewModel,
+            onToggle: { [weak context] id in context?.toggle(taskID: id) },
+            onMarkAllDone: { [weak context] in context?.markAllDone() },
+            onAdd: { [weak context] text in context?.addTask(text) },
+            onUpdateTask: { [weak context] id, title, purpose, surfaces in
+                context?.updateTask(taskID: id, title: title, purpose: purpose, surfaces: surfaces)
+            },
+            onElaborate: { [weak context] title, purpose in
+                await context?.elaboratePurpose(title: title, purpose: purpose) ?? nil
+            },
+            onRemove: { [weak context] id in context?.removeTask(taskID: id) },
+            onAssignSlot: { [weak context] id, slot in
+                context?.assignSlot(taskID: id, slotID: slot)
+            },
+            onResumeWork: { [weak context] in context?.clearDayOff() },
+            onTogglePomodoro: { [weak context] in context?.togglePomodoro() })
     }
+
+    @ViewBuilder
+    private var timetableTab: some View {
+        ScheduleView(
+            initial: context.schedule.slots,
+            tags: context.tags,
+            today: context.store.state.tasks,
+            onSave: { slots, tags in onScheduleSave(slots, tags) },
+            onCancel: { tabs.current = .notebook })
+    }
+
+    @ViewBuilder
+    private var settingsTab: some View {
+        SettingsView(
+            config: context.config,
+            onSave: onSettingsSave,
+            onCancel: { tabs.current = .notebook })
+    }
+
 }

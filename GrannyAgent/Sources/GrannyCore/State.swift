@@ -118,6 +118,7 @@ public struct DayState: Codable, Sendable {
     /// "The list is done" with no round behind it is a claim granny refuses -
     /// and she does not keep a tick she refuses to count. Returns true when it
     /// fired, so the caller says why the boxes came back off.
+    @discardableResult
     public mutating func refuseUnpaidTicks() -> Bool {
         guard allDone, !paid else { return false }
         for index in tasks.indices { tasks[index].done = false }

@@ -33,6 +33,15 @@ public struct SlotTag: Codable, Sendable, Equatable, Identifiable {
         self.color = color
     }
 
+    // Per field with defaults, like every other config value: a tag missing
+    // its colour is a tag to fix, not a reason to drop the user's palette.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? nil ?? UUID().uuidString
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil
+        color = (try? c.decodeIfPresent(String.self, forKey: .color)) ?? nil ?? "#B59E87"
+    }
+
     /// The built-in kind this tag stands for, nil for one the user invented.
     /// Only the built-ins can be matched from a task's words.
     public var kind: SlotKind? { SlotKind(rawValue: id) }
@@ -95,14 +104,15 @@ public struct ScheduleSlot: Codable, Sendable, Equatable, Identifiable {
     // the whole timetable with it.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
-        time = try c.decodeIfPresent(String.self, forKey: .time) ?? ""
-        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        func string(_ key: CodingKeys) -> String? {
+            (try? c.decodeIfPresent(String.self, forKey: key)) ?? nil
+        }
+        id = string(.id) ?? UUID().uuidString
+        time = string(.time) ?? ""
+        label = string(.label) ?? ""
         // `kind` is the old key: a config written before tags were editable
         // still opens, and its hours keep their colour.
-        let storedTag: String? = (try? c.decodeIfPresent(String.self, forKey: .tag)) ?? nil
-        let legacyKind: String? = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? nil
-        tag = storedTag ?? legacyKind ?? SlotKind.admin.rawValue
+        tag = string(.tag) ?? string(.kind) ?? SlotKind.admin.rawValue
     }
 
     /// Written without the legacy key: new files carry `tag` only.
@@ -194,9 +204,11 @@ public func droppingUnknownSlots(_ tasks: [TaskItem], in schedule: Schedule) -> 
 }
 
 /// Assigns today's tasks to today's slots, in list order: same kind first, a
-/// slot only used once, and the earliest slot of the kind preferred. It is a
-/// proposal - the notebook shows it as a chip the user can move - because a
-/// guess that is wrong and silent is worse than no guess at all.
+/// slot used once before any repeat, and the earliest slot of the kind
+/// preferred. When the matching hours run out the earliest one is reused - a
+/// second task on the same hour beats leaving it unplaced. It is a proposal:
+/// the notebook shows it as a chip the user can move, because a guess that is
+/// wrong and silent is worse than no guess at all.
 public func proposeSlots(for tasks: [TaskItem], in schedule: Schedule) -> [String: String] {
     var used: Set<String> = []
     var result: [String: String] = [:]

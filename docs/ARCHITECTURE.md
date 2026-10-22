@@ -168,7 +168,9 @@ common case and would drown the signal.
 - `~/.config/granny/config.json` (mode 600, never in the repo): OpenRouter
   key, model slug, wake/bedtime hours, language, speech, optional Laya
   URL/key, optional Langfuse keys, the local API token and port, and the
-  user's own timetable (`schedule`: time, label, kind per slot). Missing
+  user's own timetable (`schedule`: time, label, tag per slot) and the palette
+  those tags point at (`tags`: id, optional name, colour). A slot's `kind` is
+  the legacy key older files wrote; it still decodes into `tag`. Missing
   fields fall back to defaults, so old config files never break.
 - State (the day's tasks, day-off flag, greeted flag, the streak with its
   last chain day, today's pomodoro counter and the clock time of today's

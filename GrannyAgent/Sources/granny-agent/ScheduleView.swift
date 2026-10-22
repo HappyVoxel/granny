@@ -163,8 +163,11 @@ struct ScheduleView: View {
                 tagMenu(index)
             }
             Button {
-                draft.removeAll { $0.id == draft[index].id }
-                pinned.remove(draft[index].id)
+                // Take the id first: after the removal `index` may be past
+                // the end, and the last row is an ordinary thing to delete.
+                let id = draft[index].id
+                draft.removeAll { $0.id == id }
+                pinned.remove(id)
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
@@ -229,7 +232,14 @@ struct ScheduleView: View {
             if let tagIndex = tags.firstIndex(where: { $0.id == draft[index].tag }) {
                 HStack(spacing: 10) {
                     Button {
-                        colourPicker.onPick = { colour in tags[tagIndex].color = colour.hexString }
+                        // The panel outlives this row: capture the id, look it
+                        // up when a colour arrives, and a deleted tag simply
+                        // finds nothing instead of trapping on a stale index.
+                        let tagID = tags[tagIndex].id
+                        colourPicker.onPick = { colour in
+                            guard let live = tags.firstIndex(where: { $0.id == tagID }) else { return }
+                            tags[live].color = colour.hexString
+                        }
                         colourPicker.open(current: NSColor(GrannyTheme.tagColor(tags[tagIndex])))
                     } label: {
                         Circle()

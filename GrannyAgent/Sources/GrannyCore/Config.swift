@@ -12,6 +12,17 @@ public struct LangfuseConfig: Codable, Sendable {
     }
 }
 
+/// Decodes an array one element at a time: a broken element is skipped, the
+/// rest survive. `try?` around a whole array turns one bad entry into "the
+/// user has no timetable at all".
+private struct Lossy<T: Decodable>: Decodable {
+    let value: T?
+
+    init(from decoder: Decoder) throws {
+        value = try? T(from: decoder)
+    }
+}
+
 public struct GrannyConfig: Codable, Sendable {
     public var openRouterKey: String?
     public var model: String
@@ -253,8 +264,12 @@ public struct GrannyConfig: Codable, Sendable {
         contextHosts = value(.contextHosts, d.contextHosts)
         alwaysAllowedURLPrefixes = value(.alwaysAllowedURLPrefixes, d.alwaysAllowedURLPrefixes)
         entertainmentApps = value(.entertainmentApps, d.entertainmentApps)
-        schedule = value(.schedule, d.schedule)
-        tags = value(.tags, d.tags)
+        // Element by element: one unreadable slot or tag is skipped, the rest
+        // of the user's day and palette survive.
+        let slots: [Lossy<ScheduleSlot>]? = (try? c.decodeIfPresent([Lossy<ScheduleSlot>].self, forKey: .schedule)) ?? nil
+        let palette: [Lossy<SlotTag>]? = (try? c.decodeIfPresent([Lossy<SlotTag>].self, forKey: .tags)) ?? nil
+        schedule = slots?.compactMap(\.value) ?? d.schedule
+        tags = palette?.compactMap(\.value) ?? d.tags
     }
 
     public static func load(from url: URL = GrannyPaths.configURL) -> GrannyConfig {

@@ -122,6 +122,26 @@ final class ScheduleTests: XCTestCase {
                        "no tags key in the file still means the seven built-ins")
     }
 
+    func testOneWrongTypedSlotDoesNotEmptyTheTimetable() throws {
+        let raw = Data(
+            #"{"schedule":[{"time":"09:00","label":"Work"},{"time":900,"label":"Typed wrong"},"not a slot at all"]}"#
+                .utf8)
+        let config = try JSONDecoder().decode(GrannyConfig.self, from: raw)
+        XCTAssertEqual(config.schedule.count, 2,
+                       "the bad time stays visible to fix; the junk element is skipped")
+        XCTAssertEqual(config.schedule.first?.time, "09:00")
+        XCTAssertNil(config.schedule.last?.minute)
+    }
+
+    func testATagMissingItsColourKeepsTheRestOfThePalette() throws {
+        let raw = Data(
+            ##"{"tags":[{"id":"custom-1","name":"Reading"},{"id":"deepWork","color":"#123456"}]}"##.utf8)
+        let config = try JSONDecoder().decode(GrannyConfig.self, from: raw)
+        XCTAssertEqual(config.tags.count, 2)
+        XCTAssertEqual(config.tags.first?.color, "#B59E87", "a missing colour falls back")
+        XCTAssertEqual(config.tags.last?.color, "#123456", "the next tag keeps its own")
+    }
+
     func testTagColourParsing() {
         XCTAssertEqual(SlotTag(id: "x", color: "#D1A85C").rgb?.red ?? 0, 209.0 / 255, accuracy: 0.001)
         XCTAssertNil(SlotTag(id: "x", color: "gold").rgb, "unreadable colour falls back, never traps")

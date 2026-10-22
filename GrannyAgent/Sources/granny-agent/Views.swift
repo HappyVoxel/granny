@@ -1078,16 +1078,24 @@ struct TaskListView: View {
             }
 
             HStack(alignment: .bottom) {
-                Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
-                    .buttonStyle(GrannyPrimaryButtonStyle())
-                    // "I'm done" claims the day, and the day is only paid for
-                    // by a round: without one the button would take the click
-                    // and answer with a refusal.
-                    .disabled(
-                        viewModel.tasks.isEmpty
-                            || viewModel.tasks.allSatisfy { $0.done }
-                            || viewModel.rounds == 0)
-                    .help(viewModel.rounds == 0 ? GrannyLines.markAllNeedsRound : "")
+                VStack(alignment: .leading, spacing: 4) {
+                    Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
+                        .buttonStyle(GrannyPrimaryButtonStyle())
+                        // "I'm done" claims the day, and the day is only paid
+                        // for by a round: without one the click could only be
+                        // refused, and a disabled control has no tooltip.
+                        .disabled(
+                            viewModel.tasks.isEmpty
+                                || viewModel.tasks.allSatisfy { $0.done }
+                                || viewModel.rounds == 0)
+                    if viewModel.rounds == 0, !viewModel.tasks.isEmpty,
+                       !viewModel.tasks.allSatisfy({ $0.done }) {
+                        Text(GrannyLines.markAllNeedsRound)
+                            .font(.system(size: 11, design: .serif))
+                            .italic()
+                            .foregroundStyle(GrannyTheme.text.opacity(0.5))
+                    }
+                }
                 Spacer()
                 // The tomato takes the corner granny's own button used to
                 // hold: the reward is the thing the eye lands on last.

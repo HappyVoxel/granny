@@ -496,7 +496,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private enum WindowKind {
         case greeting
-        /// The one window: notebook, timetable, rhythm and settings are tabs.
+        /// The one window: notebook, timetable and settings are tabs.
         case main
     }
 
@@ -504,7 +504,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let tabs = GrannyTabs()
 
     /// What the current window holds. The intake lock needs it: a visible
-    /// window is only proof of the notebook when it *is* the notebook.
+    /// window only counts as the notebook when it is the notebook tab.
     private var windowKind: WindowKind?
 
     /// How long the yellow button buys before the intake reminder returns.
@@ -540,6 +540,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         intakeSnoozeUntil = nil
+        // A window on the timetable is still a window with no list, but
+        // replacing it would take an unsaved timetable with it: bring the
+        // notebook tab forward instead.
+        if windowKind == .main, tabs.current != .notebook {
+            tabs.current = .notebook
+            return
+        }
         if windowKind != .greeting, windowKind != .main {
             presentGreeting(force: true)
         }
@@ -615,8 +622,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self?.showAlert(title: GrannyLines.configSaveFailed,
                                     body: error.localizedDescription)
                 }
-            },
-            onSettingsCancel: {})
+            })
         show(view, title: GrannyLines.windowTitle,
              styleMask: [.titled, .closable, .miniaturizable, .resizable])
         window?.setContentSize(NSSize(width: 760, height: 620))

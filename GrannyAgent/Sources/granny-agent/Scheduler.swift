@@ -128,6 +128,10 @@ final class Scheduler {
               let task = state.tasks.first(where: { $0.slotID == slot.id && !$0.done }),
               announcedSlot != slot.id || announcedDay != state.date
         else { return }
+        // "It's 15:00" has to be true: launching at 21:00 still finds the
+        // 15:00 slot current, and granny must not claim an hour she missed.
+        let now = Schedule.minute(of: clockString(Date())) ?? 0
+        guard now - (slot.minute ?? 0) < minutesPerHour else { return }
         announcedSlot = slot.id
         announcedDay = state.date
         let line = GrannyLines.slotCue(time: slot.time, task: task.title)

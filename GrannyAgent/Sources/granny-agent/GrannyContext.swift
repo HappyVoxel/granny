@@ -287,9 +287,7 @@ final class GrannyContext {
             nudgeOffSlot(task)
         }
         if store.state.allDone {
-            announce(store.state.paid
-                ? GrannyLines.reward(bedtime: config.bedtimeHour)
-                : GrannyLines.unpaidNudge)
+            announce(GrannyLines.reward(bedtime: config.bedtimeHour))
         }
     }
 
@@ -438,6 +436,9 @@ final class GrannyContext {
     func markAllDone() {
         mutate { state in
             for index in state.tasks.indices { state.tasks[index].done = true }
+            // The same refusal as a manual tick: the button is one more way to
+            // claim the day, and a claim with no round behind it comes off.
+            state.refuseUnpaidTicks()
         }
         scheduler.tick()
         announce(store.state.paid
