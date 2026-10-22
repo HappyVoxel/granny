@@ -89,6 +89,7 @@ func runStatus() {
     print("phase: \(phase.rawValue)")
     print("blocks active: \(phase.blocksActive)")
     print("rounds: \(store.state.pomodoro.finished)")
+    print("schedule: \(config.schedule.count) slots")
     print("first round: \(store.state.firstRoundAt ?? "-")")
     print("hosts block present: \(HostsFile.isBlocked(current: hosts)) (\(HostsFile.blockedDomainCount(current: hosts)) domains)")
     print("openrouter: \(config.openRouterKey == nil ? "not configured" : "configured")")

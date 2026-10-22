@@ -150,6 +150,17 @@ contains "$out" "rounds: 0" "status rounds"
 out="$(run_agent --decide https://www.facebook.com/)"
 contains "$out" '"action" : "block"' "decide facebook unpaid"
 
+# The timetable rides in the config; the CLI must decode it and keep working.
+cat >"$SANDBOX/schedule-config.json" <<JSON
+{"token":"$TOKEN","decidePort":$PORT,"wakeHour":0,"bedtimeHour":24,
+ "schedule":[{"time":"09:00","label":"Work","kind":"deepWork"},
+             {"time":"15:00","label":"Apply jobs","kind":"admin"}]}
+JSON
+out="$(GRANNY_CONFIG_FILE="$SANDBOX/schedule-config.json" GRANNY_STATE_DIR="$SANDBOX/state" \
+  GRANNY_HOSTS_FILE="$SANDBOX/hosts" GRANNY_KILLALL="$SANDBOX/killall" "$AGENT" --status)"
+contains "$out" "schedule: 2 slots" "schedule config decodes"
+contains "$out" "phase: working" "schedule config keeps the phase"
+
 # all done and one round paid -> rewarded, entertainment allowed
 write_state false '[{"id":"1","title":"Apply 5 jobs","purpose":"","allowedSurfaces":[],"done":true}]' 1
 out="$(run_agent --status)"

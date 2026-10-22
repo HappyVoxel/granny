@@ -238,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, "\(GrannyLines.tasksTitle)…", #selector(showTasks), "t")
         add(menu, GrannyLines.menuTodayList, #selector(showGreeting), "n")
+        add(menu, GrannyLines.menuSchedule, #selector(showSchedule), "h")
         if state.dayOff {
             add(menu, GrannyLines.menuBackToWork, #selector(resumeWork), "d")
         } else {
@@ -413,6 +414,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowKind = .settings
     }
 
+    @objc private func showSchedule() {
+        let view = ScheduleView(
+            initial: context.schedule.slots,
+            today: context.store.state.tasks,
+            onSave: { [weak self] slots in
+                self?.context.saveSchedule(slots)
+                self?.presentInitialWindow()
+            },
+            onCancel: { [weak self] in self?.presentInitialWindow() })
+        show(view, title: GrannyLines.scheduleTitle,
+             styleMask: [.titled, .closable, .resizable])
+        window?.setContentSize(NSSize(width: 820, height: 620))
+        window?.minSize = NSSize(width: 720, height: 480)
+        windowKind = .schedule
+    }
+
     private func offerRelaunch() {
         let alert = NSAlert()
         alert.messageText = GrannyLines.savedTitle
@@ -476,6 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case greeting
         case tasks
         case settings
+        case schedule
     }
 
     /// What the current window holds. The intake lock needs it: a visible
@@ -515,7 +533,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         intakeSnoozeUntil = nil
-        if windowKind != .greeting, windowKind != .settings {
+        if windowKind != .greeting, windowKind != .settings, windowKind != .schedule {
             presentGreeting(force: true)
         }
     }
@@ -576,6 +594,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 await self?.context.elaboratePurpose(title: title, purpose: purpose) ?? nil
             },
             onRemove: { [weak self] id in self?.context.removeTask(taskID: id) },
+            onAssignSlot: { [weak self] id, slot in
+                self?.context.assignSlot(taskID: id, slotID: slot)
+            },
             onResumeWork: { [weak self] in self?.context.clearDayOff() },
             onOpenSettings: { [weak self] in
                 self?.window?.orderOut(nil)

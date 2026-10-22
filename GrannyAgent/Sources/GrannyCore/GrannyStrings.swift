@@ -89,6 +89,27 @@ public protocol GrannyStrings: Sendable {
     var dayOffCancelled: String { get }
     var backToWork: String { get }
 
+    // Timetable
+    var scheduleTitle: String { get }
+    var scheduleSubtitle: String { get }
+    var scheduleHint: String { get }
+    var scheduleAdd: String { get }
+    var scheduleEmpty: String { get }
+    var scheduleToday: String { get }
+    var scheduleTodayEmpty: String { get }
+    var slotTimePlaceholder: String { get }
+    var slotLabelPlaceholder: String { get }
+    var slotRemoveHelp: String { get }
+    var slotAssignHelp: String { get }
+    var slotClear: String { get }
+    var scheduleInvalid: String { get }
+    func slotKindName(kind: SlotKind) -> String
+    /// What granny says when a slot with work pinned to it comes round.
+    func slotCue(time: String, task: String) -> String
+    /// ...and when the task is finished outside its own hour.
+    func offSlot(task: String, slot: String) -> String
+    var menuSchedule: String { get }
+
     // Setup
     var setupHint: String { get }
     var setupKeyReminder: String { get }
@@ -351,6 +372,37 @@ public struct EnglishStrings: GrannyStrings {
         "A task on a day off, dear? Then it isn't one. Granny locked the door again."
     }
     public var backToWork: String { "Back to work then, dear. Granny is watching the door again." }
+
+    public var scheduleTitle: String { "TIMETABLE" }
+    public var scheduleSubtitle: String { "Your day" }
+    public var scheduleHint: String { "Click a slot to change its hour and name." }
+    public var scheduleAdd: String { "Add a slot" }
+    public var scheduleEmpty: String { "No slots yet. The day is still a blank page." }
+    public var scheduleToday: String { "TODAY" }
+    public var scheduleTodayEmpty: String { "Nothing is pinned to an hour yet." }
+    public var slotTimePlaceholder: String { "09:00" }
+    public var slotLabelPlaceholder: String { "Slot name" }
+    public var slotRemoveHelp: String { "Remove the slot" }
+    public var slotAssignHelp: String { "Pin the task to an hour" }
+    public var slotClear: String { "Take it off the timetable" }
+    public var scheduleInvalid: String { "Every slot needs a real hour (09:00) and a name." }
+    public func slotKindName(kind: SlotKind) -> String {
+        switch kind {
+        case .deepWork: return "Deep work"
+        case .admin: return "Errands"
+        case .body: return "Body"
+        case .rest: return "Rest"
+        case .learn: return "Study"
+        case .personal: return "Personal"
+        }
+    }
+    public func slotCue(time: String, task: String) -> String {
+        "It's \(time), dear. \(task)."
+    }
+    public func offSlot(task: String, slot: String) -> String {
+        "Right hour, right task, dear. Finishing \(task) is good, but discipline needs a rule - its hour was \(slot)."
+    }
+    public var menuSchedule: String { "Timetable…" }
 
     public var setupHint: String {
         "Granny has no OpenRouter key yet. Open Settings and paste one - she needs it to judge pages."
@@ -647,6 +699,37 @@ public struct VietnameseStrings: GrannyStrings {
     }
     public var backToWork: String { "Quay lại làm nhé cháu. Ngoại canh cổng lại rồi." }
 
+    public var scheduleTitle: String { "THỜI GIAN BIỂU" }
+    public var scheduleSubtitle: String { "Một ngày của cháu" }
+    public var scheduleHint: String { "Bấm vào một mốc để sửa giờ và tên." }
+    public var scheduleAdd: String { "Thêm mốc" }
+    public var scheduleEmpty: String { "Chưa có mốc nào. Ngày vẫn còn là trang giấy trắng." }
+    public var scheduleToday: String { "HÔM NAY" }
+    public var scheduleTodayEmpty: String { "Chưa gán việc nào vào mốc." }
+    public var slotTimePlaceholder: String { "09:00" }
+    public var slotLabelPlaceholder: String { "Tên mốc" }
+    public var slotRemoveHelp: String { "Xoá mốc" }
+    public var slotAssignHelp: String { "Gán việc vào mốc" }
+    public var slotClear: String { "Bỏ khỏi mốc" }
+    public var scheduleInvalid: String { "Mỗi mốc cần giờ hợp lệ (09:00) và một cái tên." }
+    public func slotKindName(kind: SlotKind) -> String {
+        switch kind {
+        case .deepWork: return "Deep work"
+        case .admin: return "Việc"
+        case .body: return "Thân"
+        case .rest: return "Nghỉ"
+        case .learn: return "Học"
+        case .personal: return "Cá nhân"
+        }
+    }
+    public func slotCue(time: String, task: String) -> String {
+        "\(time) rồi cháu. \(task)."
+    }
+    public func offSlot(task: String, slot: String) -> String {
+        "Giờ nào việc nấy cháu ạ. Xong \(task) là tốt, nhưng kỷ luật cũng nên có nguyên tắc - mốc của nó là \(slot)."
+    }
+    public var menuSchedule: String { "Thời gian biểu…" }
+
     public var setupHint: String {
         "Ngoại chưa có chìa khóa OpenRouter. Mở Settings dán vào nhé — ngoại cần nó để phán trang."
     }
@@ -940,6 +1023,37 @@ public struct FinnishStrings: GrannyStrings {
         "Vapaapäivälläkö tehtäviä, kulta? Ei sitten. Mummo laittoi oven taas lukkoon."
     }
     public var backToWork: String { "Takaisin töihin sitten, kulta. Mummo vahtii ovea taas." }
+
+    public var scheduleTitle: String { "AIKATAULU" }
+    public var scheduleSubtitle: String { "Sinun päiväsi" }
+    public var scheduleHint: String { "Napsauta kohtaa ja muuta tunti ja nimi." }
+    public var scheduleAdd: String { "Lisää kohta" }
+    public var scheduleEmpty: String { "Ei vielä yhtään kohtaa. Päivä on tyhjä sivu." }
+    public var scheduleToday: String { "TÄNÄÄN" }
+    public var scheduleTodayEmpty: String { "Mitään ei ole vielä sidottu tuntiin." }
+    public var slotTimePlaceholder: String { "09:00" }
+    public var slotLabelPlaceholder: String { "Kohdan nimi" }
+    public var slotRemoveHelp: String { "Poista kohta" }
+    public var slotAssignHelp: String { "Sido tehtävä tuntiin" }
+    public var slotClear: String { "Irrota aikataulusta" }
+    public var scheduleInvalid: String { "Jokainen kohta tarvitsee oikean tunnin (09:00) ja nimen." }
+    public func slotKindName(kind: SlotKind) -> String {
+        switch kind {
+        case .deepWork: return "Syvä työ"
+        case .admin: return "Asiat"
+        case .body: return "Keho"
+        case .rest: return "Lepo"
+        case .learn: return "Opiskelu"
+        case .personal: return "Oma"
+        }
+    }
+    public func slotCue(time: String, task: String) -> String {
+        "Kello \(time), kulta. \(task)."
+    }
+    public func offSlot(task: String, slot: String) -> String {
+        "Oikea hetki, oikea asia, kulta. \(task) valmiiksi on hyvä, mutta kuri tarvitsee säännön - sen aika oli \(slot)."
+    }
+    public var menuSchedule: String { "Aikataulu…" }
 
     public var setupHint: String {
         "Mummolla ei ole vielä OpenRouter-avainta. Avaa asetukset ja liitä se - mummo tarvitsee sitä sivujen arviointiin."

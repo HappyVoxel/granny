@@ -37,6 +37,14 @@ final class Scheduler {
     /// phase or the tomato's stage - midnight can land on the same ones.
     private var lastDay: String?
     private var naggedDate: String?
+    /// The slot last spoken for, and the day it was spoken on: the tick runs
+    /// every 15 s and a slot lasts an hour, so without this it would repeat.
+    private var announcedSlot: String?
+    private var announcedDay: String?
+    /// The timetable, swapped when the user saves a new one while granny
+    /// runs. A slot is a name for an hour; rewriting the day must not wait
+    /// for a relaunch.
+    var schedule = Schedule()
     private var lastBlockAttempt = Date.distantPast
     private var lastClearAttempt = Date.distantPast
     /// Set while the last tick saw a lifted block, so the tick that returns
@@ -105,6 +113,26 @@ final class Scheduler {
             speaker.say(GrannyLines.sleepNag)
             postNotification(body: GrannyLines.sleepNag)
         }
+        announceSlotIfDue()
+    }
+
+    /// The timetable speaks only for a slot that has work pinned to it, and
+    /// only once: a reminder with nothing to do is noise, and noise is what
+    /// makes people silence granny for good.
+    private func announceSlotIfDue() {
+        let state = store.state
+        guard !state.dayOff else { return }
+        let phase = computePhase(config: config, state: state)
+        guard phase == .awaitingTasks || phase == .working else { return }
+        guard let slot = schedule.current(),
+              let task = state.tasks.first(where: { $0.slotID == slot.id && !$0.done }),
+              announcedSlot != slot.id || announcedDay != state.date
+        else { return }
+        announcedSlot = slot.id
+        announcedDay = state.date
+        let line = GrannyLines.slotCue(time: slot.time, task: task.title)
+        speaker.say(line)
+        postNotification(body: line)
     }
 
     private func applyBlocks(_ enforced: Bool) {

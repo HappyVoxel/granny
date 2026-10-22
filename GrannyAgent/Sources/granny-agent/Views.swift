@@ -378,6 +378,8 @@ final class GrannyViewModel: ObservableObject {
     @Published var allTicked = false
     /// The coach's line about the last days; nil until there are enough.
     @Published var rhythm: RhythmReport?
+    /// The timetable, for the hour chip on each task.
+    @Published var slots: [ScheduleSlot] = []
 
     func refresh(from context: GrannyContext) {
         tasks = context.store.state.tasks
@@ -386,6 +388,7 @@ final class GrannyViewModel: ObservableObject {
         streak = displayStreak(state: context.store.state)
         allTicked = context.store.state.allDone && !context.store.state.paid
         rhythm = context.rhythmReport
+        slots = context.schedule.sorted
     }
 }
 
@@ -881,6 +884,8 @@ struct TaskListView: View {
     var onUpdateTask: (String, String, String?, [String]) -> Void
     var onElaborate: (String, String?) async -> String?
     var onRemove: (String) -> Void
+    /// Move a task to another hour of the timetable, or off the timetable.
+    var onAssignSlot: (String, String?) -> Void
     var onResumeWork: () -> Void
     var onOpenSettings: () -> Void
     var onTogglePomodoro: () -> Void
@@ -968,6 +973,9 @@ struct TaskListView: View {
                         }
                     }
                     Spacer()
+                    if !viewModel.slots.isEmpty {
+                        slotChip(task)
+                    }
                     Button {
                         editing = task
                     } label: {
@@ -1103,6 +1111,36 @@ struct TaskListView: View {
         onAdd(text)
         newTask = ""
         adding = false
+    }
+
+    /// The hour this task belongs to. A menu, not a label: the proposal is
+    /// granny's, and moving it is one click.
+    private func slotChip(_ task: TaskItem) -> some View {
+        let slot = viewModel.slots.first { $0.id == task.slotID }
+        return Menu {
+            ForEach(viewModel.slots) { option in
+                Button("\(option.time) · \(option.label)") {
+                    onAssignSlot(task.id, option.id)
+                }
+            }
+            if task.slotID != nil {
+                Divider()
+                Button(GrannyLines.slotClear) { onAssignSlot(task.id, nil) }
+            }
+        } label: {
+            Text(slot?.time ?? "—")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(slot == nil ? GrannyTheme.text.opacity(0.35) : GrannyTheme.gold)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(GrannyTheme.gold.opacity(slot == nil ? 0.25 : 0.5), lineWidth: 1))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(GrannyLines.slotAssignHelp)
     }
 
     private var status: String {

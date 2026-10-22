@@ -9,8 +9,6 @@ public let rhythmMinimumDays = 3
 /// A spread needs two starts - one point has none.
 private let minimumStartsForSpread = 2
 
-private let minutesPerHour = 60
-
 /// One finished day, one line of the day log beside the state file.
 ///
 /// The state file holds only today, so granny forgets everything the moment

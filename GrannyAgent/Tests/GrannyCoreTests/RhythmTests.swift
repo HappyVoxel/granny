@@ -185,7 +185,10 @@ final class RhythmTests: XCTestCase {
     }
 
     func testStoreReportReadsItsOwnLog() {
-        let store = StateStore(url: directory.appendingPathComponent("state.json"))
+        // The same calendar the days are written with: the report windows by
+        // calendar day, and a store on another zone would see a different one.
+        let store = StateStore(
+            url: directory.appendingPathComponent("state.json"), calendar: calendar)
         for offset in 1...4 {
             RhythmLog.append(
                 day(-offset, firstRound: "0\(offset):00", rounds: 1), to: store.logURL)

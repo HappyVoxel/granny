@@ -167,7 +167,8 @@ common case and would drown the signal.
 
 - `~/.config/granny/config.json` (mode 600, never in the repo): OpenRouter
   key, model slug, wake/bedtime hours, language, speech, optional Laya
-  URL/key, optional Langfuse keys, the local API token and port. Missing
+  URL/key, optional Langfuse keys, the local API token and port, and the
+  user's own timetable (`schedule`: time, label, kind per slot). Missing
   fields fall back to defaults, so old config files never break.
 - State (the day's tasks, day-off flag, greeted flag, the streak with its
   last chain day, today's pomodoro counter and the clock time of today's
@@ -282,6 +283,19 @@ common case and would drown the signal.
   pattern. Deliberately not a timetable: no slots, no per-task start times,
   the phase clock stays the schedule and the log measures when you actually
   sat down.
+- **Time blocking is advice, not enforcement**: the timetable is a template in
+  the config, and a task carries at most one `slotID` - proposed at intake from
+  the task's words (whole-word match, because "kỹ năng" contains "ăn"), stored
+  so the hour cannot drift under the task, and movable in one click. The
+  scheduler speaks the task of the current slot once per day, and only for a
+  slot that has work pinned to it: eleven reminders a day is how a coach gets
+  muted. A task finished outside its hour still counts - granny is strict, not
+  petty - and she says so once per task (`nudgedOffSlot`). Blocks stay on the
+  phase clock: a slot never touches `blocksEnforced`, because a second truth
+  there would put the hosts, `/decide`, the janitor and the killer back in
+  disagreement. Late is never punished retroactively; the day log carries it,
+  and the weekly line is where the pattern shows.
+
 - **Loopback is allowed unconditionally**: the rules tier answers
   `localhost` (and `*.localhost`), `127.0.0.0/8`, `::1` and `0.0.0.0` with
   an allow before any phase or allowlist check, so a dev server never

@@ -80,6 +80,31 @@ public enum GrannyLines {
     public static var dayOffCancelled: String { strings.dayOffCancelled }
     public static var backToWork: String { strings.backToWork }
 
+    // Timetable
+    public static var scheduleTitle: String { strings.scheduleTitle }
+    public static var scheduleSubtitle: String { strings.scheduleSubtitle }
+    public static var scheduleHint: String { strings.scheduleHint }
+    public static var scheduleAdd: String { strings.scheduleAdd }
+    public static var scheduleEmpty: String { strings.scheduleEmpty }
+    public static var scheduleToday: String { strings.scheduleToday }
+    public static var scheduleTodayEmpty: String { strings.scheduleTodayEmpty }
+    public static var slotTimePlaceholder: String { strings.slotTimePlaceholder }
+    public static var slotLabelPlaceholder: String { strings.slotLabelPlaceholder }
+    public static var slotRemoveHelp: String { strings.slotRemoveHelp }
+    public static var slotAssignHelp: String { strings.slotAssignHelp }
+    public static var slotClear: String { strings.slotClear }
+    public static var scheduleInvalid: String { strings.scheduleInvalid }
+    public static func slotKindName(_ kind: SlotKind) -> String {
+        strings.slotKindName(kind: kind)
+    }
+    public static func slotCue(time: String, task: String) -> String {
+        strings.slotCue(time: time, task: task)
+    }
+    public static func offSlot(task: String, slot: String) -> String {
+        strings.offSlot(task: task, slot: slot)
+    }
+    public static var menuSchedule: String { strings.menuSchedule }
+
     // Setup
     public static var setupHint: String { strings.setupHint }
     public static var setupKeyReminder: String { strings.setupKeyReminder }

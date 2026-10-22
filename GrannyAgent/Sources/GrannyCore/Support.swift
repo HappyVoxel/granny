@@ -42,6 +42,10 @@ public func dayString(_ date: Date, calendar: Calendar = .current) -> String {
     return String(format: "%04d-%02d-%02d", comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
 }
 
+/// Minutes in an hour. Clock arithmetic, shared by the day log and the
+/// timetable.
+public let minutesPerHour = 60
+
 /// "HH:mm" in the user's own zone: the day log records a wall-clock time, not
 /// an instant, because the question it answers is "what time did you start".
 public func clockString(_ date: Date, calendar: Calendar = .current) -> String {

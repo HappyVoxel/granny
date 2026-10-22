@@ -1,0 +1,151 @@
+import Foundation
+
+/// What a slot is for. The kind is what lets granny put a task in the right
+/// hour: the user writes "Apply job tại ABB", the slot at 15:00 is an admin
+/// slot, and they meet without anyone typing a time twice.
+public enum SlotKind: String, Codable, Sendable, CaseIterable {
+    case deepWork
+    case admin
+    case body
+    case rest
+    case learn
+    case personal
+}
+
+/// One entry of the personal day: "09:00, làm việc - deep work".
+public struct ScheduleSlot: Codable, Sendable, Equatable, Identifiable {
+    public var id: String
+    /// "HH:mm" on the user's own clock. Slides, not commitments: the slot is
+    /// a name for an hour, not an appointment.
+    public var time: String
+    public var label: String
+    public var kind: SlotKind
+
+    public init(id: String = UUID().uuidString, time: String, label: String, kind: SlotKind) {
+        self.id = id
+        self.time = time
+        self.label = label
+        self.kind = kind
+    }
+
+    /// Minutes since midnight, nil when the time is not readable - a
+    /// hand-edited config must not trap, it must show as "fix me".
+    public var minute: Int? { Schedule.minute(of: time) }
+
+    // Hand-rolled like the rest of the config: one broken slot must not take
+    // the whole timetable with it.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        time = try c.decodeIfPresent(String.self, forKey: .time) ?? ""
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        kind = (try c.decodeIfPresent(SlotKind.self, forKey: .kind)) ?? .admin
+    }
+}
+
+/// The whole personal day, in the order it happens.
+public struct Schedule: Codable, Sendable, Equatable {
+    public var slots: [ScheduleSlot]
+
+    public init(slots: [ScheduleSlot] = []) {
+        self.slots = slots
+    }
+
+    public var sorted: [ScheduleSlot] {
+        slots.filter { $0.minute != nil }.sorted { ($0.minute ?? 0) < ($1.minute ?? 0) }
+    }
+
+    /// The slot the clock is inside: the last one that has started. Nil before
+    /// the first slot of the day, which is not "late" - it is "not yet".
+    public func current(at now: Date = Date(), calendar: Calendar = .current) -> ScheduleSlot? {
+        let minute = Schedule.minute(of: clockString(now, calendar: calendar)) ?? 0
+        return sorted.last { ($0.minute ?? 0) <= minute }
+    }
+
+    public func slot(id: String?) -> ScheduleSlot? {
+        guard let id else { return nil }
+        return slots.first { $0.id == id }
+    }
+
+    /// "9:5" to "09:05", so the file and the chips read the same way whatever
+    /// the user typed.
+    public static func normalized(_ time: String) -> String {
+        guard let minute = minute(of: time) else { return time }
+        return String(format: "%02d:%02d", minute / minutesPerHour, minute % minutesPerHour)
+    }
+
+    /// "9:5" reads as 09:05: a text field is not a form, and a typo here is
+    /// not worth a scolding. Unreadable input is nil and stays visible as
+    /// such.
+    public static func minute(of time: String) -> Int? {
+        // "6.30" is how the user writes a time in Vietnamese; the dot is not
+        // a typo worth refusing.
+        let parts = time.replacingOccurrences(of: ".", with: ":").split(separator: ":")
+        guard parts.count == 2,
+              let hour = Int(parts[0]), let minute = Int(parts[1]),
+              (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        return hour * minutesPerHour + minute
+    }
+}
+
+// The words that say which kind of hour a task wants. Both languages: the
+// timetable is the user's, the tasks are written in whichever language they
+// think in.
+private let kindWords: [SlotKind: [String]] = [
+    .admin: ["apply", "job", "cv", "resume", "interview", "email", "invoice", "tax",
+             "admin", "nộp", "tuyển", "dụng", "phỏng", "vấn", "giấy", "tờ", "hồ", "sơ"],
+    .deepWork: ["feature", "code", "build", "fix", "ship", "implement", "design",
+                "polish", "write", "deepwork", "refactor",
+                "tính", "viết", "sửa", "làm", "việc"],
+    .learn: ["read", "study", "learn", "course", "book", "language", "license",
+             "đọc", "học", "sách", "ngôn", "ngữ", "bằng", "lái"],
+    .body: ["gym", "run", "walk", "workout", "swim", "yoga", "tập", "chạy", "bơi"],
+    .rest: ["lunch", "dinner", "breakfast", "break", "eat", "ăn", "trưa", "tối", "nghỉ"],
+    .personal: ["sleep", "shower", "journal", "meditate", "ngủ", "tắm", "vệ", "sinh",
+                "thiền", "nhật", "ký", "kí"],
+]
+
+/// Assigns today's tasks to today's slots, in list order: same kind first, a
+/// slot only used once, and the earliest slot of the kind preferred. It is a
+/// proposal - the notebook shows it as a chip the user can move - because a
+/// guess that is wrong and silent is worse than no guess at all.
+public func proposeSlots(for tasks: [TaskItem], in schedule: Schedule) -> [String: String] {
+    var used: Set<String> = []
+    var result: [String: String] = [:]
+    for task in tasks {
+        let kind = kindOf(task)
+        let candidates = schedule.sorted.filter { $0.kind == kind }
+        guard let slot = candidates.first(where: { !used.contains($0.id) }) ?? candidates.first else {
+            continue
+        }
+        used.insert(slot.id)
+        result[task.id] = slot.id
+    }
+    return result
+}
+
+/// The kinds in the order ties are broken: the desk first, because being
+/// parked at work is the safer mistake.
+private let kindOrder: [SlotKind] = [.deepWork, .admin, .learn, .body, .rest, .personal]
+
+/// The kind whose words the task's title mentions most. A task with no
+/// recognisable word is deep work: the timetable's default hour is the work
+/// one, and being put at the desk is the safer guess.
+///
+/// Whole words, not substrings: "kỹ năng" contains the letters of "ăn" (eat),
+/// and a substring match would file a study task under lunch.
+public func kindOf(_ task: TaskItem) -> SlotKind {
+    let words = Set(
+        task.title.lowercased()
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init))
+    var best: (kind: SlotKind, score: Int) = (.deepWork, 0)
+    for kind in kindOrder {
+        let vocabulary = kindWords[kind] ?? []
+        let score = vocabulary.reduce(0) { total, word in
+            total + (words.contains(word) ? 1 : 0)
+        }
+        if score > best.score { best = (kind, score) }
+    }
+    return best.kind
+}
