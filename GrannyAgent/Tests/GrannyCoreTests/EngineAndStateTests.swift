@@ -2,14 +2,18 @@ import XCTest
 @testable import GrannyCore
 
 final class EngineAndStateTests: XCTestCase {
+    /// A store file in its own directory: the day log is written beside it,
+    /// and two tests must never share one.
     private func tempStoreURL() -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("granny-state-\(UUID().uuidString).json")
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("granny-state-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent("state.json")
     }
 
     func testFreshStoreHasNoTasks() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = StateStore(url: url)
         XCTAssertTrue(store.state.tasks.isEmpty)
         XCTAssertFalse(store.state.dayOff)
@@ -17,7 +21,7 @@ final class EngineAndStateTests: XCTestCase {
 
     func testRolloverResetsStaleState() throws {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let stale = DayState(
             date: "2000-01-01",
             dayOff: true,
@@ -33,7 +37,7 @@ final class EngineAndStateTests: XCTestCase {
 
     func testRolloverCarriesUnfinishedTasks() throws {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let stale = DayState(
             date: "2000-01-01",
             greeted: true,
@@ -65,12 +69,14 @@ final class EngineAndStateTests: XCTestCase {
 
     func testStreakGrowsOnConsecutiveCleanDays() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let calendar = Calendar(identifier: .gregorian)
         let store = StateStore(url: url, calendar: calendar)
         store.update { state in
             state.date = self.day(-1, calendar: calendar)
             state.tasks = [TaskItem(title: "done", done: true)]
+            state.pomodoro = PomodoroRun(finished: 1)
+            state.firstRoundAt = "08:41"
             state.streak = 1
             state.streakDay = self.day(-2, calendar: calendar)
         }
@@ -79,16 +85,26 @@ final class EngineAndStateTests: XCTestCase {
         XCTAssertEqual(event, .kept(2))
         XCTAssertEqual(store.state.streak, 2)
         XCTAssertEqual(store.state.streakDay, day(-1, calendar: calendar))
+
+        // The day just ended is now only a log line: everything the coach
+        // knows about yesterday it reads from here.
+        let logged = RhythmLog.read(store.logURL)
+        XCTAssertEqual(logged.map(\.date), [day(-1, calendar: calendar)])
+        XCTAssertEqual(logged.first?.firstRound, "08:41")
+        XCTAssertEqual(logged.first?.rounds, 1)
+        XCTAssertEqual(logged.first?.tasksDone, 1)
+        XCTAssertEqual(logged.first?.tasksOpen, 0)
     }
 
     func testFirstCleanDayStaysQuiet() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let calendar = Calendar(identifier: .gregorian)
         let store = StateStore(url: url, calendar: calendar)
         store.update { state in
             state.date = self.day(-1, calendar: calendar)
             state.tasks = [TaskItem(title: "done", done: true)]
+            state.pomodoro = PomodoroRun(finished: 1)
         }
 
         let event = store.rolloverIfNeeded(now: Date())
@@ -98,7 +114,7 @@ final class EngineAndStateTests: XCTestCase {
 
     func testStreakBreaksOnUnfinishedFrogs() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let calendar = Calendar(identifier: .gregorian)
         let store = StateStore(url: url, calendar: calendar)
         store.update { state in
@@ -117,7 +133,7 @@ final class EngineAndStateTests: XCTestCase {
 
     func testDayOffFreezesTheStreak() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let calendar = Calendar(identifier: .gregorian)
         let store = StateStore(url: url, calendar: calendar)
         store.update { state in
@@ -135,7 +151,7 @@ final class EngineAndStateTests: XCTestCase {
 
     func testMissedDaysBreakTheStreak() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let calendar = Calendar(identifier: .gregorian)
         let store = StateStore(url: url, calendar: calendar)
         store.update { state in
@@ -153,11 +169,12 @@ final class EngineAndStateTests: XCTestCase {
 
     func testLaunchRolloverBanksTheStreakEvent() throws {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let calendar = Calendar(identifier: .gregorian)
         let seeded = DayState(
             date: day(-1, calendar: calendar),
             tasks: [TaskItem(title: "done", done: true)],
+            pomodoro: PomodoroRun(finished: 1),
             streak: 1,
             streakDay: day(-2, calendar: calendar))
         try JSON.encode(seeded)!.write(to: url)
@@ -166,6 +183,7 @@ final class EngineAndStateTests: XCTestCase {
         XCTAssertEqual(store.state.streak, 2)
         XCTAssertEqual(store.drainPendingStreakEvent(), .kept(2))
         XCTAssertNil(store.drainPendingStreakEvent())
+        XCTAssertEqual(RhythmLog.read(store.logURL).count, 1, "the launch rollover logs the day too")
     }
 
     func testDisplayStreakCountsTodayWhenClean() {
@@ -174,16 +192,73 @@ final class EngineAndStateTests: XCTestCase {
         var state = DayState(
             date: dayString(now, calendar: calendar),
             tasks: [TaskItem(title: "done", done: true)],
+            pomodoro: PomodoroRun(finished: 1),
             streak: 1,
             streakDay: day(-1, calendar: calendar))
         XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 2)
 
+        // Ticked boxes without a finished round are paperwork, not a clean day.
+        state.pomodoro = .fresh
+        XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 1)
+
+        state.pomodoro = PomodoroRun(finished: 1)
         state.tasks = [TaskItem(title: "frog")]
         XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 1)
 
         state.dayOff = true
         state.tasks = [TaskItem(title: "done", done: true)]
         XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 1)
+    }
+
+    func testStreakSurvivesADayOffWithoutARound() {
+        // A day off needs no round: it is a holiday, not work.
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+        var state = DayState(
+            date: dayString(now, calendar: calendar),
+            dayOff: true,
+            streak: 3,
+            streakDay: day(-1, calendar: calendar))
+        XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 3)
+        state.dayOff = false
+        XCTAssertEqual(displayStreak(state: state, now: now, calendar: calendar), 3)
+    }
+
+    func testTickedDayWithoutARoundBreaksTheStreak() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-1, calendar: calendar)
+            state.tasks = [TaskItem(title: "done", done: true)]
+            state.streak = 2
+            state.streakDay = self.day(-2, calendar: calendar)
+        }
+
+        let event = store.rolloverIfNeeded(now: Date())
+        XCTAssertEqual(event, .lost(2))
+        XCTAssertEqual(store.state.streak, 0)
+        let logged = RhythmLog.read(store.logURL)
+        XCTAssertEqual(logged.first?.rounds, 0)
+        XCTAssertNil(logged.first?.firstRound)
+    }
+
+    func testRolloverLogsTheDayOnce() {
+        let url = tempStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let calendar = Calendar(identifier: .gregorian)
+        let store = StateStore(url: url, calendar: calendar)
+        store.update { state in
+            state.date = self.day(-1, calendar: calendar)
+            state.tasks = [TaskItem(title: "open")]
+        }
+
+        store.rolloverIfNeeded(now: Date())
+        // A second rollover in the same day is a no-op, and the log must not
+        // count the day twice.
+        store.rolloverIfNeeded(now: Date())
+        XCTAssertEqual(RhythmLog.read(store.logURL).count, 1)
     }
 
     func testAllDoneFlag() {
@@ -194,7 +269,7 @@ final class EngineAndStateTests: XCTestCase {
 
     func testSurfaceEditPersistsAcrossReload() {
         let url = tempStoreURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = StateStore(url: url)
         let task = TaskItem(title: "Lướt Threads", allowedSurfaces: ["threads.net*"])
         store.update { $0.tasks.append(task) }

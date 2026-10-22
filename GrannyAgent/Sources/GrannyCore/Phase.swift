@@ -5,7 +5,7 @@ public enum Phase: String, Codable, Sendable {
     case awaitingTasks
     /// Tasks entered, not all done. Blocks are on.
     case working
-    /// All tasks done, before bedtime. Blocks are off.
+    /// Work day, tasks all ticked and a round paid. Blocks are off.
     case rewarded
     /// Day off. Blocks are off.
     case dayOff
@@ -31,6 +31,6 @@ public func computePhase(
     let awake = hour >= config.wakeHour && hour < config.bedtimeHour
 
     if state.tasks.isEmpty { return awake ? .awaitingTasks : .night }
-    if state.tasks.allSatisfy({ $0.done }) { return awake ? .rewarded : .night }
+    if state.rewarded { return awake ? .rewarded : .night }
     return awake ? .working : .night
 }

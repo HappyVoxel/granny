@@ -129,11 +129,102 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "granny"
+        let label = "granny"
+        item.button?.image = statusMark()
+        item.button?.toolTip = label
+        item.button?.setAccessibilityLabel(label)
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
         statusItem = item
+    }
+
+    /// The drawing grid the mark is laid out on; `statusMarkSize` scales it.
+    private static let markGrid: CGFloat = 18
+    /// 22pt, the height the neighbours in the bar sit at.
+    private static let statusMarkSize: CGFloat = 22
+
+    /// granny's face in the bar: a round head with the bob and the bun, the
+    /// glasses and the smile low. The glasses are what make her old rather
+    /// than an auntie - a bun alone reads young at any size. Drawn black and
+    /// marked as a template, so the bar paints it white or ink.
+    private func statusMark(size: CGFloat = AppDelegate.statusMarkSize) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+            let scale = size / AppDelegate.markGrid
+            let centre = AppDelegate.markGrid / 2
+            let headY: CGFloat = 7
+            let head = NSPoint(x: centre, y: headY)
+            let headRadius: CGFloat = 5.4
+            let headStroke: CGFloat = 1.4
+            let bobRadius: CGFloat = 4.7
+            let bobStroke: CGFloat = 1.9
+            let bunSize: CGFloat = 4.2
+            let bunY: CGFloat = 11.1
+            let lensSize: CGFloat = 3
+            let lensOffset: CGFloat = 2.3
+            let lensY: CGFloat = 5.1
+            let lensStroke: CGFloat = 1
+            let bridgeStroke: CGFloat = 0.9
+            let mouthY: CGFloat = 3.6
+            let mouthRadius: CGFloat = 1.2
+            let mouthStroke: CGFloat = 1.1
+            let smile: (from: CGFloat, to: CGFloat) = (200, 340)
+            let bob: (from: CGFloat, to: CGFloat) = (160, 20)
+
+            NSColor.black.setFill()
+            NSColor.black.setStroke()
+
+            func oval(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) {
+                NSBezierPath(ovalIn: NSRect(
+                    x: x * scale, y: y * scale,
+                    width: width * scale, height: height * scale)).fill()
+            }
+            func ring(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat,
+                      width stroke: CGFloat) {
+                let path = NSBezierPath(ovalIn: NSRect(
+                    x: x * scale, y: y * scale,
+                    width: width * scale, height: height * scale))
+                path.lineWidth = stroke * scale
+                path.stroke()
+            }
+            func arc(
+                _ centre: NSPoint, _ radius: CGFloat,
+                _ from: CGFloat, _ to: CGFloat, width: CGFloat, clockwise: Bool = false
+            ) {
+                let path = NSBezierPath()
+                path.appendArc(
+                    withCenter: NSPoint(x: centre.x * scale, y: centre.y * scale),
+                    radius: radius * scale,
+                    startAngle: from, endAngle: to, clockwise: clockwise)
+                path.lineWidth = width * scale
+                path.lineCapStyle = .round
+                path.stroke()
+            }
+
+            arc(head, headRadius, 0, 360, width: headStroke)
+            arc(head, bobRadius, bob.from, bob.to, width: bobStroke, clockwise: true)
+            oval(centre - bunSize / 2, bunY, bunSize, bunSize)
+
+            ring(centre - lensOffset - lensSize / 2, lensY, lensSize, lensSize,
+                 width: lensStroke)
+            ring(centre + lensOffset - lensSize / 2, lensY, lensSize, lensSize,
+                 width: lensStroke)
+            let bridge = NSBezierPath()
+            bridge.move(to: NSPoint(
+                x: (centre - lensOffset + lensSize / 2) * scale,
+                y: (lensY + lensSize / 2) * scale))
+            bridge.line(to: NSPoint(
+                x: (centre + lensOffset - lensSize / 2) * scale,
+                y: (lensY + lensSize / 2) * scale))
+            bridge.lineWidth = bridgeStroke * scale
+            bridge.stroke()
+
+            arc(NSPoint(x: centre, y: mouthY), mouthRadius, smile.from, smile.to,
+                width: mouthStroke)
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -156,8 +247,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, GrannyLines.menuSettings, #selector(showSettings), ",")
         add(menu, GrannyLines.menuInstallHelper, #selector(installHelper), "")
-        // The suggestion only exists while it is true: with the extension
-        // installed, the item would just be clutter.
         if !context.extensionInstalled {
             add(menu, GrannyLines.menuInstallExtension, #selector(installExtension), "")
         }
@@ -309,7 +398,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onSave: { [weak self] updated in
                 do {
                     try updated.save()
-                    // The relaunch dialog must already speak the new language.
                     GrannyLines.language = updated.language
                     GrannyTheme.configure(appearance: updated.appearance)
                     self?.window?.close()

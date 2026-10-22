@@ -46,11 +46,12 @@ JSON
 fail() { echo "e2e-agent FAIL: $1" >&2; exit 1; }
 contains() { case "$1" in *"$2"*) CHECKS=$((CHECKS + 1)) ;; *) fail "$3 missing: $2" ;; esac; }
 
-write_state() { # write_state <dayOff> <tasksJson>
-  local today
+write_state() { # write_state <dayOff> <tasksJson> [finishedRounds]
+  local today finished
   today="$(date +%Y-%m-%d)"
+  finished="${3:-0}"
   cat >"$SANDBOX/state/state.json" <<JSON
-{"date":"$today","dayOff":$1,"greeted":true,"tasks":$2}
+{"date":"$today","dayOff":$1,"greeted":true,"tasks":$2,"pomodoro":{"stage":"deepWork","finished":$finished}}
 JSON
 }
 
@@ -141,8 +142,16 @@ kill "$SERVER_PID" 2>/dev/null || true
 wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
 
-# all done -> rewarded, entertainment allowed
+# ticked but unpaid: boxes buy nothing, the door stays shut
 write_state false '[{"id":"1","title":"Apply 5 jobs","purpose":"","allowedSurfaces":[],"done":true}]'
+out="$(run_agent --status)"
+contains "$out" "phase: working" "status unpaid"
+contains "$out" "rounds: 0" "status rounds"
+out="$(run_agent --decide https://www.facebook.com/)"
+contains "$out" '"action" : "block"' "decide facebook unpaid"
+
+# all done and one round paid -> rewarded, entertainment allowed
+write_state false '[{"id":"1","title":"Apply 5 jobs","purpose":"","allowedSurfaces":[],"done":true}]' 1
 out="$(run_agent --status)"
 contains "$out" "phase: rewarded" "status rewarded"
 out="$(run_agent --decide https://www.facebook.com/)"
@@ -240,6 +249,32 @@ out="$(GRANNY_CONFIG_FILE="$BREAK_DIR/config.json" GRANNY_STATE_DIR="$BREAK_DIR/
   GRANNY_HOSTS_FILE="$BREAK_DIR/hosts" GRANNY_KILLALL="$SANDBOX/killall" \
   "$AGENT" --decide https://www.facebook.com/)"
 contains "$out" '"action" : "block"' "break window: stale break state blocks a fresh launch"
+
+# --- The rhythm log. A launch finds yesterday in the state file, rolls the
+# day over and writes it down beside it - once, with the round count and the
+# clock time of the first round. This file is the coach's only memory.
+LOG_DIR="$SANDBOX/log"
+mkdir -p "$LOG_DIR/state"
+yesterday="$(date -v-1d +%Y-%m-%d)"
+cat >"$LOG_DIR/state/state.json" <<JSON
+{"date":"$yesterday","dayOff":false,"greeted":true,"tasks":[{"id":"1","title":"Apply 5 jobs","done":true}],"pomodoro":{"stage":"shortBreak","finished":3},"firstRoundAt":"08:41"}
+JSON
+log_run() {
+  GRANNY_CONFIG_FILE="$SANDBOX/config.json" GRANNY_STATE_DIR="$LOG_DIR/state" \
+    GRANNY_HOSTS_FILE="$SANDBOX/hosts" GRANNY_KILLALL="$SANDBOX/killall" \
+    "$AGENT" "$@"
+}
+out="$(log_run --status)"
+contains "$out" "phase: awaitingTasks" "log: yesterday rolled over"
+line="$(tail -1 "$LOG_DIR/state/state.json.log")"
+contains "$line" "\"date\":\"$yesterday\"" "log: yesterday is written down"
+contains "$line" "\"firstRound\":\"08:41\"" "log: the first round's clock"
+contains "$line" "\"rounds\":3" "log: rounds counted"
+contains "$line" "\"tasksDone\":1" "log: tasks counted"
+log_run --status >/dev/null
+[ "$(wc -l <"$LOG_DIR/state/state.json.log" | tr -d ' ')" = "1" ] \
+  || fail "the day log counted one day twice"
+CHECKS=$((CHECKS + 1))
 
 # --- The sandbox hosts seam: a run pointed at a sandbox hosts file writes
 # that file and never the real one. It used to escalate through the privileged

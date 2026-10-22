@@ -373,12 +373,19 @@ final class GrannyViewModel: ObservableObject {
     /// the round is behind it.
     @Published var pomodoroTotal: TimeInterval = 0
     @Published var pomodoroRunning = false
+    /// Every box ticked, not one round paid: the status line has to say why
+    /// the door is still shut.
+    @Published var allTicked = false
+    /// The coach's line about the last days; nil until there are enough.
+    @Published var rhythm: RhythmReport?
 
     func refresh(from context: GrannyContext) {
         tasks = context.store.state.tasks
         phase = context.phase()
         dayOff = context.store.state.dayOff
         streak = displayStreak(state: context.store.state)
+        allTicked = context.store.state.allDone && !context.store.state.paid
+        rhythm = context.rhythmReport
     }
 }
 
@@ -903,6 +910,15 @@ struct TaskListView: View {
                             .pointingHandOnHover()
                             .padding(.top, 2)
                     }
+                    if let rhythm = viewModel.rhythm {
+                        Text(GrannyLines.rhythmLine(
+                            days: rhythm.days,
+                            started: rhythm.started,
+                            spread: rhythm.spreadMinutes.map(clockSpread)))
+                            .font(.system(size: 11, design: .serif))
+                            .foregroundStyle(GrannyTheme.text.opacity(0.5))
+                            .padding(.top, 2)
+                    }
                 }
                 Spacer()
                 if viewModel.streak >= 2 {
@@ -1092,7 +1108,7 @@ struct TaskListView: View {
     private var status: String {
         switch viewModel.phase {
         case .awaitingTasks: return GrannyLines.statusAwaiting
-        case .working: return GrannyLines.statusWorking
+        case .working: return viewModel.allTicked ? GrannyLines.statusUnpaid : GrannyLines.statusWorking
         case .rewarded: return GrannyLines.statusRewarded
         case .dayOff: return GrannyLines.statusDayOff
         case .night: return GrannyLines.statusNight

@@ -47,8 +47,12 @@ final class ServePomodoro {
     /// deep-work round waits for a click, exactly as the app's tomato does.
     private func tick() {
         guard let deadline, running, deadline.timeIntervalSinceNow <= 0 else { return }
+        let over = store.state.pomodoro.stage
         let next = store.state.pomodoro.advanced(config.pomodoro)
-        store.update { $0.pomodoro = next }
+        store.update { state in
+            state.pomodoro = next
+            if over == .deepWork { state.markFirstRound(calendar: store.calendar) }
+        }
         running = next.stage != .deepWork
         self.deadline = running
             ? Date().addingTimeInterval(TimeInterval(next.minutes(config.pomodoro) * 60))
@@ -84,6 +88,8 @@ func runStatus() {
     let hosts = (try? String(contentsOf: GrannyPaths.hostsURL, encoding: .utf8)) ?? ""
     print("phase: \(phase.rawValue)")
     print("blocks active: \(phase.blocksActive)")
+    print("rounds: \(store.state.pomodoro.finished)")
+    print("first round: \(store.state.firstRoundAt ?? "-")")
     print("hosts block present: \(HostsFile.isBlocked(current: hosts)) (\(HostsFile.blockedDomainCount(current: hosts)) domains)")
     print("openrouter: \(config.openRouterKey == nil ? "not configured" : "configured")")
     print("laya: \(config.layaURL == nil ? "not configured" : "configured")")

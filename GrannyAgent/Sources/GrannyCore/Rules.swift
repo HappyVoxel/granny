@@ -85,8 +85,6 @@ public struct RulesEngine: Sendable {
             : host
         if bare == "localhost" || bare.hasSuffix(".localhost") { return true }
         if bare == "::1" || bare == "0.0.0.0" { return true }
-        // 127.0.0.0/8, first octet only: the dotted-quad shape rejects
-        // look-alikes like 127.0.0.1.evil.com.
         let octets = bare.split(separator: ".", omittingEmptySubsequences: false)
         return octets.count == 4 && octets[0] == "127"
             && octets.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isNumber) }
