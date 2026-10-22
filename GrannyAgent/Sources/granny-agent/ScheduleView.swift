@@ -15,6 +15,7 @@ struct ScheduleView: View {
     /// Slots whose tag the user chose by hand: typing a name no longer
     /// re-classifies those, because a deliberate choice is not a guess.
     @State private var pinned: Set<String> = []
+    @StateObject private var colourPicker = TagColourPanel()
 
     init(
         initial: [ScheduleSlot],
@@ -47,10 +48,13 @@ struct ScheduleView: View {
             header
             hairline
             HStack(alignment: .top, spacing: 18) {
-                slots
+                VStack(spacing: 16) {
+                    slots
+                    tagsCard
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 VStack(spacing: 14) {
                     todayCard
-                    tagsCard
                     Spacer(minLength: 0)
                 }
                 .frame(width: 250)
@@ -215,39 +219,13 @@ struct ScheduleView: View {
     /// The tags are the user's: the seven built-ins are a seed, and anything
     /// else can carry its own name and colour.
     private var tagsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(GrannyLines.tagsTitle)
                 .font(.system(size: 11, weight: .semibold, design: .serif))
                 .tracking(3)
                 .foregroundStyle(GrannyTheme.gold)
             ForEach(Array(tags.enumerated()), id: \.element.id) { index, _ in
-                HStack(spacing: 8) {
-                    ColorPicker("", selection: Binding(
-                        get: { GrannyTheme.tagColor(tags[index]) },
-                        set: { tags[index].color = $0.hexString }
-                    ), supportsOpacity: false)
-                    .labelsHidden()
-                    .frame(width: 28)
-                    TextField(GrannyLines.tagNamePlaceholder, text: Binding(
-                        get: { tags[index].name ?? tags[index].displayName },
-                        set: { tags[index].name = $0 }
-                    ))
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .serif))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    if tags[index].kind == nil {
-                        Button {
-                            tags.removeAll { $0.id == tags[index].id }
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 10))
-                                .foregroundStyle(GrannyTheme.text.opacity(0.4))
-                        }
-                        .buttonStyle(.plain)
-                        .help(GrannyLines.tagRemoveHelp)
-                        .pointingHandOnHover()
-                    }
-                }
+                tagRow(index)
             }
             Button {
                 let tag = SlotTag(
@@ -266,6 +244,44 @@ struct ScheduleView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .grannyCard(cornerRadius: 12)
+    }
+
+    private func tagRow(_ index: Int) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                colourPicker.onPick = { colour in tags[index].color = colour.hexString }
+                colourPicker.open(current: NSColor(GrannyTheme.tagColor(tags[index])))
+            } label: {
+                Circle()
+                    .fill(GrannyTheme.tagColor(tags[index]))
+                    .frame(width: 14, height: 14)
+                    .overlay(Circle().stroke(GrannyTheme.hairline, lineWidth: 1))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help(GrannyLines.tagColourHelp)
+            .pointingHandOnHover()
+            TextField(GrannyLines.tagNamePlaceholder, text: Binding(
+                get: { tags[index].name ?? tags[index].displayName },
+                set: { tags[index].name = $0 }
+            ))
+            .textFieldStyle(.plain)
+            .font(.system(size: 13, design: .serif))
+            .frame(width: 150, alignment: .leading)
+            if tags[index].kind == nil {
+                Button {
+                    tags.removeAll { $0.id == tags[index].id }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
+                        .foregroundStyle(GrannyTheme.text.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+                .help(GrannyLines.tagRemoveHelp)
+                .pointingHandOnHover()
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     private var footer: some View {
@@ -307,4 +323,23 @@ struct ScheduleView: View {
     /// usually begins.
     private static let defaultStartHour = 8
     private static let hoursPerDay = 24
+}
+
+/// The system colour well is a capsule that reads as a button; the tag wants a
+/// dot. So the dot opens the shared colour panel and reads it back.
+final class TagColourPanel: NSObject, ObservableObject {
+    var onPick: ((Color) -> Void)?
+
+    func open(current: NSColor) {
+        let panel = NSColorPanel.shared
+        panel.showsAlpha = false
+        panel.color = current
+        panel.setTarget(self)
+        panel.setAction(#selector(read(_:)))
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func read(_ sender: NSColorPanel) {
+        onPick?(Color(nsColor: sender.color))
+    }
 }

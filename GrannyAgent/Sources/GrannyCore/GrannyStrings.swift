@@ -109,6 +109,7 @@ public protocol GrannyStrings: Sendable {
     var tagAdd: String { get }
     var tagNamePlaceholder: String { get }
     var tagRemoveHelp: String { get }
+    var tagColourHelp: String { get }
     func slotKindName(kind: SlotKind) -> String
     /// What granny says when a slot with work pinned to it comes round.
     func slotCue(time: String, task: String) -> String
@@ -398,6 +399,7 @@ public struct EnglishStrings: GrannyStrings {
     public var tagAdd: String { "New tag" }
     public var tagNamePlaceholder: String { "Tag name" }
     public var tagRemoveHelp: String { "Remove the tag" }
+    public var tagColourHelp: String { "Change the tag's colour" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -731,6 +733,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var tagAdd: String { "Thẻ mới" }
     public var tagNamePlaceholder: String { "Tên thẻ" }
     public var tagRemoveHelp: String { "Xoá thẻ" }
+    public var tagColourHelp: String { "Đổi màu thẻ" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -1063,6 +1066,7 @@ public struct FinnishStrings: GrannyStrings {
     public var tagAdd: String { "Uusi tagi" }
     public var tagNamePlaceholder: String { "Tagin nimi" }
     public var tagRemoveHelp: String { "Poista tagi" }
+    public var tagColourHelp: String { "Vaihda tagin väri" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Syvä työ"
