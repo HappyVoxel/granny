@@ -129,11 +129,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "granny"
+        // The mark, not the word. Drawn as a template - the bar paints it white
+        // or ink - because the app icon is a pastel bust that turns into a pale
+        // blob at bar size, and any redraw of its face loses the face.
+        item.button?.image = statusMark()
+        item.button?.toolTip = "granny"
+        item.button?.setAccessibilityLabel("granny")
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
         statusItem = item
+    }
+
+    /// granny's face in the bar: a round head with the bob and the bun, the
+    /// glasses and the smile low. The glasses are what make her old rather
+    /// than an auntie - a bun alone reads young at any size. Drawn black and
+    /// marked as a template, so the bar paints it white or ink.
+    private func statusMark(size: CGFloat = 22) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+            let scale = size / 18
+            NSColor.black.setFill()
+            NSColor.black.setStroke()
+
+            func oval(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) {
+                NSBezierPath(ovalIn: NSRect(
+                    x: x * scale, y: y * scale,
+                    width: width * scale, height: height * scale)).fill()
+            }
+            func ring(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat,
+                      width stroke: CGFloat) {
+                let path = NSBezierPath(ovalIn: NSRect(
+                    x: x * scale, y: y * scale,
+                    width: width * scale, height: height * scale))
+                path.lineWidth = stroke * scale
+                path.stroke()
+            }
+            func arc(
+                _ x: CGFloat, _ y: CGFloat, _ radius: CGFloat,
+                _ from: CGFloat, _ to: CGFloat, width: CGFloat, clockwise: Bool = false
+            ) {
+                let path = NSBezierPath()
+                path.appendArc(
+                    withCenter: NSPoint(x: x * scale, y: y * scale), radius: radius * scale,
+                    startAngle: from, endAngle: to, clockwise: clockwise)
+                path.lineWidth = width * scale
+                path.lineCapStyle = .round
+                path.stroke()
+            }
+
+            // The head fills the box, so the mark sits level with the other
+            // items in the bar instead of looking small.
+            arc(9, 7, 5.4, 0, 360, width: 1.4)
+            // The bob: a thick band across the crown, not a helmet.
+            arc(9, 7, 4.7, 160, 20, width: 1.9, clockwise: true)
+            // The bun on the crown.
+            oval(6.9, 11.1, 4.2, 4.2)
+
+            ring(5.2, 5.1, 3.0, 3.0, width: 1.0)
+            ring(9.8, 5.1, 3.0, 3.0, width: 1.0)
+            let bridge = NSBezierPath()
+            bridge.move(to: NSPoint(x: 8.2 * scale, y: 6.6 * scale))
+            bridge.line(to: NSPoint(x: 9.8 * scale, y: 6.6 * scale))
+            bridge.lineWidth = 0.9 * scale
+            bridge.stroke()
+            arc(9, 3.6, 1.2, 200, 340, width: 1.1)
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
