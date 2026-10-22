@@ -168,9 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let mouthY: CGFloat = 3.6
             let mouthRadius: CGFloat = 1.2
             let mouthStroke: CGFloat = 1.1
-            // A smile is a circle's lower arc.
             let smile: (from: CGFloat, to: CGFloat) = (200, 340)
-            // The bob runs over the crown only, leaving the face open.
             let bob: (from: CGFloat, to: CGFloat) = (160, 20)
 
             NSColor.black.setFill()
@@ -203,11 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 path.stroke()
             }
 
-            // The head fills the box, or the mark sits small beside its
-            // neighbours in the bar.
             arc(head, headRadius, 0, 360, width: headStroke)
-            // A thick band, short enough that the face stays open - a helmet
-            // hides the face at this size.
             arc(head, bobRadius, bob.from, bob.to, width: bobStroke, clockwise: true)
             oval(centre - bunSize / 2, bunY, bunSize, bunSize)
 
@@ -253,8 +247,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add(menu, GrannyLines.menuSettings, #selector(showSettings), ",")
         add(menu, GrannyLines.menuInstallHelper, #selector(installHelper), "")
-        // The suggestion only exists while it is true: with the extension
-        // installed, the item would just be clutter.
         if !context.extensionInstalled {
             add(menu, GrannyLines.menuInstallExtension, #selector(installExtension), "")
         }
@@ -406,7 +398,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onSave: { [weak self] updated in
                 do {
                     try updated.save()
-                    // The relaunch dialog must already speak the new language.
                     GrannyLines.language = updated.language
                     GrannyTheme.configure(appearance: updated.appearance)
                     self?.window?.close()

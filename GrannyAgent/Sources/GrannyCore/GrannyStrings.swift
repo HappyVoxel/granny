@@ -337,7 +337,7 @@ public struct EnglishStrings: GrannyStrings {
     public var sleepNag: String { "It's late, dear. Off to bed - tomorrow is another day." }
     public func reward(bedtime: Int) -> String { "Good grandchild. Go play, be back before \(bedtime)." }
     public var unpaidNudge: String {
-        "Ticked boxes aren't work, dear. One finished round and the day is yours."
+        "Ticked boxes aren't work, dear. At least one finished deep-work round, or the day doesn't count - no cheating."
     }
     public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
         guard let spread else {
@@ -417,7 +417,7 @@ public struct EnglishStrings: GrannyStrings {
     public var statusAwaiting: String { "Today's list isn't written yet." }
     public var statusWorking: String { "Working. Granny lets you play when it's all done." }
     public var statusRewarded: String { "All done. Go play, dear." }
-    public var statusUnpaid: String { "Every box ticked, no round yet. Granny is not fooled." }
+    public var statusUnpaid: String { "Every box ticked, no deep-work round yet. Granny is not fooled." }
     public var statusDayOff: String { "Day off today." }
     public var statusNight: String { "It's late. Off to bed, dear." }
 
@@ -632,7 +632,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var sleepNag: String { "Muộn rồi cháu. Đi ngủ đi, mai còn làm việc." }
     public func reward(bedtime: Int) -> String { "Tốt lắm cháu. Đi chơi đi, nhớ về trước \(bedtime) giờ." }
     public var unpaidNudge: String {
-        "Tick ô không phải là làm việc đâu cháu. Xong một round là ngày của cháu."
+        "Tick ô không phải là làm việc đâu cháu. Ít nhất xong một round deep work mới được tính, đừng có ăn gian nghen."
     }
     public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
         guard let spread else {
@@ -712,7 +712,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var statusAwaiting: String { "Chưa nhập danh sách hôm nay." }
     public var statusWorking: String { "Đang làm việc. Xong hết ngoại mới cho chơi." }
     public var statusRewarded: String { "Xong việc rồi. Đi chơi đi cháu." }
-    public var statusUnpaid: String { "Tick hết rồi nhưng chưa có round nào. Ngoại không tin đâu." }
+    public var statusUnpaid: String { "Tick hết rồi nhưng chưa có round deep work nào. Ngoại không tin đâu." }
     public var statusDayOff: String { "Hôm nay nghỉ." }
     public var statusNight: String { "Muộn rồi. Đi ngủ đi cháu." }
 
@@ -926,7 +926,7 @@ public struct FinnishStrings: GrannyStrings {
     public var sleepNag: String { "Nyt on myöhä, kulta. Nukkumaan - huomenna on taas päivä." }
     public func reward(bedtime: Int) -> String { "Hyvä kulta. Mene leikkimään, palaa ennen kello \(bedtime)." }
     public var unpaidNudge: String {
-        "Rastit eivät ole työtä, kulta. Yksi valmis kierros ja päivä on sinun."
+        "Rastit eivät ole työtä, kulta. Vähintään yksi valmis syvän työn kierros, tai päivää ei lasketa - ei huijaamista."
     }
     public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
         guard let spread else {
@@ -1007,7 +1007,7 @@ public struct FinnishStrings: GrannyStrings {
     public var statusAwaiting: String { "Tämän päivän listaa ei ole vielä kirjoitettu." }
     public var statusWorking: String { "Työ kesken. Mummo päästää leikkimään, kun kaikki on valmista." }
     public var statusRewarded: String { "Kaikki valmista. Mene leikkimään, kulta." }
-    public var statusUnpaid: String { "Kaikki rastitettu, ei yhtään kierrosta. Mummo ei mene halpaan." }
+    public var statusUnpaid: String { "Kaikki rastitettu, ei yhtään syvän työn kierrosta. Mummo ei mene halpaan." }
     public var statusDayOff: String { "Tänään on vapaapäivä." }
     public var statusNight: String { "On myöhä. Nukkumaan, kulta." }
 
