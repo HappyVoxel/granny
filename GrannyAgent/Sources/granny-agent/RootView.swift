@@ -48,6 +48,9 @@ struct GrannyRootView: View {
     /// head, the live tab a cream pill, the rest quiet.
     private var tabBar: some View {
         HStack(spacing: 4) {
+            mark
+                .frame(width: 30, height: 30)
+                .padding(.leading, 6)
             ForEach(GrannyTab.allCases, id: \.self) { tab in
                 Button {
                     tabs.current = tab
@@ -75,6 +78,13 @@ struct GrannyRootView: View {
                 .overlay(Capsule().stroke(GrannyTheme.hairline, lineWidth: 1)))
         .padding(.top, 12)
         .padding(.bottom, 6)
+    }
+
+    private var mark: some View {
+        Image(nsImage: NSApp.applicationIconImage ?? NSImage())
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .clipShape(Circle())
     }
 
     @ViewBuilder
@@ -110,7 +120,6 @@ struct GrannyRootView: View {
                     context?.assignSlot(taskID: id, slotID: slot)
                 },
                 onResumeWork: { [weak context] in context?.clearDayOff() },
-                onOpenSettings: { tabs.current = .settings },
                 onTogglePomodoro: { [weak context] in context?.togglePomodoro() })
         case .timetable:
             ScheduleView(

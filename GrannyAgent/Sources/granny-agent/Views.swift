@@ -905,13 +905,11 @@ struct TaskListView: View {
     /// Move a task to another hour of the timetable, or off the timetable.
     var onAssignSlot: (String, String?) -> Void
     var onResumeWork: () -> Void
-    var onOpenSettings: () -> Void
     var onTogglePomodoro: () -> Void
 
     @State private var adding = false
     @State private var newTask = ""
     @State private var editing: TaskItem?
-    @State private var settingsHover = false
     @FocusState private var addFocused: Bool
 
     var body: some View {
@@ -947,7 +945,6 @@ struct TaskListView: View {
                 if viewModel.streak >= 2 {
                     StreakBadge(count: viewModel.streak)
                 }
-                settingsButton
             }
 
             Rectangle()
@@ -1104,23 +1101,6 @@ struct TaskListView: View {
         .frame(minWidth: 520, minHeight: 420)
         .grannyWindowBackdrop()
         .preferredColorScheme(GrannyTheme.colorScheme)
-    }
-
-    /// Quiet gear in the notebook's corner: granny's Settings, one click away.
-    private var settingsButton: some View {
-        Button(action: onOpenSettings) {
-            Image(systemName: "gearshape")
-                .font(.system(size: 15))
-                .foregroundStyle(GrannyTheme.gold.opacity(settingsHover ? 1 : 0.55))
-                .padding(6)
-                .background(Circle().fill(GrannyTheme.gold.opacity(settingsHover ? 0.14 : 0)))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help(GrannyLines.menuSettings)
-        .onHover { settingsHover = $0 }
-        .pointingHandOnHover()
-        .animation(.easeOut(duration: 0.15), value: settingsHover)
     }
 
     private func commitAdd() {
