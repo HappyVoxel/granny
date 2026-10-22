@@ -8,15 +8,15 @@ import GrannyCore
 enum GrannyTab: String, CaseIterable {
     case notebook
     case timetable
-    case rhythm
     case settings
 
-    var title: String {
+    /// Settings is a gear, not a word: it is the one tab that is a tool
+    /// rather than a surface of the day.
+    var title: String? {
         switch self {
-        case .notebook: return GrannyLines.tasksTitle
-        case .timetable: return GrannyLines.scheduleTitle
-        case .rhythm: return GrannyLines.rhythmTitle
-        case .settings: return GrannyLines.settingsTitle
+        case .notebook: return GrannyLines.tabTasks
+        case .timetable: return GrannyLines.tabTimetable
+        case .settings: return nil
         }
     }
 }
@@ -48,17 +48,11 @@ struct GrannyRootView: View {
     /// head, the live tab a cream pill, the rest quiet.
     private var tabBar: some View {
         HStack(spacing: 4) {
-            mark
-                .frame(width: 34, height: 34)
-                .padding(.leading, 6)
             ForEach(GrannyTab.allCases, id: \.self) { tab in
                 Button {
                     tabs.current = tab
                 } label: {
-                    Text(tab.title)
-                        .font(.system(size: 12, weight: tabs.current == tab ? .semibold : .regular,
-                                      design: .serif))
-                        .lineLimit(1)
+                    tabLabel(tab)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .background(
@@ -70,6 +64,7 @@ struct GrannyRootView: View {
                             tabs.current == tab ? GrannyTheme.background : GrannyTheme.text.opacity(0.7))
                 }
                 .buttonStyle(.plain)
+                .help(tab.title ?? GrannyLines.settingsTitle)
                 .pointingHandOnHover()
             }
         }
@@ -82,11 +77,17 @@ struct GrannyRootView: View {
         .padding(.bottom, 6)
     }
 
-    private var mark: some View {
-        Image(nsImage: NSApp.applicationIconImage ?? NSImage())
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .clipShape(Circle())
+    @ViewBuilder
+    private func tabLabel(_ tab: GrannyTab) -> some View {
+        if let title = tab.title {
+            Text(title)
+                .font(.system(size: 12, weight: tabs.current == tab ? .semibold : .regular,
+                              design: .serif))
+                .lineLimit(1)
+        } else {
+            Image(systemName: "gearshape")
+                .font(.system(size: 12, weight: tabs.current == tab ? .semibold : .regular))
+        }
     }
 
     @ViewBuilder
@@ -120,8 +121,6 @@ struct GrannyRootView: View {
                     tabs.current = .notebook
                 },
                 onCancel: { tabs.current = .notebook })
-        case .rhythm:
-            RhythmView(viewModel: viewModel)
         case .settings:
             SettingsView(
                 config: context.config,
@@ -131,66 +130,5 @@ struct GrannyRootView: View {
                     onSettingsCancel()
                 })
         }
-    }
-}
-
-/// The week's numbers, given a page of their own: the line under the list was
-/// one sentence, and a pattern needs a picture.
-struct RhythmView: View {
-    @ObservedObject var viewModel: GrannyViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(GrannyLines.rhythmTitle)
-                .font(.system(size: 11, weight: .semibold, design: .serif))
-                .tracking(3)
-                .foregroundStyle(GrannyTheme.gold)
-            Text(GrannyLines.rhythmSubtitle)
-                .font(.system(size: 22, weight: .semibold, design: .serif))
-            Rectangle().fill(GrannyTheme.gold.opacity(0.45)).frame(height: 1)
-
-            if let rhythm = viewModel.rhythm {
-                Text(GrannyLines.rhythmLine(
-                    days: rhythm.days,
-                    started: rhythm.started,
-                    spread: rhythm.spreadMinutes.map(clockSpread)))
-                    .font(.system(size: 15, design: .serif))
-                bars(rhythm)
-            } else {
-                Text(GrannyLines.rhythmEmpty)
-                    .font(.system(size: 13, design: .serif))
-                    .italic()
-                    .foregroundStyle(GrannyTheme.text.opacity(0.55))
-            }
-            Spacer()
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    /// One bar per day of the window, newest last. Height is the clock: an
-    /// early first round is a short bar, because the point is how low it sits,
-    /// not how much was done.
-    private func bars(_ rhythm: RhythmReport) -> some View {
-        let readings = rhythm.firstRounds
-        let closingMinute = minutesPerHour * 23
-        return HStack(alignment: .bottom, spacing: 10) {
-            ForEach(Array(readings.enumerated()), id: \.offset) { index, minute in
-                VStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(index == readings.count - 1
-                              ? GrannyTheme.gold
-                              : GrannyTheme.text.opacity(0.28))
-                        .frame(
-                            width: 18,
-                            height: minute.map { CGFloat($0) / CGFloat(closingMinute) * 120 + 6 } ?? 4)
-                    Text(clockSpread(minute ?? 0))
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(GrannyTheme.text.opacity(minute == nil ? 0.25 : 0.5))
-                }
-            }
-        }
-        .frame(height: 160, alignment: .bottom)
-        .padding(.top, 8)
     }
 }

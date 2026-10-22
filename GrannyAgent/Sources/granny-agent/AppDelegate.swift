@@ -609,6 +609,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tabs.current = .notebook
     }
 
+    /// granny's face in the titlebar, where the words used to be.
+    private static func markAccessory() -> NSTitlebarAccessoryViewController {
+        let controller = NSTitlebarAccessoryViewController()
+        let image = NSImageView()
+        image.image = NSApp.applicationIconImage
+        image.imageScaling = .scaleProportionallyUpOrDown
+        image.frame = NSRect(x: 0, y: 0, width: 16, height: 16)
+        controller.view = image
+        controller.layoutAttribute = .leading
+        return controller
+    }
+
     private func show<Content: View>(_ view: Content, title: String, styleMask: NSWindow.StyleMask) {
         window?.close()
         let newWindow = NSWindow(
@@ -628,6 +640,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // scroll view passes under it, and a fully transparent bar would let
         // the text collide with the title.
         newWindow.titlebarAppearsTransparent = false
+        // The mark where the title was: a window that says "granny" beside
+        // granny's own face says it twice.
+        newWindow.titleVisibility = .hidden
+        newWindow.addTitlebarAccessoryViewController(AppDelegate.markAccessory())
         newWindow.contentView = NSHostingView(rootView: view)
         newWindow.setContentSize(newWindow.contentView?.fittingSize ?? NSSize(width: 560, height: 420))
         newWindow.center()

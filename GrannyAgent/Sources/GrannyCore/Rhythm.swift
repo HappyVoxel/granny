@@ -123,18 +123,10 @@ public struct RhythmReport: Sendable, Equatable {
     /// Latest minus earliest first round, in minutes. Nil below two started
     /// days: a single point has no spread.
     public var spreadMinutes: Int?
-    /// One reading per day of the window, oldest first: minutes since
-    /// midnight the first round landed, nil on a day without one. The
-    /// sparkline; the numbers above are the same data totalled.
-    public var firstRounds: [Int?]
-
-    public init(
-        days: Int, started: Int, spreadMinutes: Int? = nil, firstRounds: [Int?] = []
-    ) {
+    public init(days: Int, started: Int, spreadMinutes: Int? = nil) {
         self.days = days
         self.started = started
         self.spreadMinutes = spreadMinutes
-        self.firstRounds = firstRounds
     }
 }
 
@@ -165,18 +157,12 @@ public func weeklyRhythm(
             return oldestDate >= dayString(edge, calendar: calendar)
         } ?? limit
     } ?? limit
-    let readings = stride(from: span, through: 1, by: -1).map { ago -> Int? in
-        let day = dayString(
-            calendar.date(byAdding: .day, value: -ago, to: now) ?? now, calendar: calendar)
-        return days.first { $0.date == day }?.firstRoundMinute
-    }
     return RhythmReport(
         days: span,
         started: starts.count,
         spreadMinutes: starts.count >= minimumStartsForSpread
             ? (starts.max() ?? 0) - (starts.min() ?? 0)
-            : nil,
-        firstRounds: readings)
+            : nil)
 }
 
 /// "2h05", "45m" - a clock distance, not a duration, so it never says "0h".

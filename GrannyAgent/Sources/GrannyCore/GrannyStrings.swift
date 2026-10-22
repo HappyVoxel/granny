@@ -103,9 +103,8 @@ public protocol GrannyStrings: Sendable {
     var slotAssignHelp: String { get }
     var slotClear: String { get }
     var scheduleInvalid: String { get }
-    var rhythmTitle: String { get }
-    var rhythmSubtitle: String { get }
-    var rhythmEmpty: String { get }
+    var tabTasks: String { get }
+    var tabTimetable: String { get }
     func slotKindName(kind: SlotKind) -> String
     /// What granny says when a slot with work pinned to it comes round.
     func slotCue(time: String, task: String) -> String
@@ -389,9 +388,8 @@ public struct EnglishStrings: GrannyStrings {
     public var slotAssignHelp: String { "Pin the task to an hour" }
     public var slotClear: String { "Take it off the timetable" }
     public var scheduleInvalid: String { "Every slot needs a real hour (09:00) and a name." }
-    public var rhythmTitle: String { "RHYTHM" }
-    public var rhythmSubtitle: String { "When you sat down" }
-    public var rhythmEmpty: String { "Not enough days yet. Live a few first." }
+    public var tabTasks: String { "To-do list" }
+    public var tabTimetable: String { "Timetable" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -719,9 +717,8 @@ public struct VietnameseStrings: GrannyStrings {
     public var slotAssignHelp: String { "Gán việc vào mốc" }
     public var slotClear: String { "Bỏ khỏi mốc" }
     public var scheduleInvalid: String { "Mỗi mốc cần giờ hợp lệ (09:00) và một cái tên." }
-    public var rhythmTitle: String { "NHỊP" }
-    public var rhythmSubtitle: String { "Cháu ngồi vào bàn lúc nào" }
-    public var rhythmEmpty: String { "Chưa đủ ngày. Sống đã rồi tính." }
+    public var tabTasks: String { "Việc hôm nay" }
+    public var tabTimetable: String { "Thời gian biểu" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -1048,9 +1045,8 @@ public struct FinnishStrings: GrannyStrings {
     public var slotAssignHelp: String { "Sido tehtävä tuntiin" }
     public var slotClear: String { "Irrota aikataulusta" }
     public var scheduleInvalid: String { "Jokainen kohta tarvitsee oikean tunnin (09:00) ja nimen." }
-    public var rhythmTitle: String { "RYTMI" }
-    public var rhythmSubtitle: String { "Milloin istuit alas" }
-    public var rhythmEmpty: String { "Ei vielä tarpeeksi päiviä. Elä ensin." }
+    public var tabTasks: String { "Tehtävälista" }
+    public var tabTimetable: String { "Aikataulu" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Syvä työ"
