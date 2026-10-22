@@ -389,6 +389,9 @@ final class GrannyViewModel: ObservableObject {
     /// Every box ticked, not one round paid: the status line has to say why
     /// the door is still shut.
     @Published var allTicked = false
+    /// Deep-work rounds finished today, so the notebook can say "not yet"
+    /// instead of offering a button that cannot pay.
+    @Published var rounds = 0
     /// The coach's line about the last days; nil until there are enough.
     @Published var rhythm: RhythmReport?
     /// The timetable, for the hour chip on each task.
@@ -401,6 +404,7 @@ final class GrannyViewModel: ObservableObject {
         dayOff = context.store.state.dayOff
         streak = displayStreak(state: context.store.state)
         allTicked = context.store.state.allDone && !context.store.state.paid
+        rounds = context.store.state.pomodoro.finished
         rhythm = context.rhythmReport
         slots = context.schedule.sorted
         tags = context.tags
@@ -1076,7 +1080,14 @@ struct TaskListView: View {
             HStack(alignment: .bottom) {
                 Button(GrannyLines.markAllDoneButton) { onMarkAllDone() }
                     .buttonStyle(GrannyPrimaryButtonStyle())
-                    .disabled(viewModel.tasks.isEmpty || viewModel.tasks.allSatisfy { $0.done })
+                    // "I'm done" claims the day, and the day is only paid for
+                    // by a round: without one the button would take the click
+                    // and answer with a refusal.
+                    .disabled(
+                        viewModel.tasks.isEmpty
+                            || viewModel.tasks.allSatisfy { $0.done }
+                            || viewModel.rounds == 0)
+                    .help(viewModel.rounds == 0 ? GrannyLines.markAllNeedsRound : "")
                 Spacer()
                 // The tomato takes the corner granny's own button used to
                 // hold: the reward is the thing the eye lands on last.

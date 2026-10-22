@@ -110,6 +110,7 @@ public protocol GrannyStrings: Sendable {
     var tagNamePlaceholder: String { get }
     var tagRemoveHelp: String { get }
     var tagColourHelp: String { get }
+    var markAllNeedsRound: String { get }
     func slotKindName(kind: SlotKind) -> String
     /// What granny says when a slot with work pinned to it comes round.
     func slotCue(time: String, task: String) -> String
@@ -365,7 +366,7 @@ public struct EnglishStrings: GrannyStrings {
     public var sleepNag: String { "It's late, dear. Off to bed - tomorrow is another day." }
     public func reward(bedtime: Int) -> String { "Good grandchild. Go play, be back before \(bedtime)." }
     public var unpaidNudge: String {
-        "Ticked boxes aren't work, dear. At least one finished deep-work round, or the day doesn't count - no cheating."
+        "Ticked boxes aren't work, dear. At least one finished deep-work round, or the day doesn't count - no cheating. Granny has taken the ticks back off."
     }
     public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
         guard let spread else {
@@ -400,6 +401,7 @@ public struct EnglishStrings: GrannyStrings {
     public var tagNamePlaceholder: String { "Tag name" }
     public var tagRemoveHelp: String { "Remove the tag" }
     public var tagColourHelp: String { "Change the tag's colour" }
+    public var markAllNeedsRound: String { "A finished round first, dear - then you can say you're done." }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -699,7 +701,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var sleepNag: String { "Muộn rồi cháu. Đi ngủ đi, mai còn làm việc." }
     public func reward(bedtime: Int) -> String { "Tốt lắm cháu. Đi chơi đi, nhớ về trước \(bedtime) giờ." }
     public var unpaidNudge: String {
-        "Tick ô không phải là làm việc đâu cháu. Ít nhất xong một round deep work mới được tính, đừng có ăn gian nghen."
+        "Tick ô không phải là làm việc đâu cháu. Ít nhất xong một round deep work mới được tính, đừng có ăn gian nghen. Ngoại bỏ tick lại rồi."
     }
     public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
         guard let spread else {
@@ -734,6 +736,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var tagNamePlaceholder: String { "Tên thẻ" }
     public var tagRemoveHelp: String { "Xoá thẻ" }
     public var tagColourHelp: String { "Đổi màu thẻ" }
+    public var markAllNeedsRound: String { "Xong một round đã cháu - rồi mới nói là làm xong." }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -1032,7 +1035,7 @@ public struct FinnishStrings: GrannyStrings {
     public var sleepNag: String { "Nyt on myöhä, kulta. Nukkumaan - huomenna on taas päivä." }
     public func reward(bedtime: Int) -> String { "Hyvä kulta. Mene leikkimään, palaa ennen kello \(bedtime)." }
     public var unpaidNudge: String {
-        "Rastit eivät ole työtä, kulta. Vähintään yksi valmis syvän työn kierros, tai päivää ei lasketa - ei huijaamista."
+        "Rastit eivät ole työtä, kulta. Vähintään yksi valmis syvän työn kierros, tai päivää ei lasketa - ei huijaamista. Mummo otti rastit pois."
     }
     public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
         guard let spread else {
@@ -1067,6 +1070,7 @@ public struct FinnishStrings: GrannyStrings {
     public var tagNamePlaceholder: String { "Tagin nimi" }
     public var tagRemoveHelp: String { "Poista tagi" }
     public var tagColourHelp: String { "Vaihda tagin väri" }
+    public var markAllNeedsRound: String { "Ensin yksi valmis kierros, kulta - sitten voit sanoa olevasi valmis." }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Syvä työ"

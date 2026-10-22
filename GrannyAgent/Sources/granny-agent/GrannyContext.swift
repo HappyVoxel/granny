@@ -271,12 +271,18 @@ final class GrannyContext {
     }
 
     func toggle(taskID: String) {
+        var refused = false
         mutate { state in
             if let index = state.tasks.firstIndex(where: { $0.id == taskID }) {
                 state.tasks[index].done.toggle()
             }
+            refused = state.refuseUnpaidTicks()
         }
         scheduler.tick()
+        if refused {
+            announce(GrannyLines.unpaidNudge)
+            return
+        }
         if let task = store.state.tasks.first(where: { $0.id == taskID }), task.done {
             nudgeOffSlot(task)
         }

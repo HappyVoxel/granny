@@ -115,6 +115,15 @@ public struct DayState: Codable, Sendable {
         firstRoundAt = clockString(now, calendar: calendar)
     }
 
+    /// "The list is done" with no round behind it is a claim granny refuses -
+    /// and she does not keep a tick she refuses to count. Returns true when it
+    /// fired, so the caller says why the boxes came back off.
+    public mutating func refuseUnpaidTicks() -> Bool {
+        guard allDone, !paid else { return false }
+        for index in tasks.indices { tasks[index].done = false }
+        return true
+    }
+
     /// Writing a task cancels the day off: a day off has no tasks by
     /// definition, so new work means the user is back on duty. Returns true
     /// when the flag flipped, so the caller announces it once.
