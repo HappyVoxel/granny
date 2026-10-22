@@ -72,6 +72,10 @@ enum GrannyTheme {
     /// highlighter.
     static func slotColor(_ kind: SlotKind) -> Color { Color(nsColor: slotNSColor(kind)) }
 
+    /// The one warning tone: the tomato's brick, so an error already belongs
+    /// to the palette instead of a system red dropped into it.
+    static var warning: Color { Color(nsColor: tomatoDeepNS) }
+
     static func slotNSColor(_ kind: SlotKind) -> NSColor {
         switch kind {
         case .deepWork: return NSColor(calibratedRed: 0.82, green: 0.66, blue: 0.36, alpha: 1)

@@ -589,7 +589,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             context: context,
             tabs: tabs,
             viewModel: context.viewModel,
+            onScheduleSave: { [weak self] slots in
+                guard let self else { return }
+                do {
+                    try self.context.saveSchedule(slots)
+                    self.tabs.current = .notebook
+                } catch {
+                    self.showAlert(title: GrannyLines.configSaveFailed,
+                                   body: error.localizedDescription)
+                }
+            },
             onSettingsSave: { [weak self] updated in
+                // Settings edits a launch-time copy and writes it whole; the
+                // timetable it holds is that same old copy, so the live one
+                // wins - otherwise saving a key would revert the day.
+                var updated = updated
+                updated.schedule = self?.context.schedule.slots ?? updated.schedule
                 do {
                     try updated.save()
                     GrannyLines.language = updated.language

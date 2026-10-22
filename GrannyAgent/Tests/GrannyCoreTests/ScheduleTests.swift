@@ -92,6 +92,28 @@ final class ScheduleTests: XCTestCase {
         XCTAssertEqual(proposal[tasks[2].id].flatMap { byTime[$0] }, "15:00")
     }
 
+    func testPhrasesCountDoubleAndSingleWordsDoNot() {
+        XCTAssertEqual(kindOf(TaskItem(title: "Viết lách buổi tối")), .journal,
+                       "a two-word phrase outranks the bare verb")
+        XCTAssertEqual(kindOf(TaskItem(title: "Viết báo cáo tuần")), .deepWork)
+        XCTAssertEqual(kindOf(TaskItem(title: "Deep work session")), .deepWork)
+    }
+
+    func testTimesWithStraySpaceStillParse() {
+        XCTAssertEqual(Schedule.minute(of: "09:00 "), 540)
+        XCTAssertEqual(Schedule.minute(of: " 6.30"), 390)
+    }
+
+    func testTasksOnADeletedHourAreReleased() {
+        let schedule = self.schedule()
+        let kept = TaskItem(title: "Apply job", slotID: schedule.slots[1].id)
+        let orphan = TaskItem(title: "Old hour", slotID: "gone")
+        let result = droppingUnknownSlots([kept, orphan], in: schedule)
+        XCTAssertEqual(result[0].slotID, schedule.slots[1].id)
+        XCTAssertNil(result[1].slotID)
+        XCTAssertEqual(result[1].title, "Old hour", "the task survives, only the hour goes")
+    }
+
     func testProposalSkipsHoursWithNoMatch() {
         let schedule = Schedule(slots: [
             ScheduleSlot(time: "09:00", label: "Làm việc", kind: .deepWork),

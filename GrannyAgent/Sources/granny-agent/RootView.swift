@@ -31,6 +31,7 @@ struct GrannyRootView: View {
     let context: GrannyContext
     @ObservedObject var tabs: GrannyTabs
     @ObservedObject var viewModel: GrannyViewModel
+    var onScheduleSave: ([ScheduleSlot]) -> Void
     var onSettingsSave: (GrannyConfig) -> Void
     var onSettingsCancel: () -> Void
 
@@ -125,10 +126,7 @@ struct GrannyRootView: View {
             ScheduleView(
                 initial: context.schedule.slots,
                 today: context.store.state.tasks,
-                onSave: { [weak context] slots in
-                    context?.saveSchedule(slots)
-                    tabs.current = .notebook
-                },
+                onSave: { slots in onScheduleSave(slots) },
                 onCancel: { tabs.current = .notebook })
         case .settings:
             SettingsView(

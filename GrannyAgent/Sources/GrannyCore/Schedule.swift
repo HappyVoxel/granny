@@ -83,7 +83,10 @@ public struct Schedule: Codable, Sendable, Equatable {
     public static func minute(of time: String) -> Int? {
         // "6.30" is how the user writes a time in Vietnamese; the dot is not
         // a typo worth refusing.
-        let parts = time.replacingOccurrences(of: ".", with: ":").split(separator: ":")
+        let parts = time
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: ".", with: ":")
+            .split(separator: ":")
         guard parts.count == 2,
               let hour = Int(parts[0]), let minute = Int(parts[1]),
               (0...23).contains(hour), (0...59).contains(minute) else { return nil }
@@ -98,7 +101,7 @@ private let kindWords: [SlotKind: [String]] = [
     .admin: ["apply", "job", "cv", "resume", "interview", "email", "invoice", "tax",
              "admin", "nộp", "tuyển", "dụng", "phỏng", "vấn", "giấy", "tờ", "hồ", "sơ"],
     .deepWork: ["feature", "code", "build", "fix", "ship", "implement", "design",
-                "polish", "write", "deepwork", "refactor",
+                "polish", "write", "deepwork", "deep work", "refactor",
                 "tính", "viết", "sửa", "làm", "việc"],
     .learn: ["read", "study", "learn", "course", "book", "language", "license",
              "đọc", "học", "sách", "ngôn", "ngữ", "bằng", "lái"],
@@ -107,6 +110,19 @@ private let kindWords: [SlotKind: [String]] = [
     .personal: ["sleep", "shower", "meditate", "ngủ", "tắm", "vệ", "sinh", "thiền"],
     .journal: ["journal", "diary", "gratitude", "nhật", "ký", "kí", "viết lách"],
 ]
+
+/// Drops hour ids whose slot is gone, so a rewritten timetable does not leave
+/// tasks pinned to an hour that no longer exists: they would show "-", never
+/// be nudged, and never be re-proposed.
+public func droppingUnknownSlots(_ tasks: [TaskItem], in schedule: Schedule) -> [TaskItem] {
+    let known = Set(schedule.slots.map(\.id))
+    return tasks.map { task in
+        guard let slotID = task.slotID, !known.contains(slotID) else { return task }
+        var copy = task
+        copy.slotID = nil
+        return copy
+    }
+}
 
 /// Assigns today's tasks to today's slots, in list order: same kind first, a
 /// slot only used once, and the earliest slot of the kind preferred. It is a
@@ -138,17 +154,19 @@ private let kindOrder: [SlotKind] = [
 /// one, and being put at the desk is the safer guess.
 ///
 /// Whole words, not substrings: "kỹ năng" contains the letters of "ăn" (eat),
-/// and a substring match would file a study task under lunch.
+/// and a substring match would file a study task under lunch. A phrase
+/// ("viết lách", "deep work") is matched against the raw title and counts
+/// double: two words that belong together say more than one verb does.
 public func kindOf(_ task: TaskItem) -> SlotKind {
-    let words = Set(
-        task.title.lowercased()
-            .split { !$0.isLetter && !$0.isNumber }
-            .map(String.init))
+    let text = task.title.lowercased()
+    let words = Set(text.split { !$0.isLetter && !$0.isNumber }.map(String.init))
     var best: (kind: SlotKind, score: Int) = (.deepWork, 0)
     for kind in kindOrder {
         let vocabulary = kindWords[kind] ?? []
-        let score = vocabulary.reduce(0) { total, word in
-            total + (words.contains(word) ? 1 : 0)
+        let score = vocabulary.reduce(0) { total, entry in
+            entry.contains(" ")
+                ? total + (text.contains(entry) ? 2 : 0)
+                : total + (words.contains(entry) ? 1 : 0)
         }
         if score > best.score { best = (kind, score) }
     }

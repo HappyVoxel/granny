@@ -296,14 +296,28 @@ final class GrannyContext {
     }
 
     /// Saves the day to the config and adopts it at once: the next tick
-    /// announces from the new hours, no relaunch.
-    func saveSchedule(_ slots: [ScheduleSlot]) {
-        var updated = config
-        updated.schedule = slots
-        try? updated.save()
+    /// announces from the new hours, no relaunch. The file on disk is
+    /// re-read first and only `schedule` is merged into it - this context's
+    /// `config` is the launch-time copy, and writing that back would undo a
+    /// Settings save the user declined to relaunch for.
+    func saveSchedule(_ slots: [ScheduleSlot]) throws {
+        var onDisk = GrannyConfig.load()
+        onDisk.schedule = slots
+        try onDisk.save()
+        admit(slots)
+    }
+
+    /// Adopts a timetable that is already on disk. The failed-save path must
+    /// not reach here: the window would behave as if the hours were saved
+    /// while the next launch quietly reverted them.
+    private func admit(_ slots: [ScheduleSlot]) {
         schedule = Schedule(slots: slots)
         scheduler.schedule = schedule
-        viewModel.refresh(from: self)
+        mutate { state in
+            state.tasks = droppingUnknownSlots(state.tasks, in: schedule)
+            state.carried = droppingUnknownSlots(state.carried, in: schedule)
+        }
+        assignSlots()
     }
 
     /// The user moving a task off its proposed hour, or onto one.

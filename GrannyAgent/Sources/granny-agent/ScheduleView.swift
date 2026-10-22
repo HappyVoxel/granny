@@ -24,9 +24,7 @@ struct ScheduleView: View {
         _draft = State(initialValue: initial)
     }
 
-    private var ordered: [ScheduleSlot] {
-        draft.filter { $0.minute != nil }.sorted { ($0.minute ?? 0) < ($1.minute ?? 0) }
-    }
+    private var ordered: [ScheduleSlot] { Schedule(slots: draft).sorted }
 
     /// A slot with an unreadable hour would silently drop out of the day; the
     /// save button says so instead.
@@ -183,7 +181,7 @@ struct ScheduleView: View {
             if !valid {
                 Text(GrannyLines.scheduleInvalid)
                     .font(.caption2)
-                    .foregroundStyle(.red.opacity(0.8))
+                    .foregroundStyle(GrannyTheme.warning.opacity(0.9))
             }
             Spacer()
             Button(GrannyLines.cancelButton) { onCancel() }
