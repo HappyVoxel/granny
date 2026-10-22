@@ -16,6 +16,8 @@ struct ScheduleView: View {
     /// re-classifies those, because a deliberate choice is not a guess.
     @State private var pinned: Set<String> = []
     @StateObject private var colourPicker = TagColourPanel()
+    /// The slot whose tag menu is open.
+    @State private var tagMenuSlot: String?
 
     init(
         initial: [ScheduleSlot],
@@ -48,11 +50,7 @@ struct ScheduleView: View {
             header
             hairline
             HStack(alignment: .top, spacing: 18) {
-                VStack(spacing: 16) {
-                    slots
-                    tagsCard
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                slots.frame(maxWidth: .infinity, alignment: .topLeading)
                 VStack(spacing: 14) {
                     todayCard
                     Spacer(minLength: 0)
@@ -95,11 +93,12 @@ struct ScheduleView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .frame(maxHeight: 420)
+            .frame(maxHeight: 460)
 
             Button {
-                draft.append(
-                    ScheduleSlot(time: nextTime(), label: "", tag: tags.first?.id ?? SlotKind.deepWork.rawValue))
+                draft.append(ScheduleSlot(
+                    time: nextTime(), label: "",
+                    tag: tags.first?.id ?? SlotKind.deepWork.rawValue))
             } label: {
                 Text("+ " + GrannyLines.scheduleAdd)
                     .font(.system(size: 13, design: .serif))
@@ -115,7 +114,6 @@ struct ScheduleView: View {
                     .foregroundStyle(captionStyle)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func row(_ index: Int) -> some View {
@@ -135,19 +133,35 @@ struct ScheduleView: View {
                 .onChange(of: draft[index].label) { _, label in
                     classify(index, label: label)
                 }
-            Picker("", selection: Binding(
-                get: { draft[index].tag },
-                set: { newValue in
-                    draft[index].tag = newValue
-                    pinned.insert(draft[index].id)
+            Button {
+                tagMenuSlot = draft[index].id
+            } label: {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(GrannyTheme.tagColor(tag(for: draft[index])))
+                        .frame(width: 8, height: 8)
+                    Text(tag(for: draft[index])?.displayName ?? GrannyLines.tagNamePlaceholder)
+                        .font(.system(size: 12, design: .serif))
+                        .foregroundStyle(GrannyTheme.text.opacity(0.85))
+                        .lineLimit(1)
                 }
-            )) {
-                ForEach(tags) { tag in
-                    Text(tag.displayName).tag(tag.id)
-                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .frame(width: 132, alignment: .leading)
+                .background(Capsule().fill(GrannyTheme.card))
+                .overlay(Capsule().stroke(GrannyTheme.hairline, lineWidth: 1))
             }
-            .labelsHidden()
-            .frame(width: 130)
+            .buttonStyle(.plain)
+            .help(GrannyLines.tagColourHelp)
+            .pointingHandOnHover()
+            .popover(
+                isPresented: Binding(
+                    get: { tagMenuSlot == draft[index].id },
+                    set: { if !$0 { tagMenuSlot = nil } }),
+                arrowEdge: .bottom
+            ) {
+                tagMenu(index)
+            }
             Button {
                 draft.removeAll { $0.id == draft[index].id }
                 pinned.remove(draft[index].id)
@@ -166,7 +180,7 @@ struct ScheduleView: View {
     }
 
     /// Typing the name picks the kind: granny reads the words and moves the
-    /// picker herself, and the user overrides by touching the picker.
+    /// tag herself, and the user overrides by choosing one in the menu.
     private func classify(_ index: Int, label: String) {
         guard draft.indices.contains(index), !label.isEmpty,
               !pinned.contains(draft[index].id) else { return }
@@ -177,6 +191,98 @@ struct ScheduleView: View {
 
     private func tag(for slot: ScheduleSlot) -> SlotTag? {
         tags.first { $0.id == slot.tag }
+    }
+
+    /// Everything about tags happens in the slot's own dropdown: pick one,
+    /// recolour or rename the one in use, invent another. A separate card
+    /// made the user look in two places for one decision.
+    private func tagMenu(_ index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(tags) { tag in
+                Button {
+                    draft[index].tag = tag.id
+                    pinned.insert(draft[index].id)
+                    tagMenuSlot = nil
+                } label: {
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(GrannyTheme.tagColor(tag))
+                            .frame(width: 10, height: 10)
+                        Text(tag.displayName)
+                            .font(.system(size: 13, design: .serif))
+                            .foregroundStyle(GrannyTheme.text)
+                        Spacer(minLength: 12)
+                        if draft[index].tag == tag.id {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(GrannyTheme.gold)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointingHandOnHover()
+            }
+
+            Rectangle().fill(GrannyTheme.hairline).frame(height: 1)
+
+            if let tagIndex = tags.firstIndex(where: { $0.id == draft[index].tag }) {
+                HStack(spacing: 10) {
+                    Button {
+                        colourPicker.onPick = { colour in tags[tagIndex].color = colour.hexString }
+                        colourPicker.open(current: NSColor(GrannyTheme.tagColor(tags[tagIndex])))
+                    } label: {
+                        Circle()
+                            .fill(GrannyTheme.tagColor(tags[tagIndex]))
+                            .frame(width: 14, height: 14)
+                            .overlay(Circle().stroke(GrannyTheme.hairline, lineWidth: 1))
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(GrannyLines.tagColourHelp)
+                    .pointingHandOnHover()
+                    TextField(GrannyLines.tagNamePlaceholder, text: Binding(
+                        get: { tags[tagIndex].name ?? tags[tagIndex].displayName },
+                        set: { tags[tagIndex].name = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .serif))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if tags[tagIndex].kind == nil {
+                        Button {
+                            tags.removeAll { $0.id == tags[tagIndex].id }
+                            draft[index].tag = tags.first?.id ?? draft[index].tag
+                            tagMenuSlot = nil
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 10))
+                                .foregroundStyle(GrannyTheme.text.opacity(0.4))
+                        }
+                        .buttonStyle(.plain)
+                        .help(GrannyLines.tagRemoveHelp)
+                        .pointingHandOnHover()
+                    }
+                }
+            }
+
+            Button {
+                let tag = SlotTag(
+                    id: "custom-\(UUID().uuidString.prefix(8))",
+                    name: "",
+                    color: "#B59E87")
+                tags.append(tag)
+                draft[index].tag = tag.id
+                pinned.insert(draft[index].id)
+            } label: {
+                Text("+ " + GrannyLines.tagAdd)
+                    .font(.system(size: 12, design: .serif))
+                    .foregroundStyle(GrannyTheme.gold)
+            }
+            .buttonStyle(.plain)
+            .pointingHandOnHover()
+        }
+        .padding(12)
+        .frame(width: 250)
     }
 
     private var todayCard: some View {
@@ -214,74 +320,6 @@ struct ScheduleView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .grannyCard(cornerRadius: 12)
-    }
-
-    /// The tags are the user's: the seven built-ins are a seed, and anything
-    /// else can carry its own name and colour.
-    private var tagsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(GrannyLines.tagsTitle)
-                .font(.system(size: 11, weight: .semibold, design: .serif))
-                .tracking(3)
-                .foregroundStyle(GrannyTheme.gold)
-            ForEach(Array(tags.enumerated()), id: \.element.id) { index, _ in
-                tagRow(index)
-            }
-            Button {
-                let tag = SlotTag(
-                    id: "custom-\(UUID().uuidString.prefix(8))",
-                    name: "",
-                    color: "#B59E87")
-                tags.append(tag)
-            } label: {
-                Text("+ " + GrannyLines.tagAdd)
-                    .font(.system(size: 12, design: .serif))
-                    .foregroundStyle(GrannyTheme.gold)
-            }
-            .buttonStyle(.plain)
-            .pointingHandOnHover()
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .grannyCard(cornerRadius: 12)
-    }
-
-    private func tagRow(_ index: Int) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                colourPicker.onPick = { colour in tags[index].color = colour.hexString }
-                colourPicker.open(current: NSColor(GrannyTheme.tagColor(tags[index])))
-            } label: {
-                Circle()
-                    .fill(GrannyTheme.tagColor(tags[index]))
-                    .frame(width: 14, height: 14)
-                    .overlay(Circle().stroke(GrannyTheme.hairline, lineWidth: 1))
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help(GrannyLines.tagColourHelp)
-            .pointingHandOnHover()
-            TextField(GrannyLines.tagNamePlaceholder, text: Binding(
-                get: { tags[index].name ?? tags[index].displayName },
-                set: { tags[index].name = $0 }
-            ))
-            .textFieldStyle(.plain)
-            .font(.system(size: 13, design: .serif))
-            .frame(width: 150, alignment: .leading)
-            if tags[index].kind == nil {
-                Button {
-                    tags.removeAll { $0.id == tags[index].id }
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10))
-                        .foregroundStyle(GrannyTheme.text.opacity(0.4))
-                }
-                .buttonStyle(.plain)
-                .help(GrannyLines.tagRemoveHelp)
-                .pointingHandOnHover()
-            }
-            Spacer(minLength: 0)
-        }
     }
 
     private var footer: some View {
