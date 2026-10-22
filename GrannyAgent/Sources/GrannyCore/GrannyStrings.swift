@@ -105,6 +105,10 @@ public protocol GrannyStrings: Sendable {
     var scheduleInvalid: String { get }
     var tabTasks: String { get }
     var tabTimetable: String { get }
+    var tagsTitle: String { get }
+    var tagAdd: String { get }
+    var tagNamePlaceholder: String { get }
+    var tagRemoveHelp: String { get }
     func slotKindName(kind: SlotKind) -> String
     /// What granny says when a slot with work pinned to it comes round.
     func slotCue(time: String, task: String) -> String
@@ -390,6 +394,10 @@ public struct EnglishStrings: GrannyStrings {
     public var scheduleInvalid: String { "Every slot needs a real hour (09:00) and a name." }
     public var tabTasks: String { "To-do list" }
     public var tabTimetable: String { "Timetable" }
+    public var tagsTitle: String { "TAGS" }
+    public var tagAdd: String { "New tag" }
+    public var tagNamePlaceholder: String { "Tag name" }
+    public var tagRemoveHelp: String { "Remove the tag" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -719,6 +727,10 @@ public struct VietnameseStrings: GrannyStrings {
     public var scheduleInvalid: String { "Mỗi mốc cần giờ hợp lệ (09:00) và một cái tên." }
     public var tabTasks: String { "Việc hôm nay" }
     public var tabTimetable: String { "Thời gian biểu" }
+    public var tagsTitle: String { "THẺ" }
+    public var tagAdd: String { "Thẻ mới" }
+    public var tagNamePlaceholder: String { "Tên thẻ" }
+    public var tagRemoveHelp: String { "Xoá thẻ" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -1047,6 +1059,10 @@ public struct FinnishStrings: GrannyStrings {
     public var scheduleInvalid: String { "Jokainen kohta tarvitsee oikean tunnin (09:00) ja nimen." }
     public var tabTasks: String { "Tehtävälista" }
     public var tabTimetable: String { "Aikataulu" }
+    public var tagsTitle: String { "TAGIT" }
+    public var tagAdd: String { "Uusi tagi" }
+    public var tagNamePlaceholder: String { "Tagin nimi" }
+    public var tagRemoveHelp: String { "Poista tagi" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Syvä työ"

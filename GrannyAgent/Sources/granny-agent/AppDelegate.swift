@@ -589,10 +589,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             context: context,
             tabs: tabs,
             viewModel: context.viewModel,
-            onScheduleSave: { [weak self] slots in
+            onScheduleSave: { [weak self] slots, tags in
                 guard let self else { return }
                 do {
-                    try self.context.saveSchedule(slots)
+                    try self.context.saveSchedule(slots, tags: tags)
                     self.tabs.current = .notebook
                 } catch {
                     self.showAlert(title: GrannyLines.configSaveFailed,
@@ -605,6 +605,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 // wins - otherwise saving a key would revert the day.
                 var updated = updated
                 updated.schedule = self?.context.schedule.slots ?? updated.schedule
+                updated.tags = self?.context.tags ?? updated.tags
                 do {
                     try updated.save()
                     GrannyLines.language = updated.language

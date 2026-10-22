@@ -22,6 +22,9 @@ final class GrannyContext {
     /// save, so an edit lands without a relaunch.
     private(set) var schedule: Schedule
 
+    /// The tags the slots point at: the colours and names of the day.
+    private(set) var tags: [SlotTag]
+
     /// The coach's line about the last days, read once at launch and once per
     /// rollover - the log only grows at midnight, so there is nothing to
     /// re-read in between.
@@ -52,6 +55,7 @@ final class GrannyContext {
         self.store = StateStore()
         self.rhythmReport = store.rhythm()
         self.schedule = Schedule(slots: config.schedule)
+        self.tags = config.tags
         self.trace = TraceClient(config: config.langfuse)
         self.engine = DecisionEngine(config: config, trace: trace)
         self.scheduler = Scheduler(config: config, store: store, engine: engine, block: block, speaker: speaker)
@@ -300,10 +304,12 @@ final class GrannyContext {
     /// re-read first and only `schedule` is merged into it - this context's
     /// `config` is the launch-time copy, and writing that back would undo a
     /// Settings save the user declined to relaunch for.
-    func saveSchedule(_ slots: [ScheduleSlot]) throws {
+    func saveSchedule(_ slots: [ScheduleSlot], tags newTags: [SlotTag]) throws {
         var onDisk = GrannyConfig.load()
         onDisk.schedule = slots
+        onDisk.tags = newTags
         try onDisk.save()
+        tags = newTags
         admit(slots)
     }
 

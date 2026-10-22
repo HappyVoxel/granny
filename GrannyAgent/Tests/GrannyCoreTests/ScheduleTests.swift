@@ -17,10 +17,10 @@ final class ScheduleTests: XCTestCase {
 
     private func schedule() -> Schedule {
         Schedule(slots: [
-            ScheduleSlot(time: "09:00", label: "Làm việc — deep work", kind: .deepWork),
-            ScheduleSlot(time: "12:00", label: "Ăn trưa", kind: .rest),
-            ScheduleSlot(time: "13:00", label: "Làm việc", kind: .deepWork),
-            ScheduleSlot(time: "15:00", label: "Apply jobs", kind: .admin),
+            ScheduleSlot(time: "09:00", label: "Làm việc — deep work", tag: SlotKind.deepWork.rawValue),
+            ScheduleSlot(time: "12:00", label: "Ăn trưa", tag: SlotKind.rest.rawValue),
+            ScheduleSlot(time: "13:00", label: "Làm việc", tag: SlotKind.deepWork.rawValue),
+            ScheduleSlot(time: "15:00", label: "Apply jobs", tag: SlotKind.admin.rawValue),
         ])
     }
 
@@ -44,8 +44,8 @@ final class ScheduleTests: XCTestCase {
 
     func testSortedSkipsUnreadableHours() {
         let broken = Schedule(slots: [
-            ScheduleSlot(time: "noon", label: "x", kind: .rest),
-            ScheduleSlot(time: "09:00", label: "work", kind: .deepWork),
+            ScheduleSlot(time: "noon", label: "x", tag: SlotKind.rest.rawValue),
+            ScheduleSlot(time: "09:00", label: "work", tag: SlotKind.deepWork.rawValue),
         ])
         XCTAssertEqual(broken.sorted.map(\.time), ["09:00"])
     }
@@ -114,9 +114,31 @@ final class ScheduleTests: XCTestCase {
         XCTAssertEqual(result[1].title, "Old hour", "the task survives, only the hour goes")
     }
 
+    func testAnOldConfigKeepsItsColours() throws {
+        let raw = Data(#"{"schedule":[{"time":"09:00","label":"Work","kind":"journal"}]}"#.utf8)
+        let config = try JSONDecoder().decode(GrannyConfig.self, from: raw)
+        XCTAssertEqual(config.schedule.first?.tag, SlotKind.journal.rawValue)
+        XCTAssertEqual(config.tags.count, SlotTag.defaults.count,
+                       "no tags key in the file still means the seven built-ins")
+    }
+
+    func testTagColourParsing() {
+        XCTAssertEqual(SlotTag(id: "x", color: "#D1A85C").rgb?.red ?? 0, 209.0 / 255, accuracy: 0.001)
+        XCTAssertNil(SlotTag(id: "x", color: "gold").rgb, "unreadable colour falls back, never traps")
+        XCTAssertNil(SlotTag(id: "x", color: "#12345").rgb)
+        XCTAssertEqual(SlotTag.defaults.count, SlotKind.allCases.count)
+        XCTAssertTrue(SlotTag.defaults.allSatisfy { $0.rgb != nil })
+    }
+
+    func testACustomTagIsNotMatchable() {
+        let custom = SlotTag(id: "custom-1", name: "Reading", color: "#7EA0C8")
+        XCTAssertNil(custom.kind, "only the built-ins can be guessed from a task's words")
+        XCTAssertEqual(custom.displayName, "Reading")
+    }
+
     func testProposalSkipsHoursWithNoMatch() {
         let schedule = Schedule(slots: [
-            ScheduleSlot(time: "09:00", label: "Làm việc", kind: .deepWork),
+            ScheduleSlot(time: "09:00", label: "Làm việc", tag: SlotKind.deepWork.rawValue),
         ])
         let tasks = [TaskItem(title: "Apply job tại ABB")]
         XCTAssertTrue(proposeSlots(for: tasks, in: schedule).isEmpty,
@@ -125,7 +147,7 @@ final class ScheduleTests: XCTestCase {
 
     func testMoreTasksThanHoursReusesTheFirst() {
         let schedule = Schedule(slots: [
-            ScheduleSlot(time: "09:00", label: "Làm việc", kind: .deepWork),
+            ScheduleSlot(time: "09:00", label: "Làm việc", tag: SlotKind.deepWork.rawValue),
         ])
         let tasks = [TaskItem(title: "Feature A"), TaskItem(title: "Feature B")]
         XCTAssertEqual(proposeSlots(for: tasks, in: schedule).count, 2)
@@ -155,8 +177,9 @@ final class ScheduleTests: XCTestCase {
         """.data(using: .utf8)!
         let config = try JSONDecoder().decode(GrannyConfig.self, from: raw)
         XCTAssertEqual(config.schedule.count, 2)
-        XCTAssertEqual(config.schedule.first?.kind, .deepWork)
-        XCTAssertEqual(config.schedule.last?.kind, .admin, "a missing kind falls back")
+        XCTAssertEqual(config.schedule.first?.tag, SlotKind.deepWork.rawValue)
+        XCTAssertEqual(config.schedule.last?.tag, SlotKind.admin.rawValue,
+                       "a missing tag falls back")
         XCTAssertNil(config.schedule.last?.minute)
     }
 }

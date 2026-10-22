@@ -2,26 +2,32 @@ import AppKit
 import SwiftUI
 import GrannyCore
 
-/// The personal day: the hours granny nudges against. The timetable is a
-/// template, not an appointment book - it names each hour, and granny puts the
-/// day's tasks inside those names.
+/// The personal day: the hours granny nudges against, and the tags that colour
+/// them. The timetable is a template, not an appointment book - it names each
+/// hour, and granny puts the day's tasks inside those names.
 struct ScheduleView: View {
     var today: [TaskItem]
-    var onSave: ([ScheduleSlot]) -> Void
+    var onSave: ([ScheduleSlot], [SlotTag]) -> Void
     var onCancel: () -> Void
 
     @State private var draft: [ScheduleSlot]
+    @State private var tags: [SlotTag]
+    /// Slots whose tag the user chose by hand: typing a name no longer
+    /// re-classifies those, because a deliberate choice is not a guess.
+    @State private var pinned: Set<String> = []
 
     init(
         initial: [ScheduleSlot],
+        tags: [SlotTag],
         today: [TaskItem],
-        onSave: @escaping ([ScheduleSlot]) -> Void,
+        onSave: @escaping ([ScheduleSlot], [SlotTag]) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.today = today
         self.onSave = onSave
         self.onCancel = onCancel
         _draft = State(initialValue: initial)
+        _tags = State(initialValue: tags)
     }
 
     private var ordered: [ScheduleSlot] { Schedule(slots: draft).sorted }
@@ -29,7 +35,9 @@ struct ScheduleView: View {
     /// A slot with an unreadable hour would silently drop out of the day; the
     /// save button says so instead.
     private var valid: Bool {
-        draft.allSatisfy { $0.minute != nil && !$0.label.trimmingCharacters(in: .whitespaces).isEmpty }
+        draft.allSatisfy {
+            $0.minute != nil && !$0.label.trimmingCharacters(in: .whitespaces).isEmpty
+        }
     }
 
     private var captionStyle: Color { GrannyTheme.text.opacity(0.55) }
@@ -40,14 +48,19 @@ struct ScheduleView: View {
             hairline
             HStack(alignment: .top, spacing: 18) {
                 slots
-                todayCard
+                VStack(spacing: 14) {
+                    todayCard
+                    tagsCard
+                    Spacer(minLength: 0)
+                }
+                .frame(width: 250)
             }
             footer
         }
         .padding(20)
         .grannyWindowBackdrop()
         .foregroundStyle(GrannyTheme.text)
-        .frame(minWidth: 720, idealWidth: 820, minHeight: 480, idealHeight: 620)
+        .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 660)
     }
 
     private var header: some View {
@@ -78,11 +91,11 @@ struct ScheduleView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .frame(maxHeight: 360)
+            .frame(maxHeight: 420)
 
             Button {
                 draft.append(
-                    ScheduleSlot(time: nextTime(), label: "", kind: .deepWork))
+                    ScheduleSlot(time: nextTime(), label: "", tag: tags.first?.id ?? SlotKind.deepWork.rawValue))
             } label: {
                 Text("+ " + GrannyLines.scheduleAdd)
                     .font(.system(size: 13, design: .serif))
@@ -104,7 +117,7 @@ struct ScheduleView: View {
     private func row(_ index: Int) -> some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(GrannyTheme.slotColor(draft[index].kind))
+                .fill(GrannyTheme.tagColor(tag(for: draft[index])))
                 .frame(width: 8, height: 8)
             TextField(GrannyLines.slotTimePlaceholder, text: $draft[index].time)
                 .textFieldStyle(.plain)
@@ -115,15 +128,25 @@ struct ScheduleView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 14, design: .serif))
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Picker("", selection: $draft[index].kind) {
-                ForEach(SlotKind.allCases, id: \.self) { kind in
-                    Text(GrannyLines.slotKindName(kind)).tag(kind)
+                .onChange(of: draft[index].label) { _, label in
+                    classify(index, label: label)
+                }
+            Picker("", selection: Binding(
+                get: { draft[index].tag },
+                set: { newValue in
+                    draft[index].tag = newValue
+                    pinned.insert(draft[index].id)
+                }
+            )) {
+                ForEach(tags) { tag in
+                    Text(tag.displayName).tag(tag.id)
                 }
             }
             .labelsHidden()
             .frame(width: 130)
             Button {
                 draft.removeAll { $0.id == draft[index].id }
+                pinned.remove(draft[index].id)
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
@@ -138,27 +161,41 @@ struct ScheduleView: View {
         .grannyCard(cornerRadius: 8)
     }
 
+    /// Typing the name picks the kind: granny reads the words and moves the
+    /// picker herself, and the user overrides by touching the picker.
+    private func classify(_ index: Int, label: String) {
+        guard draft.indices.contains(index), !label.isEmpty,
+              !pinned.contains(draft[index].id) else { return }
+        let kind = kindOf(TaskItem(title: label))
+        guard let match = tags.first(where: { $0.kind == kind }) else { return }
+        draft[index].tag = match.id
+    }
+
+    private func tag(for slot: ScheduleSlot) -> SlotTag? {
+        tags.first { $0.id == slot.tag }
+    }
+
     private var todayCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(GrannyLines.scheduleToday)
                 .font(.system(size: 11, weight: .semibold, design: .serif))
                 .tracking(3)
                 .foregroundStyle(GrannyTheme.gold)
-            let pinned = ordered.compactMap { slot -> (ScheduleSlot, [TaskItem])? in
+            let pinnedSlots = ordered.compactMap { slot -> (ScheduleSlot, [TaskItem])? in
                 let tasks = today.filter { $0.slotID == slot.id }
                 return tasks.isEmpty ? nil : (slot, tasks)
             }
-            if pinned.isEmpty {
+            if pinnedSlots.isEmpty {
                 Text(GrannyLines.scheduleTodayEmpty)
                     .font(.system(size: 12, design: .serif))
                     .italic()
                     .foregroundStyle(captionStyle)
             } else {
-                ForEach(pinned, id: \.0.id) { slot, tasks in
+                ForEach(pinnedSlots, id: \.0.id) { slot, tasks in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(slot.time)
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(GrannyTheme.slotColor(slot.kind))
+                            .foregroundStyle(GrannyTheme.tagColor(tag(for: slot)))
                         ForEach(tasks) { task in
                             Text(task.title)
                                 .font(.system(size: 13, design: .serif))
@@ -171,8 +208,63 @@ struct ScheduleView: View {
             }
         }
         .padding(14)
-        .frame(width: 250)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .grannyCard(cornerRadius: 12)
+    }
+
+    /// The tags are the user's: the seven built-ins are a seed, and anything
+    /// else can carry its own name and colour.
+    private var tagsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(GrannyLines.tagsTitle)
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+                .tracking(3)
+                .foregroundStyle(GrannyTheme.gold)
+            ForEach(Array(tags.enumerated()), id: \.element.id) { index, _ in
+                HStack(spacing: 8) {
+                    ColorPicker("", selection: Binding(
+                        get: { GrannyTheme.tagColor(tags[index]) },
+                        set: { tags[index].color = $0.hexString }
+                    ), supportsOpacity: false)
+                    .labelsHidden()
+                    .frame(width: 28)
+                    TextField(GrannyLines.tagNamePlaceholder, text: Binding(
+                        get: { tags[index].name ?? tags[index].displayName },
+                        set: { tags[index].name = $0 }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, design: .serif))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if tags[index].kind == nil {
+                        Button {
+                            tags.removeAll { $0.id == tags[index].id }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 10))
+                                .foregroundStyle(GrannyTheme.text.opacity(0.4))
+                        }
+                        .buttonStyle(.plain)
+                        .help(GrannyLines.tagRemoveHelp)
+                        .pointingHandOnHover()
+                    }
+                }
+            }
+            Button {
+                let tag = SlotTag(
+                    id: "custom-\(UUID().uuidString.prefix(8))",
+                    name: "",
+                    color: "#B59E87")
+                tags.append(tag)
+            } label: {
+                Text("+ " + GrannyLines.tagAdd)
+                    .font(.system(size: 12, design: .serif))
+                    .foregroundStyle(GrannyTheme.gold)
+            }
+            .buttonStyle(.plain)
+            .pointingHandOnHover()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .grannyCard(cornerRadius: 12)
     }
 
@@ -187,15 +279,20 @@ struct ScheduleView: View {
             Button(GrannyLines.cancelButton) { onCancel() }
                 .buttonStyle(GrannySecondaryButtonStyle())
             Button(GrannyLines.settingsSave) {
-                onSave(ordered.map { slot in
-                    var copy = slot
-                    copy.time = Schedule.normalized(slot.time)
-                    return copy
-                })
+                onSave(normalised(ordered), tags)
             }
-                .buttonStyle(GrannyPrimaryButtonStyle())
-                .disabled(!valid)
-                .keyboardShortcut(.defaultAction)
+            .buttonStyle(GrannyPrimaryButtonStyle())
+            .disabled(!valid)
+            .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    /// "9:5" is a time; the file stores "09:05".
+    private func normalised(_ slots: [ScheduleSlot]) -> [ScheduleSlot] {
+        slots.map { slot in
+            var copy = slot
+            copy.time = Schedule.normalized(slot.time)
+            return copy
         }
     }
 

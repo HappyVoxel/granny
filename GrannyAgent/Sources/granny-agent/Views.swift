@@ -66,27 +66,18 @@ enum GrannyTheme {
     }
     static var text: Color { Color(nsColor: textNS) }
 
-    /// One colour per timetable kind. At chip size the colour is read before
-    /// the word, so the seven stay apart while still sitting quietly on the
-    /// leather - one bright palette per kind would turn the day into a
-    /// highlighter.
-    static func slotColor(_ kind: SlotKind) -> Color { Color(nsColor: slotNSColor(kind)) }
+    /// A tag owns its colour - the built-ins ship with one, the user may
+    /// change it or invent a tag. At chip size the colour is read before the
+    /// word, which is why it lives in the tag and not in the theme.
+    static func tagColor(_ tag: SlotTag?) -> Color {
+        guard let tag, let rgb = tag.rgb else { return text.opacity(0.4) }
+        return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue)
+    }
 
     /// The one warning tone: the tomato's brick, so an error already belongs
     /// to the palette instead of a system red dropped into it.
     static var warning: Color { Color(nsColor: tomatoDeepNS) }
 
-    static func slotNSColor(_ kind: SlotKind) -> NSColor {
-        switch kind {
-        case .deepWork: return NSColor(calibratedRed: 0.82, green: 0.66, blue: 0.36, alpha: 1)
-        case .journal: return NSColor(calibratedRed: 0.47, green: 0.69, blue: 0.66, alpha: 1)
-        case .admin: return NSColor(calibratedRed: 0.53, green: 0.64, blue: 0.80, alpha: 1)
-        case .learn: return NSColor(calibratedRed: 0.67, green: 0.57, blue: 0.78, alpha: 1)
-        case .body: return NSColor(calibratedRed: 0.58, green: 0.71, blue: 0.49, alpha: 1)
-        case .rest: return NSColor(calibratedRed: 0.71, green: 0.62, blue: 0.53, alpha: 1)
-        case .personal: return NSColor(calibratedRed: 0.76, green: 0.55, blue: 0.55, alpha: 1)
-        }
-    }
     static var gold: Color { Color(nsColor: goldNS) }
     static var hairline: Color { Color(nsColor: hairlineNS) }
 
@@ -402,6 +393,7 @@ final class GrannyViewModel: ObservableObject {
     @Published var rhythm: RhythmReport?
     /// The timetable, for the hour chip on each task.
     @Published var slots: [ScheduleSlot] = []
+    @Published var tags: [SlotTag] = []
 
     func refresh(from context: GrannyContext) {
         tasks = context.store.state.tasks
@@ -411,6 +403,7 @@ final class GrannyViewModel: ObservableObject {
         allTicked = context.store.state.allDone && !context.store.state.paid
         rhythm = context.rhythmReport
         slots = context.schedule.sorted
+        tags = context.tags
     }
 }
 
@@ -1130,7 +1123,9 @@ struct TaskListView: View {
                 Button(GrannyLines.slotClear) { onAssignSlot(task.id, nil) }
             }
         } label: {
-            let tone = slot.map { GrannyTheme.slotColor($0.kind) } ?? GrannyTheme.text.opacity(0.35)
+            let tone = slot.flatMap { slot in
+                viewModel.tags.first { $0.id == slot.tag }
+            }.map(GrannyTheme.tagColor) ?? GrannyTheme.text.opacity(0.35)
             Text(slot?.time ?? "—")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(tone)
@@ -1346,5 +1341,18 @@ struct TaskEditorView: View {
                 elaborating = false
             }
         }
+    }
+}
+
+extension Color {
+    /// "#RRGGBB" for the config, through sRGB so the value survives the round
+    /// trip back into `SlotTag.rgb`.
+    var hexString: String {
+        guard let rgb = NSColor(self).usingColorSpace(.sRGB) else { return "#000000" }
+        return String(
+            format: "#%02X%02X%02X",
+            Int((rgb.redComponent * 255).rounded()),
+            Int((rgb.greenComponent * 255).rounded()),
+            Int((rgb.blueComponent * 255).rounded()))
     }
 }

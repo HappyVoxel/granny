@@ -61,6 +61,9 @@ public struct GrannyConfig: Codable, Sendable {
     /// The user's own day: the hours granny nudges against. Empty until they
     /// write one.
     public var schedule: [ScheduleSlot]
+    /// The colours and names of the hours. The seven built-ins are the seed;
+    /// a user may recolour, rename or add to them.
+    public var tags: [SlotTag]
 
     public init(
         openRouterKey: String? = nil,
@@ -91,7 +94,8 @@ public struct GrannyConfig: Codable, Sendable {
         contextHosts: [String] = GrannyConfig.defaultContextHosts,
         alwaysAllowedURLPrefixes: [String] = GrannyConfig.defaultAlwaysAllowedPrefixes,
         entertainmentApps: [String] = GrannyConfig.defaultEntertainmentApps,
-        schedule: [ScheduleSlot] = []
+        schedule: [ScheduleSlot] = [],
+        tags: [SlotTag] = SlotTag.defaults
     ) {
         self.openRouterKey = openRouterKey
         self.model = model
@@ -122,6 +126,7 @@ public struct GrannyConfig: Codable, Sendable {
         self.alwaysAllowedURLPrefixes = alwaysAllowedURLPrefixes
         self.entertainmentApps = entertainmentApps
         self.schedule = schedule
+        self.tags = tags
     }
 
     public static let defaultBlockedDomains = [
@@ -249,6 +254,7 @@ public struct GrannyConfig: Codable, Sendable {
         alwaysAllowedURLPrefixes = value(.alwaysAllowedURLPrefixes, d.alwaysAllowedURLPrefixes)
         entertainmentApps = value(.entertainmentApps, d.entertainmentApps)
         schedule = value(.schedule, d.schedule)
+        tags = value(.tags, d.tags)
     }
 
     public static func load(from url: URL = GrannyPaths.configURL) -> GrannyConfig {

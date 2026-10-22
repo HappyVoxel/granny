@@ -96,6 +96,10 @@ public enum GrannyLines {
     public static var scheduleInvalid: String { strings.scheduleInvalid }
     public static var tabTasks: String { strings.tabTasks }
     public static var tabTimetable: String { strings.tabTimetable }
+    public static var tagsTitle: String { strings.tagsTitle }
+    public static var tagAdd: String { strings.tagAdd }
+    public static var tagNamePlaceholder: String { strings.tagNamePlaceholder }
+    public static var tagRemoveHelp: String { strings.tagRemoveHelp }
     public static func slotKindName(_ kind: SlotKind) -> String {
         strings.slotKindName(kind: kind)
     }
