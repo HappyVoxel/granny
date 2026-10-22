@@ -158,7 +158,9 @@ public final class StateStore {
     /// initializer runs. The app drains it on its first tick.
     public private(set) var pendingStreakEvent: StreakEvent?
     private let url: URL
-    private let calendar: Calendar
+    /// The calendar every date in the store is computed with - the rollover's
+    /// dates, the log's window and the clock time of a first round alike.
+    public let calendar: Calendar
     /// The day log, beside the state file. Its own parameter so a test store
     /// never appends to a path shared with another one.
     public let logURL: URL
@@ -188,7 +190,7 @@ public final class StateStore {
     public func rhythm(days limit: Int = 7) -> RhythmReport? {
         // The log is one line a day, so reading all of it is cheap; the window
         // is the report's job, not the read's.
-        weeklyRhythm(RhythmLog.read(logURL, limit: .max), limit: limit)
+        weeklyRhythm(RhythmLog.read(logURL, limit: .max), now: Date(), calendar: calendar, limit: limit)
     }
 
     /// Rolls the day over and banks yesterday's streak. The chain grows on a

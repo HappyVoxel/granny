@@ -51,7 +51,7 @@ final class ServePomodoro {
         let next = store.state.pomodoro.advanced(config.pomodoro)
         store.update { state in
             state.pomodoro = next
-            if over == .deepWork { state.markFirstRound() }
+            if over == .deepWork { state.markFirstRound(calendar: store.calendar) }
         }
         running = next.stage != .deepWork
         self.deadline = running

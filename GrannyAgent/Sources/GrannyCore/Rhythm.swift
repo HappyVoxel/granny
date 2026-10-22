@@ -53,6 +53,19 @@ public struct RhythmDay: Codable, Sendable, Equatable {
         }
         return hour * 60 + minute
     }
+
+    // Hand-rolled like `TaskItem`: the log is append-only, so a field added
+    // later must decode old lines with its default instead of throwing them
+    // away - a synthesized decoder would erase the whole history.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decode(String.self, forKey: .date)
+        firstRound = try c.decodeIfPresent(String.self, forKey: .firstRound)
+        rounds = try c.decodeIfPresent(Int.self, forKey: .rounds) ?? 0
+        tasksDone = try c.decodeIfPresent(Int.self, forKey: .tasksDone) ?? 0
+        tasksOpen = try c.decodeIfPresent(Int.self, forKey: .tasksOpen) ?? 0
+        dayOff = try c.decodeIfPresent(Bool.self, forKey: .dayOff) ?? false
+    }
 }
 
 /// The day log: JSON lines, written once per rollover.
@@ -68,15 +81,17 @@ public enum RhythmLog {
         data.append(0x0A)
         try? FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let handle = try? FileHandle(forWritingTo: url) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: data)
-        } else {
+        if !FileManager.default.fileExists(atPath: url.path) {
             try? data.write(to: url)
             try? FileManager.default.setAttributes(
                 [.posixPermissions: 0o600], ofItemAtPath: url.path)
+        } else if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
         }
+        // A log that exists but cannot be opened loses this line, never the
+        // history: only the create path writes the file whole.
     }
 
     /// The newest `limit` days. Unreadable lines are skipped rather than
@@ -125,8 +140,17 @@ public func weeklyRhythm(
     let recent = days.filter { $0.date >= from && $0.date < until }
     guard recent.count >= 3 else { return nil }
     let starts = recent.compactMap(\.firstRoundMinute)
+    // At most `limit` days, but the window starts where the log does: a
+    // three-day-old install must not read as four skipped days.
+    let oldest = days.map(\.date).min()
+    let span = oldest.map { oldestDate in
+        (1...limit).first { ago in
+            let edge = calendar.date(byAdding: .day, value: -ago, to: now) ?? now
+            return oldestDate >= dayString(edge, calendar: calendar)
+        } ?? limit
+    } ?? limit
     return RhythmReport(
-        days: limit,
+        days: span,
         started: starts.count,
         spreadMinutes: starts.count >= 2 ? (starts.max() ?? 0) - (starts.min() ?? 0) : nil)
 }

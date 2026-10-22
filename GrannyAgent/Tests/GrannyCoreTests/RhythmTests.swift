@@ -72,6 +72,35 @@ final class RhythmTests: XCTestCase {
         XCTAssertEqual(RhythmLog.read(log), [good])
     }
 
+    /// An append-only file must survive its own growth: a line written before
+    /// a field existed decodes with that field's default instead of taking the
+    /// whole history with it.
+    func testOldLinesDecodeWithDefaults() {
+        try? "{\"date\":\"2026-03-01\"}\n".write(to: log, atomically: true, encoding: .utf8)
+        let days = RhythmLog.read(log)
+        XCTAssertEqual(days.count, 1)
+        XCTAssertEqual(days.first?.rounds, 0)
+        XCTAssertEqual(days.first?.tasksDone, 0)
+        XCTAssertEqual(days.first?.tasksOpen, 0)
+        XCTAssertEqual(days.first?.dayOff, false)
+        XCTAssertNil(days.first?.firstRound)
+    }
+
+    /// The log is the only cross-day memory: a log it cannot open must lose
+    /// the new line, never the history.
+    func testAppendKeepsHistoryWhenTheLogCannotBeOpened() {
+        RhythmLog.append(day(-2, rounds: 1), to: log)
+        let before = try? String(contentsOf: log, encoding: .utf8)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o400], ofItemAtPath: log.path)
+
+        RhythmLog.append(day(-1, rounds: 9), to: log)
+
+        XCTAssertEqual(try? String(contentsOf: log, encoding: .utf8), before)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: log.path)
+    }
+
     func testReadKeepsTheNewest() {
         for index in 1...9 {
             RhythmLog.append(day(-index, rounds: index), to: log)
@@ -93,10 +122,15 @@ final class RhythmTests: XCTestCase {
             day(-4, firstRound: "11:05", rounds: 3),
         ]
         let report = report(days)
-        XCTAssertEqual(report?.days, 7)
+        XCTAssertEqual(report?.days, 4, "four logged days, four days back from yesterday")
         XCTAssertEqual(report?.started, 3)
         // 08:41 .. 11:05 is 2h24.
         XCTAssertEqual(report?.spreadMinutes, 144)
+    }
+
+    func testYoungLogDoesNotClaimAWeek() {
+        let report = report([day(-1), day(-2, firstRound: "08:00"), day(-3)])
+        XCTAssertEqual(report?.days, 3, "a three-day-old log has not seen seven days")
     }
 
     func testReportWithOneStartHasNoSpread() {
@@ -155,7 +189,7 @@ final class RhythmTests: XCTestCase {
             RhythmLog.append(
                 day(-offset, firstRound: "0\(offset):00", rounds: 1), to: store.logURL)
         }
-        XCTAssertEqual(store.rhythm()?.days, 7)
+        XCTAssertEqual(store.rhythm()?.days, 4)
         XCTAssertEqual(store.rhythm()?.started, 4)
         // 01:00 .. 04:00.
         XCTAssertEqual(store.rhythm()?.spreadMinutes, 180)

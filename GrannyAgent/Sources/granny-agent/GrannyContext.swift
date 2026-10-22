@@ -578,17 +578,17 @@ final class GrannyContext {
         }
         mutate { state in
             state.pomodoro = next
-            if over == .deepWork { state.markFirstRound() }
+            if over == .deepWork { state.markFirstRound(calendar: store.calendar) }
         }
         // The bell first: it is the part that has to work with the window
         // behind another app or the screen asleep.
         if over == .deepWork {
             chime.breakTime()
             // The break lifts the block: the line says what to do with it,
-            // and when the door closes again. Unless that round was the last
-            // thing the day was waiting for - then the reward is the news,
-            // and nothing else would announce it.
-            announce(store.state.rewarded
+            // and when the door closes again. Only the round that first paid
+            // the day says "go play" - every later round is a break again,
+            // and nothing else would announce the reward.
+            announce(store.state.rewarded && store.state.pomodoro.finished == 1
                 ? GrannyLines.reward(bedtime: config.bedtimeHour)
                 : GrannyLines.pomodoroBreakLine(minutes: minutes))
         } else {
