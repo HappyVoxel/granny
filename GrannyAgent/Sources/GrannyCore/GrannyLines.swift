@@ -94,6 +94,9 @@ public enum GrannyLines {
     public static var slotAssignHelp: String { strings.slotAssignHelp }
     public static var slotClear: String { strings.slotClear }
     public static var scheduleInvalid: String { strings.scheduleInvalid }
+    public static var rhythmTitle: String { strings.rhythmTitle }
+    public static var rhythmSubtitle: String { strings.rhythmSubtitle }
+    public static var rhythmEmpty: String { strings.rhythmEmpty }
     public static func slotKindName(_ kind: SlotKind) -> String {
         strings.slotKindName(kind: kind)
     }

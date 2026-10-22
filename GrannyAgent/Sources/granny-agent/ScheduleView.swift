@@ -105,6 +105,9 @@ struct ScheduleView: View {
 
     private func row(_ index: Int) -> some View {
         HStack(spacing: 10) {
+            Circle()
+                .fill(GrannyTheme.slotColor(draft[index].kind))
+                .frame(width: 8, height: 8)
             TextField(GrannyLines.slotTimePlaceholder, text: $draft[index].time)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -157,7 +160,7 @@ struct ScheduleView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(slot.time)
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(GrannyTheme.gold)
+                            .foregroundStyle(GrannyTheme.slotColor(slot.kind))
                         ForEach(tasks) { task in
                             Text(task.title)
                                 .font(.system(size: 13, design: .serif))

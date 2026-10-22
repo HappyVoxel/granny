@@ -65,6 +65,24 @@ enum GrannyTheme {
         return card
     }
     static var text: Color { Color(nsColor: textNS) }
+
+    /// One colour per timetable kind. At chip size the colour is read before
+    /// the word, so the seven stay apart while still sitting quietly on the
+    /// leather - one bright palette per kind would turn the day into a
+    /// highlighter.
+    static func slotColor(_ kind: SlotKind) -> Color { Color(nsColor: slotNSColor(kind)) }
+
+    static func slotNSColor(_ kind: SlotKind) -> NSColor {
+        switch kind {
+        case .deepWork: return NSColor(calibratedRed: 0.82, green: 0.66, blue: 0.36, alpha: 1)
+        case .journal: return NSColor(calibratedRed: 0.47, green: 0.69, blue: 0.66, alpha: 1)
+        case .admin: return NSColor(calibratedRed: 0.53, green: 0.64, blue: 0.80, alpha: 1)
+        case .learn: return NSColor(calibratedRed: 0.67, green: 0.57, blue: 0.78, alpha: 1)
+        case .body: return NSColor(calibratedRed: 0.58, green: 0.71, blue: 0.49, alpha: 1)
+        case .rest: return NSColor(calibratedRed: 0.71, green: 0.62, blue: 0.53, alpha: 1)
+        case .personal: return NSColor(calibratedRed: 0.76, green: 0.55, blue: 0.55, alpha: 1)
+        }
+    }
     static var gold: Color { Color(nsColor: goldNS) }
     static var hairline: Color { Color(nsColor: hairlineNS) }
 
@@ -1128,14 +1146,15 @@ struct TaskListView: View {
                 Button(GrannyLines.slotClear) { onAssignSlot(task.id, nil) }
             }
         } label: {
+            let tone = slot.map { GrannyTheme.slotColor($0.kind) } ?? GrannyTheme.text.opacity(0.35)
             Text(slot?.time ?? "—")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(slot == nil ? GrannyTheme.text.opacity(0.35) : GrannyTheme.gold)
+                .foregroundStyle(tone)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .stroke(GrannyTheme.gold.opacity(slot == nil ? 0.25 : 0.5), lineWidth: 1))
+                        .stroke(tone.opacity(slot == nil ? 0.7 : 0.6), lineWidth: 1))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

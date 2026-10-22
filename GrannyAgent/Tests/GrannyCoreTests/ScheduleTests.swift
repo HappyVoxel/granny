@@ -68,6 +68,10 @@ final class ScheduleTests: XCTestCase {
         XCTAssertEqual(kindOf(TaskItem(title: "Đi gym")), .body)
         XCTAssertEqual(kindOf(TaskItem(title: "Nộp hồ sơ thuế")), .admin)
         XCTAssertEqual(kindOf(TaskItem(title: "Học thêm một kỹ năng")), .learn)
+        XCTAssertEqual(kindOf(TaskItem(title: "Viết nhật ký")), .journal)
+        XCTAssertEqual(kindOf(TaskItem(title: "Journal before bed")), .journal)
+        XCTAssertEqual(kindOf(TaskItem(title: "Viết feature mới cho granny")), .deepWork,
+                       "one journal word cannot outvote two work words")
         XCTAssertEqual(kindOf(TaskItem(title: "Gọi mẹ")), .deepWork,
                        "no recognisable word lands at the desk, the safer default")
     }

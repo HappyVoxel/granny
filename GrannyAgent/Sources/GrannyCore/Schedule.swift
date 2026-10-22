@@ -10,6 +10,9 @@ public enum SlotKind: String, Codable, Sendable, CaseIterable {
     case rest
     case learn
     case personal
+    /// Writing that is not work: the journal, notes to self, a page of a
+    /// diary. Its own kind because it is neither a task to finish nor rest.
+    case journal
 }
 
 /// One entry of the personal day: "09:00, làm việc - deep work".
@@ -101,8 +104,8 @@ private let kindWords: [SlotKind: [String]] = [
              "đọc", "học", "sách", "ngôn", "ngữ", "bằng", "lái"],
     .body: ["gym", "run", "walk", "workout", "swim", "yoga", "tập", "chạy", "bơi"],
     .rest: ["lunch", "dinner", "breakfast", "break", "eat", "ăn", "trưa", "tối", "nghỉ"],
-    .personal: ["sleep", "shower", "journal", "meditate", "ngủ", "tắm", "vệ", "sinh",
-                "thiền", "nhật", "ký", "kí"],
+    .personal: ["sleep", "shower", "meditate", "ngủ", "tắm", "vệ", "sinh", "thiền"],
+    .journal: ["journal", "diary", "gratitude", "nhật", "ký", "kí", "viết lách"],
 ]
 
 /// Assigns today's tasks to today's slots, in list order: same kind first, a
@@ -126,7 +129,9 @@ public func proposeSlots(for tasks: [TaskItem], in schedule: Schedule) -> [Strin
 
 /// The kinds in the order ties are broken: the desk first, because being
 /// parked at work is the safer mistake.
-private let kindOrder: [SlotKind] = [.deepWork, .admin, .learn, .body, .rest, .personal]
+private let kindOrder: [SlotKind] = [
+    .deepWork, .journal, .admin, .learn, .body, .rest, .personal,
+]
 
 /// The kind whose words the task's title mentions most. A task with no
 /// recognisable word is deep work: the timetable's default hour is the work

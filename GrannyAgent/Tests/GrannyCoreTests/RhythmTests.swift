@@ -155,6 +155,20 @@ final class RhythmTests: XCTestCase {
         XCTAssertEqual(report?.spreadMinutes, 0)
     }
 
+    func testReadingsFollowTheWindow() {
+        let now = Date()
+        let days = [
+            day(-1, firstRound: "08:41"),
+            day(-2),
+            day(-3, firstRound: "10:00"),
+        ]
+        let report = report(days, now: now)
+        XCTAssertEqual(report?.firstRounds.count, 3)
+        XCTAssertEqual(report?.firstRounds.first, 10 * 60, "oldest first")
+        XCTAssertNil(report?.firstRounds[1], "a day with no round has no reading")
+        XCTAssertEqual(report?.firstRounds.last, 8 * 60 + 41)
+    }
+
     func testFirstRoundMinute() {
         XCTAssertEqual(day(-1, firstRound: "08:41").firstRoundMinute, 521)
         XCTAssertEqual(day(-1, firstRound: "00:00").firstRoundMinute, 0)
