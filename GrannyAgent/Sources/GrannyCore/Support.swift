@@ -42,6 +42,13 @@ public func dayString(_ date: Date, calendar: Calendar = .current) -> String {
     return String(format: "%04d-%02d-%02d", comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
 }
 
+/// "HH:mm" in the user's own zone: the day log records a wall-clock time, not
+/// an instant, because the question it answers is "what time did you start".
+public func clockString(_ date: Date, calendar: Calendar = .current) -> String {
+    let comps = calendar.dateComponents([.hour, .minute], from: date)
+    return String(format: "%02d:%02d", comps.hour ?? 0, comps.minute ?? 0)
+}
+
 /// Parses a URL query string. Values are form-decoded: "+" means a space
 /// (URLSearchParams writes spaces that way) and %XX is percent-decoded. A
 /// literal plus arrives as %2B and survives, or model titles would come

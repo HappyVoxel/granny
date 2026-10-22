@@ -79,6 +79,11 @@ public protocol GrannyStrings: Sendable {
     // Day cycle
     var sleepNag: String { get }
     func reward(bedtime: Int) -> String
+    /// Ticked every box without a finished round: the reward is not paid for.
+    var unpaidNudge: String { get }
+    /// The coach's one line about the last days. `spread` is a clock distance
+    /// ("1h45") and nil when too few days have a first round to compare.
+    func rhythmLine(days: Int, started: Int, spread: String?) -> String
     func dayOffConfirm() -> String
     var dayOffDone: String { get }
     var dayOffCancelled: String { get }
@@ -140,6 +145,7 @@ public protocol GrannyStrings: Sendable {
     var statusAwaiting: String { get }
     var statusWorking: String { get }
     var statusRewarded: String { get }
+    var statusUnpaid: String { get }
     var statusDayOff: String { get }
     var statusNight: String { get }
 
@@ -330,6 +336,15 @@ public struct EnglishStrings: GrannyStrings {
 
     public var sleepNag: String { "It's late, dear. Off to bed - tomorrow is another day." }
     public func reward(bedtime: Int) -> String { "Good grandchild. Go play, be back before \(bedtime)." }
+    public var unpaidNudge: String {
+        "Ticked boxes aren't work, dear. One finished round and the day is yours."
+    }
+    public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
+        guard let spread else {
+            return "Last \(days) days: a first round on \(started) - too few to see a rhythm."
+        }
+        return "Last \(days) days: a first round on \(started). Start times spread \(spread)."
+    }
     public func dayOffConfirm() -> String { "Are you sure? Granny writes it down. A real day off?" }
     public var dayOffDone: String { "Granny wrote it down. Rest up, dear." }
     public var dayOffCancelled: String {
@@ -402,6 +417,7 @@ public struct EnglishStrings: GrannyStrings {
     public var statusAwaiting: String { "Today's list isn't written yet." }
     public var statusWorking: String { "Working. Granny lets you play when it's all done." }
     public var statusRewarded: String { "All done. Go play, dear." }
+    public var statusUnpaid: String { "Every box ticked, no round yet. Granny is not fooled." }
     public var statusDayOff: String { "Day off today." }
     public var statusNight: String { "It's late. Off to bed, dear." }
 
@@ -615,6 +631,15 @@ public struct VietnameseStrings: GrannyStrings {
 
     public var sleepNag: String { "Muộn rồi cháu. Đi ngủ đi, mai còn làm việc." }
     public func reward(bedtime: Int) -> String { "Tốt lắm cháu. Đi chơi đi, nhớ về trước \(bedtime) giờ." }
+    public var unpaidNudge: String {
+        "Tick ô không phải là làm việc đâu cháu. Xong một round là ngày của cháu."
+    }
+    public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
+        guard let spread else {
+            return "\(days) ngày qua: \(started) ngày có round đầu tiên - chưa đủ để thấy nhịp."
+        }
+        return "\(days) ngày qua: \(started) ngày có round đầu tiên, giờ vào bàn lệch \(spread)."
+    }
     public func dayOffConfirm() -> String { "Chắc chưa? Ngoại ghi sổ đấy. Hôm nay nghỉ thật à?" }
     public var dayOffDone: String { "Ngoại ghi sổ rồi. Nghỉ ngơi đi cháu." }
     public var dayOffCancelled: String {
@@ -687,6 +712,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var statusAwaiting: String { "Chưa nhập danh sách hôm nay." }
     public var statusWorking: String { "Đang làm việc. Xong hết ngoại mới cho chơi." }
     public var statusRewarded: String { "Xong việc rồi. Đi chơi đi cháu." }
+    public var statusUnpaid: String { "Tick hết rồi nhưng chưa có round nào. Ngoại không tin đâu." }
     public var statusDayOff: String { "Hôm nay nghỉ." }
     public var statusNight: String { "Muộn rồi. Đi ngủ đi cháu." }
 
@@ -899,6 +925,15 @@ public struct FinnishStrings: GrannyStrings {
 
     public var sleepNag: String { "Nyt on myöhä, kulta. Nukkumaan - huomenna on taas päivä." }
     public func reward(bedtime: Int) -> String { "Hyvä kulta. Mene leikkimään, palaa ennen kello \(bedtime)." }
+    public var unpaidNudge: String {
+        "Rastit eivät ole työtä, kulta. Yksi valmis kierros ja päivä on sinun."
+    }
+    public func rhythmLine(days: Int, started: Int, spread: String?) -> String {
+        guard let spread else {
+            return "Viimeiset \(days) päivää: ensimmäinen kierros \(started) päivänä - liian vähän rytmin näkemiseen."
+        }
+        return "Viimeiset \(days) päivää: ensimmäinen kierros \(started) päivänä. Aloitusajat hajallaan \(spread)."
+    }
     public func dayOffConfirm() -> String { "Oletko varma? Mummo kirjaa sen ylös. Oikeasti vapaapäivä?" }
     public var dayOffDone: String { "Mummo kirjasi sen ylös. Lepää, kulta." }
     public var dayOffCancelled: String {
@@ -972,6 +1007,7 @@ public struct FinnishStrings: GrannyStrings {
     public var statusAwaiting: String { "Tämän päivän listaa ei ole vielä kirjoitettu." }
     public var statusWorking: String { "Työ kesken. Mummo päästää leikkimään, kun kaikki on valmista." }
     public var statusRewarded: String { "Kaikki valmista. Mene leikkimään, kulta." }
+    public var statusUnpaid: String { "Kaikki rastitettu, ei yhtään kierrosta. Mummo ei mene halpaan." }
     public var statusDayOff: String { "Tänään on vapaapäivä." }
     public var statusNight: String { "On myöhä. Nukkumaan, kulta." }
 

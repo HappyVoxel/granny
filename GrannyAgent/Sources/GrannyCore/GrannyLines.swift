@@ -71,6 +71,10 @@ public enum GrannyLines {
     // Day cycle
     public static var sleepNag: String { strings.sleepNag }
     public static func reward(bedtime: Int) -> String { strings.reward(bedtime: bedtime) }
+    public static var unpaidNudge: String { strings.unpaidNudge }
+    public static func rhythmLine(days: Int, started: Int, spread: String?) -> String {
+        strings.rhythmLine(days: days, started: started, spread: spread)
+    }
     public static func dayOffConfirm() -> String { strings.dayOffConfirm() }
     public static var dayOffDone: String { strings.dayOffDone }
     public static var dayOffCancelled: String { strings.dayOffCancelled }
@@ -139,6 +143,7 @@ public enum GrannyLines {
     public static var statusAwaiting: String { strings.statusAwaiting }
     public static var statusWorking: String { strings.statusWorking }
     public static var statusRewarded: String { strings.statusRewarded }
+    public static var statusUnpaid: String { strings.statusUnpaid }
     public static var statusDayOff: String { strings.statusDayOff }
     public static var statusNight: String { strings.statusNight }
 

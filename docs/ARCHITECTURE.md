@@ -170,9 +170,13 @@ common case and would drown the signal.
   URL/key, optional Langfuse keys, the local API token and port. Missing
   fields fall back to defaults, so old config files never break.
 - State (the day's tasks, day-off flag, greeted flag, the streak with its
-  last chain day, and today's pomodoro counter) lives at
+  last chain day, today's pomodoro counter and the clock time of today's
+  first finished round) lives at
   `~/Library/Application Support/granny/state.json` and rolls over at
-  midnight.
+  midnight. The rollover also appends one line to `state.json.log` beside it
+  (date, first round, rounds, tasks done/open, day off): that append-only log
+  is the only memory granny has across days, and the source of the weekly
+  line.
 - The HTTP decision endpoint binds 127.0.0.1 only and requires the token
   header; the extension's options page holds the same port and token.
 
@@ -243,8 +247,9 @@ common case and would drown the signal.
   first, because the fast classifier cannot write that line and the verdict
   has to read the title/channel. A placeholder title ("YouTube") always asks
   for context instead of deciding.
-- **Streak**: a day banks only when it ends with tasks all done and no frog
-   carried; day off freezes the chain, a day granny never saw breaks it, and
+- **Streak**: a day banks only when it ends with tasks all done, a round
+  paid and no frog carried; day off freezes the chain, a day granny never saw
+  breaks it, and
    the flame shows from two clean days on (Duolingo's first-day flame felt
    like noise next to the frog reminder). Counting happens at rollover, so
    the badge can include today the moment its tasks are done; notifications
@@ -261,6 +266,22 @@ common case and would drown the signal.
   rings three times (one system sound vanishes under music or a meeting), the
   click that answers it silences it, and the banner behind it opens granny at
   the notebook - the tomato is what the click is for.
+- **The reward is paid with a round**: ticked boxes buy nothing. `rewarded`
+  needs every task done *and* one finished deep-work round that day, so a
+  morning of clicking the list - or adding one spare task and ticking it -
+  no longer opens the whole day. That was the gap: the reward cost nothing,
+  so the first thing the day bought was the thing that ended it. One
+  predicate (`DayState.rewarded`) decides the phase, the streak and the
+  reward line, so the four ends cannot disagree; a running break still lifts
+  the block through `blocksEnforced`, unaffected. `firstRoundAt` records when
+  the first round landed, and the rollover writes the finished day to
+  `state.json.log` as append-only JSON lines, deduped by date, unreadable
+  lines skipped. The coach's line is three numbers - days logged, days with a
+  first round, spread between the earliest and the latest start - and it
+  stays silent below three logged days, because one bad morning is not a
+  pattern. Deliberately not a timetable: no slots, no per-task start times,
+  the phase clock stays the schedule and the log measures when you actually
+  sat down.
 - **Loopback is allowed unconditionally**: the rules tier answers
   `localhost` (and `*.localhost`), `127.0.0.0/8`, `::1` and `0.0.0.0` with
   an allow before any phase or allowlist check, so a dev server never

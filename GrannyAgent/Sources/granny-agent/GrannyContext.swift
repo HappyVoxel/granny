@@ -17,6 +17,11 @@ final class GrannyContext {
     /// Set when GitHub reports a newer release; the menu offers the link.
     private(set) var availableUpdate: ReleaseInfo?
 
+    /// The coach's line about the last days, read once at launch and once per
+    /// rollover - the log only grows at midnight, so there is nothing to
+    /// re-read in between.
+    private(set) var rhythmReport: RhythmReport?
+
     private var server: DecisionServer?
     private var killer: AppKiller?
     private var janitor: BrowserJanitor?
@@ -40,6 +45,7 @@ final class GrannyContext {
         GrannyLines.language = config.language
         GrannyTheme.configure(appearance: config.appearance)
         self.store = StateStore()
+        self.rhythmReport = store.rhythm()
         self.trace = TraceClient(config: config.langfuse)
         self.engine = DecisionEngine(config: config, trace: trace)
         self.scheduler = Scheduler(config: config, store: store, engine: engine, block: block, speaker: speaker)
@@ -257,7 +263,9 @@ final class GrannyContext {
         }
         scheduler.tick()
         if store.state.allDone {
-            announce(GrannyLines.reward(bedtime: config.bedtimeHour))
+            announce(store.state.paid
+                ? GrannyLines.reward(bedtime: config.bedtimeHour)
+                : GrannyLines.unpaidNudge)
         }
     }
 
@@ -343,7 +351,9 @@ final class GrannyContext {
             for index in state.tasks.indices { state.tasks[index].done = true }
         }
         scheduler.tick()
-        announce(GrannyLines.reward(bedtime: config.bedtimeHour))
+        announce(store.state.paid
+            ? GrannyLines.reward(bedtime: config.bedtimeHour)
+            : GrannyLines.unpaidNudge)
     }
 
     func setDayOff() {
@@ -566,14 +576,21 @@ final class GrannyContext {
             pomodoroTimer?.invalidate()
             pomodoroTimer = nil
         }
-        mutate { $0.pomodoro = next }
+        mutate { state in
+            state.pomodoro = next
+            if over == .deepWork { state.markFirstRound() }
+        }
         // The bell first: it is the part that has to work with the window
         // behind another app or the screen asleep.
         if over == .deepWork {
             chime.breakTime()
             // The break lifts the block: the line says what to do with it,
-            // and when the door closes again.
-            announce(GrannyLines.pomodoroBreakLine(minutes: minutes))
+            // and when the door closes again. Unless that round was the last
+            // thing the day was waiting for - then the reward is the news,
+            // and nothing else would announce it.
+            announce(store.state.rewarded
+                ? GrannyLines.reward(bedtime: config.bedtimeHour)
+                : GrannyLines.pomodoroBreakLine(minutes: minutes))
         } else {
             chime.backToWork()
             announce(GrannyLines.pomodoroNext(stage: stageName(next.stage), minutes: minutes))
@@ -599,6 +616,8 @@ final class GrannyContext {
         pomodoroRunning = false
         pomodoroRemaining = TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60)
         syncPomodoro()
+        // The rollover just logged yesterday: the line may say something new.
+        rhythmReport = store.rhythm()
     }
 
     private func stageName(_ stage: PomodoroStage) -> String {

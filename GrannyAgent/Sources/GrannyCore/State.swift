@@ -61,6 +61,10 @@ public struct DayState: Codable, Sendable {
     /// Last calendar day in the current chain (clean or frozen). Lets the
     /// next rollover tell a continued chain from a fresh start.
     public var streakDay: String?
+    /// Clock time ("HH:mm") today's first deep-work round finished. The reward
+    /// is paid with a round, and the day log records when it landed - that is
+    /// the "rhythm" granny measures, not how many hours were worked.
+    public var firstRoundAt: String?
 
     public init(
         date: String,
@@ -70,7 +74,8 @@ public struct DayState: Codable, Sendable {
         carried: [TaskItem] = [],
         pomodoro: PomodoroRun = .fresh,
         streak: Int = 0,
-        streakDay: String? = nil
+        streakDay: String? = nil,
+        firstRoundAt: String? = nil
     ) {
         self.date = date
         self.dayOff = dayOff
@@ -80,6 +85,7 @@ public struct DayState: Codable, Sendable {
         self.carried = carried
         self.streak = streak
         self.streakDay = streakDay
+        self.firstRoundAt = firstRoundAt
     }
 
     public static func fresh(date: String) -> DayState {
@@ -88,6 +94,21 @@ public struct DayState: Codable, Sendable {
 
     public var allDone: Bool {
         !tasks.isEmpty && tasks.allSatisfy { $0.done }
+    }
+
+    /// A round was finished today: the day is paid for.
+    public var paid: Bool { pomodoro.finished > 0 }
+
+    /// The reward is earned, not ticked: every task done *and* one finished
+    /// round. A day of ticked boxes with no round is a day of paperwork, and
+    /// it buys nothing - that is the whole rule.
+    public var rewarded: Bool { allDone && paid }
+
+    /// Records the day's first finished round. Later rounds leave it alone:
+    /// the log wants when you sat down, not when you stopped.
+    public mutating func markFirstRound(now: Date = Date(), calendar: Calendar = .current) {
+        guard firstRoundAt == nil else { return }
+        firstRoundAt = clockString(now, calendar: calendar)
     }
 
     /// Writing a task cancels the day off: a day off has no tasks by
@@ -112,6 +133,7 @@ public struct DayState: Codable, Sendable {
         pomodoro = try c.decodeIfPresent(PomodoroRun.self, forKey: .pomodoro) ?? .fresh
         streak = try c.decodeIfPresent(Int.self, forKey: .streak) ?? 0
         streakDay = try c.decodeIfPresent(String.self, forKey: .streakDay)
+        firstRoundAt = try c.decodeIfPresent(String.self, forKey: .firstRoundAt)
     }
 }
 
@@ -124,7 +146,7 @@ public func displayStreak(
 ) -> Int {
     let yesterday = dayString(
         calendar.date(byAdding: .day, value: -1, to: now) ?? now, calendar: calendar)
-    if !state.dayOff, state.allDone, state.streakDay == yesterday {
+    if !state.dayOff, state.rewarded, state.streakDay == yesterday {
         return state.streak + 1
     }
     return state.streak
@@ -137,10 +159,14 @@ public final class StateStore {
     public private(set) var pendingStreakEvent: StreakEvent?
     private let url: URL
     private let calendar: Calendar
+    /// The day log, beside the state file. Its own parameter so a test store
+    /// never appends to a path shared with another one.
+    public let logURL: URL
 
-    public init(url: URL = GrannyPaths.stateURL, calendar: Calendar = .current) {
+    public init(url: URL = GrannyPaths.stateURL, calendar: Calendar = .current, logURL: URL? = nil) {
         self.url = url
         self.calendar = calendar
+        self.logURL = logURL ?? url.appendingPathExtension("log")
         GrannyPaths.ensureDirectories()
         if let data = try? Data(contentsOf: url), let saved = JSON.decode(DayState.self, from: data) {
             self.state = saved
@@ -155,6 +181,14 @@ public final class StateStore {
     public func drainPendingStreakEvent() -> StreakEvent? {
         defer { pendingStreakEvent = nil }
         return pendingStreakEvent
+    }
+
+    /// The coach's reading of the last `limit` logged days, nil until there
+    /// are enough of them to be worth saying.
+    public func rhythm(days limit: Int = 7) -> RhythmReport? {
+        // The log is one line a day, so reading all of it is cheap; the window
+        // is the report's job, not the read's.
+        weeklyRhythm(RhythmLog.read(logURL, limit: .max), limit: limit)
     }
 
     /// Rolls the day over and banks yesterday's streak. The chain grows on a
@@ -189,7 +223,7 @@ public final class StateStore {
             // Day off freezes the chain: no day added, none lost.
             state.streak = old.streak
             state.streakDay = old.date
-        } else if old.allDone {
+        } else if old.rewarded {
             let next = old.streakDay == twoDaysAgo ? old.streak + 1 : 1
             state.streak = next
             state.streakDay = old.date
@@ -197,6 +231,9 @@ public final class StateStore {
         } else if old.streak >= 2 {
             event = .lost(old.streak)
         }
+        // The day is over and nothing will read it again: this line is the
+        // only thing carrying it forward.
+        RhythmLog.append(RhythmDay(old), to: logURL)
         save()
         return event
     }

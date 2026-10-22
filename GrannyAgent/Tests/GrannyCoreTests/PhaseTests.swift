@@ -17,8 +17,12 @@ final class PhaseTests: XCTestCase {
 
     private var config: GrannyConfig { GrannyConfig(wakeHour: 7, bedtimeHour: 23) }
 
-    private func state(tasks: [TaskItem] = [], dayOff: Bool = false) -> DayState {
-        DayState(date: dayString(Date(), calendar: calendar), dayOff: dayOff, tasks: tasks)
+    private func state(tasks: [TaskItem] = [], dayOff: Bool = false, rounds: Int = 0) -> DayState {
+        DayState(
+            date: dayString(Date(), calendar: calendar),
+            dayOff: dayOff,
+            tasks: tasks,
+            pomodoro: PomodoroRun(finished: rounds))
     }
 
     func testEmptyTasksDuringDayAwaitsGreeting() {
@@ -41,14 +45,44 @@ final class PhaseTests: XCTestCase {
 
     func testAllDoneDuringDayIsRewarded() {
         let tasks = [TaskItem(title: "a", done: true)]
-        let phase = computePhase(now: date(hour: 10), config: config, state: state(tasks: tasks), calendar: calendar)
+        let phase = computePhase(
+            now: date(hour: 10), config: config, state: state(tasks: tasks, rounds: 1),
+            calendar: calendar)
         XCTAssertEqual(phase, .rewarded)
         XCTAssertFalse(phase.blocksActive)
     }
 
+    /// The whole rule: ticked boxes buy nothing. A day is paid for with a
+    /// finished round, not with three clicks on the list.
+    func testTickedBoxesWithoutARoundKeepBlocking() {
+        let tasks = [TaskItem(title: "a", done: true), TaskItem(title: "b", done: true)]
+        let phase = computePhase(
+            now: date(hour: 10), config: config, state: state(tasks: tasks, rounds: 0),
+            calendar: calendar)
+        XCTAssertEqual(phase, .working)
+        XCTAssertTrue(phase.blocksActive)
+    }
+
+    func testTodayPaidMeansOneFinishedRound() {
+        var today = state(tasks: [TaskItem(title: "a", done: true)])
+        XCTAssertFalse(today.paid)
+        XCTAssertFalse(today.rewarded)
+        today.pomodoro = PomodoroRun(stage: .shortBreak, finished: 1)
+        XCTAssertTrue(today.paid)
+        XCTAssertTrue(today.rewarded)
+    }
+
+    func testMarkFirstRoundKeepsTheFirst() {
+        var today = state()
+        today.markFirstRound(now: date(hour: 8, minute: 41), calendar: calendar)
+        XCTAssertEqual(today.firstRoundAt, "08:41")
+        today.markFirstRound(now: date(hour: 15, minute: 5), calendar: calendar)
+        XCTAssertEqual(today.firstRoundAt, "08:41")
+    }
+
     func testAllDoneAfterBedtimeIsNight() {
         let tasks = [TaskItem(title: "a", done: true)]
-        XCTAssertEqual(computePhase(now: date(hour: 23, minute: 30), config: config, state: state(tasks: tasks), calendar: calendar), .night)
+        XCTAssertEqual(computePhase(now: date(hour: 23, minute: 30), config: config, state: state(tasks: tasks, rounds: 1), calendar: calendar), .night)
     }
 
     func testDayOffWins() {
