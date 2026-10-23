@@ -110,6 +110,7 @@ public protocol GrannyStrings: Sendable {
     var tagNamePlaceholder: String { get }
     var tagRemoveHelp: String { get }
     var tagColourHelp: String { get }
+    var colourDone: String { get }
     var markAllNeedsRound: String { get }
     var menuRoundStart: String { get }
     var menuRoundPause: String { get }
@@ -403,6 +404,7 @@ public struct EnglishStrings: GrannyStrings {
     public var tagNamePlaceholder: String { "Tag name" }
     public var tagRemoveHelp: String { "Remove the tag" }
     public var tagColourHelp: String { "Change the tag's colour" }
+    public var colourDone: String { "Done" }
     public var markAllNeedsRound: String { "A finished round first, dear - then you can say you're done." }
     public var menuRoundStart: String { "Start" }
     public var menuRoundPause: String { "Pause" }
@@ -740,6 +742,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var tagNamePlaceholder: String { "Tên thẻ" }
     public var tagRemoveHelp: String { "Xoá thẻ" }
     public var tagColourHelp: String { "Đổi màu thẻ" }
+    public var colourDone: String { "Xong" }
     public var markAllNeedsRound: String { "Xong một round đã cháu - rồi mới nói là làm xong." }
     public var menuRoundStart: String { "Bắt đầu" }
     public var menuRoundPause: String { "Dừng" }
@@ -1076,6 +1079,7 @@ public struct FinnishStrings: GrannyStrings {
     public var tagNamePlaceholder: String { "Tagin nimi" }
     public var tagRemoveHelp: String { "Poista tagi" }
     public var tagColourHelp: String { "Vaihda tagin väri" }
+    public var colourDone: String { "Valmis" }
     public var markAllNeedsRound: String { "Ensin yksi valmis kierros, kulta - sitten voit sanoa olevasi valmis." }
     public var menuRoundStart: String { "Aloita" }
     public var menuRoundPause: String { "Tauko" }

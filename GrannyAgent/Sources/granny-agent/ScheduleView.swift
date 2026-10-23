@@ -384,7 +384,30 @@ final class TagColourPanel: NSObject, ObservableObject {
         panel.color = current
         panel.setTarget(self)
         panel.setAction(#selector(read(_:)))
+        // The panel applies as the picker moves; a Done button is the way out
+        // of it, so the panel is not the one window with no closing verb.
+        panel.accessoryView = Self.doneView(target: self)
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func close() {
+        NSColorPanel.shared.orderOut(nil)
+    }
+
+    private static func doneView(target: AnyObject) -> NSView {
+        let bar = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 40))
+        bar.autoresizingMask = [.width]
+        let button = NSButton(
+            title: GrannyLines.colourDone, target: target, action: #selector(close))
+        button.bezelStyle = .rounded
+        button.keyEquivalent = "\r"
+        button.sizeToFit()
+        button.frame.origin = NSPoint(
+            x: bar.bounds.maxX - button.frame.width - 12,
+            y: (bar.bounds.height - button.frame.height) / 2)
+        button.autoresizingMask = [.minXMargin, .minYMargin]
+        bar.addSubview(button)
+        return bar
     }
 
     @objc private func read(_ sender: NSColorPanel) {

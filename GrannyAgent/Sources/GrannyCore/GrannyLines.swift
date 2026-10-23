@@ -101,6 +101,7 @@ public enum GrannyLines {
     public static var tagNamePlaceholder: String { strings.tagNamePlaceholder }
     public static var tagRemoveHelp: String { strings.tagRemoveHelp }
     public static var tagColourHelp: String { strings.tagColourHelp }
+    public static var colourDone: String { strings.colourDone }
     public static var markAllNeedsRound: String { strings.markAllNeedsRound }
     public static var menuRoundStart: String { strings.menuRoundStart }
     public static var menuRoundPause: String { strings.menuRoundPause }
