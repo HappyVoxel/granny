@@ -74,9 +74,6 @@ enum GrannyTheme {
         return Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue)
     }
 
-    /// The one warning tone: the tomato's brick, so an error already belongs
-    /// to the palette instead of a system red dropped into it.
-    static var warning: Color { Color(nsColor: tomatoDeepNS) }
 
     static var gold: Color { Color(nsColor: goldNS) }
     static var hairline: Color { Color(nsColor: hairlineNS) }

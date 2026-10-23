@@ -18,6 +18,8 @@ struct ScheduleView: View {
     @StateObject private var colourPicker = TagColourPanel()
     /// The slot whose tag menu is open.
     @State private var tagMenuSlot: String?
+    /// The field the keyboard is in, by slot id.
+    @FocusState private var focusedField: String?
 
     init(
         initial: [ScheduleSlot],
@@ -96,9 +98,7 @@ struct ScheduleView: View {
             .frame(maxHeight: 460)
 
             Button {
-                draft.append(ScheduleSlot(
-                    time: nextTime(), label: "",
-                    tag: tags.first?.id ?? SlotKind.deepWork.rawValue))
+                addSlot()
             } label: {
                 Text("+ " + GrannyLines.scheduleAdd)
                     .font(.system(size: 13, design: .serif))
@@ -130,9 +130,15 @@ struct ScheduleView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 14, design: .serif))
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .focused($focusedField, equals: draft[index].id)
                 .onChange(of: draft[index].label) { _, label in
                     classify(index, label: label)
                 }
+                // Typing the name is the whole job: finish the row with the
+                // keyboard and start the next one, exactly as "+ Add a slot"
+                // would, so the day can be written without the mouse.
+                .onSubmit { commit(index) }
+                .onKeyPress(.tab) { commit(index) ? .handled : .ignored }
             Button {
                 tagMenuSlot = draft[index].id
             } label: {
@@ -180,6 +186,27 @@ struct ScheduleView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .grannyCard(cornerRadius: 8)
+    }
+
+    /// Finishes the row and opens the next hour: the fast path is writing a
+    /// day, not adding empty rows by hand.
+    @discardableResult
+    private func commit(_ index: Int) -> Bool {
+        guard draft.indices.contains(index) else { return false }
+        let label = draft[index].label.trimmingCharacters(in: .whitespaces)
+        guard !label.isEmpty, draft[index].minute != nil else { return false }
+        draft[index].label = label
+        classify(index, label: label)
+        addSlot()
+        return true
+    }
+
+    private func addSlot() {
+        let slot = ScheduleSlot(
+            time: nextTime(), label: "",
+            tag: tags.first?.id ?? SlotKind.deepWork.rawValue)
+        draft.append(slot)
+        focusedField = slot.id
     }
 
     /// Typing the name picks the kind: granny reads the words and moves the
@@ -337,7 +364,7 @@ struct ScheduleView: View {
             if !valid {
                 Text(GrannyLines.scheduleInvalid)
                     .font(.caption2)
-                    .foregroundStyle(GrannyTheme.warning.opacity(0.9))
+                    .foregroundStyle(GrannyTheme.gold.opacity(0.8))
             }
             Spacer()
             Button(GrannyLines.cancelButton) { onCancel() }
