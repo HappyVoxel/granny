@@ -229,6 +229,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+        addRoundRow(to: menu)
+        menu.addItem(.separator())
         let (state, phase) = context.snapshot()
         let streak = displayStreak(state: state)
         let title = "\(GrannyLines.statusPrefix): \(phase.rawValue)\(state.dayOff ? " \(GrannyLines.dayOffTag)" : "")\(streak >= 2 ? " · 🔥 \(streak)" : "")"
@@ -257,6 +259,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: GrannyLines.menuQuit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    }
+
+    /// The tomato at the top of the menu: starting a round should not cost
+    /// opening the notebook first.
+    private func addRoundRow(to menu: NSMenu) {
+        let viewModel = context.viewModel
+        let row = MenuRoundView(
+            width: 280,
+            stage: viewModel.pomodoroStage,
+            index: viewModel.pomodoroIndex,
+            remaining: viewModel.pomodoroRemaining,
+            total: viewModel.pomodoroTotal,
+            running: viewModel.pomodoroRunning,
+            onToggle: { [weak self] in
+                self?.context.togglePomodoro()
+                self?.statusItem?.menu?.cancelTracking()
+            })
+        let item = NSMenuItem()
+        item.view = row
+        menu.addItem(item)
     }
 
     private func add(_ menu: NSMenu, _ title: String, _ action: Selector, _ key: String) {

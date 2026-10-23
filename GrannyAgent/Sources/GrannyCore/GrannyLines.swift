@@ -102,6 +102,8 @@ public enum GrannyLines {
     public static var tagRemoveHelp: String { strings.tagRemoveHelp }
     public static var tagColourHelp: String { strings.tagColourHelp }
     public static var markAllNeedsRound: String { strings.markAllNeedsRound }
+    public static var menuRoundStart: String { strings.menuRoundStart }
+    public static var menuRoundPause: String { strings.menuRoundPause }
     public static func slotKindName(_ kind: SlotKind) -> String {
         strings.slotKindName(kind: kind)
     }
