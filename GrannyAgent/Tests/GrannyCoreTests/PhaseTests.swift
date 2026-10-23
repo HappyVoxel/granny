@@ -84,6 +84,19 @@ final class PhaseTests: XCTestCase {
         XCTAssertTrue(open.paidThisRound)
     }
 
+    func testABlockGuessedFromTheUrlAsksForTheTitleFirst() {
+        let block = Decision(.block, message: "go away", reason: "laya block", source: "laya")
+        let asked = askingForContextInstead(block, hasContentSignal: false)
+        XCTAssertEqual(asked.action, .needContext)
+        XCTAssertEqual(asked.source, "laya", "the trace still says which tier guessed")
+        XCTAssertEqual(askingForContextInstead(block, hasContentSignal: true).action, .block,
+                       "a block with the title in hand is a verdict")
+
+        let allow = Decision(.allow, reason: "fine", source: "laya")
+        XCTAssertEqual(askingForContextInstead(allow, hasContentSignal: false).action, .allow,
+                       "only the dead end pays the extra round trip")
+    }
+
     func testUnpaidTicksAreRefused() {
         var unpaid = state(tasks: [TaskItem(title: "a", done: true), TaskItem(title: "b", done: true)])
         XCTAssertTrue(unpaid.refuseUnpaidTicks())
