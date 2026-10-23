@@ -197,6 +197,17 @@ public actor DecisionEngine {
         // short or a game is not audio.
         final = Self.nightVoice(Self.focusAudioRelief(final, context: context), phase: phase)
 
+        // A block guessed from the URL alone is the expensive kind of wrong:
+        // a documentation page looks like a feed to a classifier that cannot
+        // see it, and the user is left staring at an overlay on a page they
+        // opened to learn from. Ask for the title instead - the extension
+        // waits for it and re-asks with force. Allow and warn pass as they
+        // always did: only the dead end pays the extra round trip.
+        if decision != nil, !force, !isContextHost(context.url) {
+            final = askingForContextInstead(
+                final, hasContentSignal: context.hasContentSignal)
+        }
+
         // A verdict judged on a placeholder title ("YouTube") or none at all
         // must not be cached: it would stick the URL to that verdict for the
         // rest of the day, overlays included. The extension re-asks once the
@@ -348,4 +359,19 @@ public actor DecisionEngine {
             startedAt: Date(),
             endedAt: Date()))
     }
+}
+
+/// A block guessed without the page's title is not a verdict, it is a guess -
+/// and the expensive kind of wrong, because a documentation page looks like a
+/// feed to a classifier that cannot see it. Ask for context instead; the
+/// extension waits for the title and re-asks with force. Allow and warn pass
+/// untouched: only the dead end pays the extra round trip.
+public func askingForContextInstead(
+    _ decision: Decision, hasContentSignal: Bool
+) -> Decision {
+    guard decision.action == .block, !hasContentSignal else { return decision }
+    return Decision(
+        .needContext,
+        reason: "blocked on a URL alone: asked for the title first",
+        source: decision.source)
 }

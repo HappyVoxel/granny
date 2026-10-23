@@ -298,6 +298,16 @@ common case and would drown the signal.
   disagreement. Late is never punished retroactively; the day log carries it,
   and the weekly line is where the pattern shows.
 
+- **A block guessed from the URL alone asks for the title**: the extension
+  intercepts at navigation start, before the page has a `<title>`, so a
+  classifier that can only see the host and path decides blind. Documentation
+  reads like a feed to it - mastra.ai/docs was blocked at 0.62 confidence while
+  the same URL with its title was allowed as technical documentation. When a
+  model tier answers `block` with no content signal, the engine answers
+  `need-context` instead and the extension re-asks once the title lands (it
+  already had that path for YouTube). Allow and warn keep the fast path; only
+  the dead end pays the extra round trip, and such a verdict is never cached.
+
 - **Loopback is allowed unconditionally**: the rules tier answers
   `localhost` (and `*.localhost`), `127.0.0.0/8`, `::1` and `0.0.0.0` with
   an allow before any phase or allowlist check, so a dev server never
