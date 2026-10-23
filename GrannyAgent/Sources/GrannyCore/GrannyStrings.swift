@@ -111,6 +111,8 @@ public protocol GrannyStrings: Sendable {
     var tagRemoveHelp: String { get }
     var tagColourHelp: String { get }
     var markAllNeedsRound: String { get }
+    var menuRoundStart: String { get }
+    var menuRoundPause: String { get }
     func slotKindName(kind: SlotKind) -> String
     /// What granny says when a slot with work pinned to it comes round.
     func slotCue(time: String, task: String) -> String
@@ -402,6 +404,8 @@ public struct EnglishStrings: GrannyStrings {
     public var tagRemoveHelp: String { "Remove the tag" }
     public var tagColourHelp: String { "Change the tag's colour" }
     public var markAllNeedsRound: String { "A finished round first, dear - then you can say you're done." }
+    public var menuRoundStart: String { "Start" }
+    public var menuRoundPause: String { "Pause" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -737,6 +741,8 @@ public struct VietnameseStrings: GrannyStrings {
     public var tagRemoveHelp: String { "Xoá thẻ" }
     public var tagColourHelp: String { "Đổi màu thẻ" }
     public var markAllNeedsRound: String { "Xong một round đã cháu - rồi mới nói là làm xong." }
+    public var menuRoundStart: String { "Bắt đầu" }
+    public var menuRoundPause: String { "Dừng" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Deep work"
@@ -1071,6 +1077,8 @@ public struct FinnishStrings: GrannyStrings {
     public var tagRemoveHelp: String { "Poista tagi" }
     public var tagColourHelp: String { "Vaihda tagin väri" }
     public var markAllNeedsRound: String { "Ensin yksi valmis kierros, kulta - sitten voit sanoa olevasi valmis." }
+    public var menuRoundStart: String { "Aloita" }
+    public var menuRoundPause: String { "Tauko" }
     public func slotKindName(kind: SlotKind) -> String {
         switch kind {
         case .deepWork: return "Syvä työ"
