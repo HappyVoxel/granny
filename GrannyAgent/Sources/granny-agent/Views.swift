@@ -786,13 +786,20 @@ struct GreetingView: View {
                                     .foregroundStyle(GrannyTheme.gold)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            // A day of old work is a click, not a retyped list.
-                            Button(GrannyLines.eatFrogsButton) { onEatFrogs() }
-                                .buttonStyle(.plain)
-                                .font(.system(size: 12, weight: .semibold, design: .serif))
-                                .foregroundStyle(GrannyTheme.gold)
-                                .pointingHandOnHover()
-                                .padding(.leading, 21)
+                            // A day of old work is a click, not a retyped list:
+                            // a bordered button, because a line of gold text
+                            // reads as one more sentence.
+                            Button {
+                                onEatFrogs()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text("🍽").font(.system(size: 11))
+                                    Text(GrannyLines.eatFrogsButton(count: carried.count))
+                                }
+                            }
+                            .buttonStyle(GrannySecondaryButtonStyle())
+                            .pointingHandOnHover()
+                            .padding(.leading, 21)
                         }
                         .padding(.top, 2)
                     }
