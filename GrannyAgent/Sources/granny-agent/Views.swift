@@ -1092,14 +1092,40 @@ struct TaskListView: View {
                     .keyboardShortcut(.cancelAction)
                     .pointingHandOnHover()
                 }
-                TextField(GrannyLines.taskDetailPlaceholder, text: $newDetail, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .serif))
-                    .foregroundStyle(GrannyTheme.text.opacity(0.85))
-                    .tint(GrannyTheme.gold)
-                    .lineLimit(1...4)
-                    .padding(7)
-                    .grannyCard(cornerRadius: 4)
+                    // A TextField with a vertical axis still submits on
+                    // Return; notes need real newlines, so this is an editor.
+                    TextEditor(text: $newDetail)
+                        .font(.system(size: 12, design: .serif))
+                        .foregroundStyle(GrannyTheme.text.opacity(0.9))
+                        .tint(GrannyTheme.gold)
+                        .lineSpacing(3)
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 62)
+                        .padding(7)
+                        .grannyCard(cornerRadius: 4)
+                        .overlay(alignment: .topLeading) {
+                            if newDetail.isEmpty {
+                                Text(GrannyLines.taskDetailPlaceholder)
+                                    .font(.system(size: 12, design: .serif))
+                                    .foregroundStyle(GrannyTheme.text.opacity(0.35))
+                                    .padding(.leading, 12)
+                                    .padding(.top, 10)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .onChange(of: newDetail) { _, value in
+                            // Enter after a bullet continues the list; on a
+                            // plain line it is just a new line. Notes are
+                            // notes, not a list with rules.
+                            guard value.hasSuffix("\n") else { return }
+                            let finished = value.dropLast()
+                                .split(separator: "\n", omittingEmptySubsequences: false)
+                                .last.map(String.init) ?? ""
+                            let trimmed = finished.trimmingCharacters(in: .whitespaces)
+                            if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
+                                newDetail = value + TaskParser.bullet
+                            }
+                        }
                 }
             } else {
                 Button {
@@ -1308,6 +1334,18 @@ struct TaskEditorView: View {
                     .frame(height: 76)
                     .padding(6)
                     .grannyCard(cornerRadius: 4)
+                    .onChange(of: detail) { _, value in
+                        // Same rule as the quick-add field: a bullet continues
+                        // itself, anything else just takes the new line.
+                        guard value.hasSuffix("\n") else { return }
+                        let finished = value.dropLast()
+                            .split(separator: "\n", omittingEmptySubsequences: false)
+                            .last.map(String.init) ?? ""
+                        let trimmed = finished.trimmingCharacters(in: .whitespaces)
+                        if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
+                            detail = value + TaskParser.bullet
+                        }
+                    }
                     .overlay(alignment: .topLeading) {
                         if detail.isEmpty {
                             Text(GrannyLines.taskDetailPlaceholder)
