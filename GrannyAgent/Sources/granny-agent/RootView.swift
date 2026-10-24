@@ -126,9 +126,11 @@ struct GrannyRootView: View {
             viewModel: viewModel,
             onToggle: { [weak context] id in context?.toggle(taskID: id) },
             onMarkAllDone: { [weak context] in context?.markAllDone() },
-            onAdd: { [weak context] text in context?.addTask(text) },
-            onUpdateTask: { [weak context] id, title, purpose, surfaces in
-                context?.updateTask(taskID: id, title: title, purpose: purpose, surfaces: surfaces)
+            onAdd: { [weak context] text, detail in context?.addTask(text, detail: detail) },
+            onUpdateTask: { [weak context] id, title, purpose, detail, surfaces in
+                context?.updateTask(
+                    taskID: id, title: title, purpose: purpose, detail: detail,
+                    surfaces: surfaces)
             },
             onElaborate: { [weak context] title, purpose in
                 await context?.elaboratePurpose(title: title, purpose: purpose) ?? nil

@@ -239,8 +239,19 @@ final class GrannyContext {
     /// (instant feedback), then the same intake brain as the morning list
     /// refines them in place - purpose, allowed surfaces, the lot. New open
     /// work re-locks the door if the day was already rewarded.
-    func addTask(_ text: String) {
-        let naive = TaskParser.parse(text)
+    func addTask(_ text: String, detail: String? = nil) {
+        var naive = TaskParser.parse(text)
+        let notes = detail?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let detailText = (notes?.isEmpty ?? true) ? nil : notes
+        if let detailText, !naive.isEmpty {
+            // The notes belong to the task just written, not to the whole
+            // batch: a quick add is one task.
+            naive = naive.map { task in
+                var copy = task
+                copy.detail = detailText
+                return copy
+            }
+        }
         guard !naive.isEmpty else { return }
         var resumed = false
         mutate { state in
@@ -385,18 +396,22 @@ final class GrannyContext {
     /// rules open the sites the new words need and the purpose matches them.
     /// Whether the user wrote the purpose and the surfaces themselves is
     /// read off the change: an untouched field belongs to the model.
-    func updateTask(taskID: String, title: String, purpose: String?, surfaces: [String]) {
+    func updateTask(
+        taskID: String, title: String, purpose: String?, detail: String?, surfaces: [String]
+    ) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let purposeText = purpose?.trimmingCharacters(in: .whitespacesAndNewlines)
         let original = store.state.tasks.first { $0.id == taskID }
         let purposeEdited = (purposeText ?? "") != (original?.purpose ?? "")
         let surfacesEdited = surfaces != (original?.allowedSurfaces ?? [])
+        let detailText = detail?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         mutate { state in
             guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else { return }
             state.tasks[index].title = trimmed
             state.tasks[index].purpose = (purposeText?.isEmpty ?? true) ? nil : purposeText
+            state.tasks[index].detail = (detailText?.isEmpty ?? true) ? nil : detailText
             state.tasks[index].allowedSurfaces = surfaces
         }
         scheduler.tick()

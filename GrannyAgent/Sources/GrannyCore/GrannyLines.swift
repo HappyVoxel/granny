@@ -103,6 +103,8 @@ public enum GrannyLines {
     public static var tagColourHelp: String { strings.tagColourHelp }
     public static var colourDone: String { strings.colourDone }
     public static var markAllNeedsRound: String { strings.markAllNeedsRound }
+    public static var taskDetailPlaceholder: String { strings.taskDetailPlaceholder }
+    public static var taskDetailLabel: String { strings.taskDetailLabel }
     public static func eatFrogsButton(count: Int) -> String {
         strings.eatFrogsButton(count: count)
     }

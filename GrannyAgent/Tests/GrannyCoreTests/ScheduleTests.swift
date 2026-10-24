@@ -173,6 +173,16 @@ final class ScheduleTests: XCTestCase {
         XCTAssertEqual(proposeSlots(for: tasks, in: schedule).count, 2)
     }
 
+    func testTaskDetailIsOptionalAndSurvivesTheFile() throws {
+        let old = Data(#"{"id":"1","title":"Apply job","done":false}"#.utf8)
+        XCTAssertNil(try JSONDecoder().decode(TaskItem.self, from: old).detail)
+
+        var task = TaskItem(title: "Apply job")
+        task.detail = "CV tailored; portal link in the email"
+        let round = try JSONDecoder().decode(TaskItem.self, from: JSONEncoder().encode(task))
+        XCTAssertEqual(round.detail, task.detail)
+    }
+
     func testSlotSurvivesAnOldStateFile() throws {
         let old = """
         {"id":"1","title":"Apply job","done":false}

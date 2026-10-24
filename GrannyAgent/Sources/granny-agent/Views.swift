@@ -918,8 +918,8 @@ struct TaskListView: View {
     @ObservedObject var viewModel: GrannyViewModel
     var onToggle: (String) -> Void
     var onMarkAllDone: () -> Void
-    var onAdd: (String) -> Void
-    var onUpdateTask: (String, String, String?, [String]) -> Void
+    var onAdd: (String, String?) -> Void
+    var onUpdateTask: (String, String, String?, String?, [String]) -> Void
     var onElaborate: (String, String?) async -> String?
     var onRemove: (String) -> Void
     /// Move a task to another hour of the timetable, or off the timetable.
@@ -929,6 +929,7 @@ struct TaskListView: View {
 
     @State private var adding = false
     @State private var newTask = ""
+    @State private var newDetail = ""
     @State private var editing: TaskItem?
     @FocusState private var addFocused: Bool
 
@@ -995,6 +996,13 @@ struct TaskListView: View {
                                 .foregroundStyle(GrannyTheme.text)
                                 .strikethrough(task.done)
                         }
+                        if let detail = task.detail, !detail.isEmpty {
+                            Text(detail)
+                                .font(.system(size: 11, design: .serif))
+                                .foregroundStyle(GrannyTheme.text.opacity(0.65))
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if let purpose = task.purpose, !purpose.isEmpty {
                             Text(purpose)
                                 .font(.system(size: 11, design: .serif))
@@ -1041,8 +1049,8 @@ struct TaskListView: View {
             .sheet(item: $editing) { task in
                 TaskEditorView(
                     task: task,
-                    onSave: { title, purpose, surfaces in
-                        onUpdateTask(task.id, title, purpose, surfaces)
+                    onSave: { title, purpose, detail, surfaces in
+                        onUpdateTask(task.id, title, purpose, detail, surfaces)
                         editing = nil
                     },
                     onElaborate: onElaborate,
@@ -1057,6 +1065,7 @@ struct TaskListView: View {
             }
 
             if adding {
+                VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     TextField(GrannyLines.addTaskPlaceholder, text: $newTask)
                         .textFieldStyle(.plain)
@@ -1082,6 +1091,15 @@ struct TaskListView: View {
                     .foregroundStyle(GrannyTheme.text.opacity(0.7))
                     .keyboardShortcut(.cancelAction)
                     .pointingHandOnHover()
+                }
+                TextField(GrannyLines.taskDetailPlaceholder, text: $newDetail, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, design: .serif))
+                    .foregroundStyle(GrannyTheme.text.opacity(0.85))
+                    .tint(GrannyTheme.gold)
+                    .lineLimit(1...4)
+                    .padding(7)
+                    .grannyCard(cornerRadius: 4)
                 }
             } else {
                 Button {
@@ -1141,8 +1159,10 @@ struct TaskListView: View {
     private func commitAdd() {
         let text = newTask.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        onAdd(text)
+        let detail = newDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        onAdd(text, detail.isEmpty ? nil : detail)
         newTask = ""
+        newDetail = ""
         adding = false
     }
 
@@ -1196,19 +1216,20 @@ struct TaskListView: View {
 /// re-derived - and a hand-written purpose or surfaces list is left alone.
 struct TaskEditorView: View {
     let task: TaskItem
-    var onSave: (String, String?, [String]) -> Void
+    var onSave: (String, String?, String?, [String]) -> Void
     var onElaborate: (String, String?) async -> String?
     var onCancel: () -> Void
 
     @State private var title: String
     @State private var purpose: String
+    @State private var detail: String
     @State private var surfaces: [String]
     @State private var newSurface = ""
     @State private var elaborating = false
 
     init(
         task: TaskItem,
-        onSave: @escaping (String, String?, [String]) -> Void,
+        onSave: @escaping (String, String?, String?, [String]) -> Void,
         onElaborate: @escaping (String, String?) async -> String?,
         onCancel: @escaping () -> Void
     ) {
@@ -1218,6 +1239,7 @@ struct TaskEditorView: View {
         self.onCancel = onCancel
         _title = State(initialValue: task.title)
         _purpose = State(initialValue: task.purpose ?? "")
+        _detail = State(initialValue: task.detail ?? "")
         _surfaces = State(initialValue: task.allowedSurfaces)
     }
 
@@ -1270,6 +1292,30 @@ struct TaskEditorView: View {
                             ProgressView()
                                 .controlSize(.small)
                                 .padding(.trailing, 8)
+                        }
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(GrannyLines.taskDetailLabel)
+                    .font(.system(size: 11, weight: .semibold, design: .serif))
+                    .tracking(3)
+                    .foregroundStyle(GrannyTheme.gold)
+                TextEditor(text: $detail)
+                    .font(.system(size: 13, design: .serif))
+                    .foregroundStyle(GrannyTheme.text)
+                    .scrollContentBackground(.hidden)
+                    .frame(height: 76)
+                    .padding(6)
+                    .grannyCard(cornerRadius: 4)
+                    .overlay(alignment: .topLeading) {
+                        if detail.isEmpty {
+                            Text(GrannyLines.taskDetailPlaceholder)
+                                .font(.system(size: 12, design: .serif))
+                                .foregroundStyle(GrannyTheme.text.opacity(0.35))
+                                .padding(.leading, 11)
+                                .padding(.top, 12)
+                                .allowsHitTesting(false)
                         }
                     }
             }
@@ -1329,7 +1375,7 @@ struct TaskEditorView: View {
                 Button(GrannyLines.cancelButton) { onCancel() }
                 Button(GrannyLines.settingsSave) {
                     onSave(title.trimmingCharacters(in: .whitespacesAndNewlines),
-                           purpose, surfaces)
+                           purpose, detail, surfaces)
                 }
                 .buttonStyle(GrannyPrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
