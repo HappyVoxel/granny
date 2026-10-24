@@ -115,6 +115,18 @@ public struct DayState: Codable, Sendable {
         firstRoundAt = clockString(now, calendar: calendar)
     }
 
+    /// Yesterday's frogs become today's work without a word typed. Returns
+    /// true when there was something to take, so the caller can open the book.
+    @discardableResult
+    public mutating func takeCarriedFrogs() -> Bool {
+        guard !carried.isEmpty else { return false }
+        cancelDayOff()
+        tasks = carried + tasks
+        carried = []
+        greeted = true
+        return true
+    }
+
     /// "The list is done" with no round behind it is a claim granny refuses -
     /// and she does not keep a tick she refuses to count. Returns true when it
     /// fired, so the caller says why the boxes came back off.

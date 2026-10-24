@@ -134,6 +134,18 @@ final class GrannyContext {
 
     // MARK: - Mutations
 
+    /// The greeting's one-click frog: yesterday's unfinished work becomes
+    /// today's list, no typing required.
+    @discardableResult
+    func eatCarriedFrogs() -> Bool {
+        var taken = false
+        mutate { taken = $0.takeCarriedFrogs() }
+        guard taken else { return false }
+        scheduler.tick()
+        assignSlots()
+        return true
+    }
+
     func markGreeted() {
         mutate { $0.greeted = true }
     }
