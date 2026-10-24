@@ -112,6 +112,7 @@ public protocol GrannyStrings: Sendable {
     var tagColourHelp: String { get }
     var colourDone: String { get }
     var markAllNeedsRound: String { get }
+    var eatFrogsButton: String { get }
     var menuRoundStart: String { get }
     var menuRoundPause: String { get }
     func slotKindName(kind: SlotKind) -> String
@@ -406,6 +407,7 @@ public struct EnglishStrings: GrannyStrings {
     public var tagColourHelp: String { "Change the tag's colour" }
     public var colourDone: String { "Done" }
     public var markAllNeedsRound: String { "A finished round first, dear - then you can say you're done." }
+    public var eatFrogsButton: String { "Eat yesterday's frogs" }
     public var menuRoundStart: String { "Start" }
     public var menuRoundPause: String { "Pause" }
     public func slotKindName(kind: SlotKind) -> String {
@@ -744,6 +746,7 @@ public struct VietnameseStrings: GrannyStrings {
     public var tagColourHelp: String { "Đổi màu thẻ" }
     public var colourDone: String { "Xong" }
     public var markAllNeedsRound: String { "Xong một round đã cháu - rồi mới nói là làm xong." }
+    public var eatFrogsButton: String { "Ăn ếch hôm qua" }
     public var menuRoundStart: String { "Bắt đầu" }
     public var menuRoundPause: String { "Dừng" }
     public func slotKindName(kind: SlotKind) -> String {
@@ -1081,6 +1084,7 @@ public struct FinnishStrings: GrannyStrings {
     public var tagColourHelp: String { "Vaihda tagin väri" }
     public var colourDone: String { "Valmis" }
     public var markAllNeedsRound: String { "Ensin yksi valmis kierros, kulta - sitten voit sanoa olevasi valmis." }
+    public var eatFrogsButton: String { "Syö eilisen sammakot" }
     public var menuRoundStart: String { "Aloita" }
     public var menuRoundPause: String { "Tauko" }
     public func slotKindName(kind: SlotKind) -> String {

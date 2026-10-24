@@ -758,6 +758,8 @@ struct GreetingView: View {
     var onInstallHelper: () -> Void = {}
     var onSave: (String) -> Void
     var onDayOff: () -> Void
+    /// Yesterday's frogs, taken on without typing anything.
+    var onEatFrogs: () -> Void = {}
     @State private var text = TaskParser.bullet
 
     var body: some View {
@@ -776,12 +778,21 @@ struct GreetingView: View {
                         .italic()
                         .foregroundStyle(GrannyTheme.text.opacity(0.55))
                     if !carried.isEmpty {
-                        HStack(alignment: .top, spacing: 7) {
-                            Text("🐸").font(.system(size: 14))
-                            Text(GrannyLines.carryOver(tasks: carried))
-                                .font(.system(size: 12, design: .serif))
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top, spacing: 7) {
+                                Text("🐸").font(.system(size: 14))
+                                Text(GrannyLines.carryOver(tasks: carried))
+                                    .font(.system(size: 12, design: .serif))
+                                    .foregroundStyle(GrannyTheme.gold)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            // A day of old work is a click, not a retyped list.
+                            Button(GrannyLines.eatFrogsButton) { onEatFrogs() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 12, weight: .semibold, design: .serif))
                                 .foregroundStyle(GrannyTheme.gold)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .pointingHandOnHover()
+                                .padding(.leading, 21)
                         }
                         .padding(.top, 2)
                     }

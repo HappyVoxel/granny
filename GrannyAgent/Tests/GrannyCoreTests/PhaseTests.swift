@@ -97,6 +97,23 @@ final class PhaseTests: XCTestCase {
                        "only the dead end pays the extra round trip")
     }
 
+    func testFrogsAreEatenWithoutTypingAnything() {
+        var state = DayState(
+            date: "2026-02-10",
+            dayOff: true,
+            tasks: [TaskItem(title: "today")],
+            carried: [TaskItem(title: "yesterday", carriedOver: true)])
+        XCTAssertTrue(state.takeCarriedFrogs())
+        XCTAssertEqual(state.tasks.map(\.title), ["yesterday", "today"],
+                       "the frogs lead the day, in the order they were written")
+        XCTAssertTrue(state.carried.isEmpty)
+        XCTAssertFalse(state.dayOff, "taking work on cancels the day off")
+
+        var empty = DayState(date: "2026-02-10", tasks: [TaskItem(title: "a")])
+        XCTAssertFalse(empty.takeCarriedFrogs())
+        XCTAssertEqual(empty.tasks.count, 1, "nothing to take, nothing touched")
+    }
+
     func testUnpaidTicksAreRefused() {
         var unpaid = state(tasks: [TaskItem(title: "a", done: true), TaskItem(title: "b", done: true)])
         XCTAssertTrue(unpaid.refuseUnpaidTicks())
