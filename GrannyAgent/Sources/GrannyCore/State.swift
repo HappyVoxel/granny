@@ -7,6 +7,9 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
     public var allowedSurfaces: [String]
     public var done: Bool
     public var carriedOver: Bool
+    /// The user's own notes on the task: the steps, the link, the reason.
+    /// Written by hand - the intake never invents it.
+    public var detail: String?
     /// The slot of the user's timetable this task belongs to. A proposal
     /// granny makes at intake and the user can move: stored, never recomputed,
     /// so the hour cannot drift under the task.
@@ -18,7 +21,8 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
         allowedSurfaces: [String] = [],
         done: Bool = false,
         carriedOver: Bool = false,
-        slotID: String? = nil
+        slotID: String? = nil,
+        detail: String? = nil
     ) {
         self.id = UUID().uuidString
         self.title = title
@@ -27,6 +31,7 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
         self.done = done
         self.carriedOver = carriedOver
         self.slotID = slotID
+        self.detail = detail
     }
 
     // Hand-rolled so a state file written before `carriedOver` existed still
@@ -40,6 +45,7 @@ public struct TaskItem: Codable, Sendable, Equatable, Identifiable {
         done = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
         carriedOver = try c.decodeIfPresent(Bool.self, forKey: .carriedOver) ?? false
         slotID = try c.decodeIfPresent(String.self, forKey: .slotID)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
     }
 }
 
@@ -113,6 +119,18 @@ public struct DayState: Codable, Sendable {
     public mutating func markFirstRound(now: Date = Date(), calendar: Calendar = .current) {
         guard firstRoundAt == nil else { return }
         firstRoundAt = clockString(now, calendar: calendar)
+    }
+
+    /// Yesterday's frogs become today's work without a word typed. Returns
+    /// true when there was something to take, so the caller can open the book.
+    @discardableResult
+    public mutating func takeCarriedFrogs() -> Bool {
+        guard !carried.isEmpty else { return false }
+        cancelDayOff()
+        tasks = carried + tasks
+        carried = []
+        greeted = true
+        return true
     }
 
     /// "The list is done" with no round behind it is a claim granny refuses -

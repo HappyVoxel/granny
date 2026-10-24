@@ -112,6 +112,9 @@ public protocol GrannyStrings: Sendable {
     var tagColourHelp: String { get }
     var colourDone: String { get }
     var markAllNeedsRound: String { get }
+    var taskDetailPlaceholder: String { get }
+    var taskDetailLabel: String { get }
+    func eatFrogsButton(count: Int) -> String
     var menuRoundStart: String { get }
     var menuRoundPause: String { get }
     func slotKindName(kind: SlotKind) -> String
@@ -406,6 +409,11 @@ public struct EnglishStrings: GrannyStrings {
     public var tagColourHelp: String { "Change the tag's colour" }
     public var colourDone: String { "Done" }
     public var markAllNeedsRound: String { "A finished round first, dear - then you can say you're done." }
+    public var taskDetailPlaceholder: String { "Details - steps, links, anything (optional)" }
+    public var taskDetailLabel: String { "DETAILS" }
+    public func eatFrogsButton(count: Int) -> String {
+        count == 1 ? "Eat yesterday's frog" : "Eat yesterday's \(count) frogs"
+    }
     public var menuRoundStart: String { "Start" }
     public var menuRoundPause: String { "Pause" }
     public func slotKindName(kind: SlotKind) -> String {
@@ -744,6 +752,11 @@ public struct VietnameseStrings: GrannyStrings {
     public var tagColourHelp: String { "Đổi màu thẻ" }
     public var colourDone: String { "Xong" }
     public var markAllNeedsRound: String { "Xong một round đã cháu - rồi mới nói là làm xong." }
+    public var taskDetailPlaceholder: String { "Chi tiết - các bước, link, ghi chú (không bắt buộc)" }
+    public var taskDetailLabel: String { "CHI TIẾT" }
+    public func eatFrogsButton(count: Int) -> String {
+        count == 1 ? "Ăn con ếch hôm qua" : "Ăn \(count) con ếch hôm qua"
+    }
     public var menuRoundStart: String { "Bắt đầu" }
     public var menuRoundPause: String { "Dừng" }
     public func slotKindName(kind: SlotKind) -> String {
@@ -1081,6 +1094,11 @@ public struct FinnishStrings: GrannyStrings {
     public var tagColourHelp: String { "Vaihda tagin väri" }
     public var colourDone: String { "Valmis" }
     public var markAllNeedsRound: String { "Ensin yksi valmis kierros, kulta - sitten voit sanoa olevasi valmis." }
+    public var taskDetailPlaceholder: String { "Yksityiskohdat - vaiheet, linkit, muistiinpanot (valinnainen)" }
+    public var taskDetailLabel: String { "YKSITYISKOHDAT" }
+    public func eatFrogsButton(count: Int) -> String {
+        count == 1 ? "Syö eilinen sammakko" : "Syö eilisen \(count) sammakkoa"
+    }
     public var menuRoundStart: String { "Aloita" }
     public var menuRoundPause: String { "Tauko" }
     public func slotKindName(kind: SlotKind) -> String {

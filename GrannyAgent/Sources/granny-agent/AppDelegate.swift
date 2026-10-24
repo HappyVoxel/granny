@@ -593,6 +593,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onDayOff: { [weak self] in
                 self?.window?.close()
                 self?.confirmDayOff()
+            },
+            onEatFrogs: { [weak self] in
+                guard let self else { return }
+                guard self.context.eatCarriedFrogs() else { return }
+                self.window?.close()
+                self.presentTasks()
             })
         show(view, title: GrannyLines.windowTitle, styleMask: [.titled, .miniaturizable, .resizable])
         window?.setContentSize(NSSize(width: 530, height: context.needsSetupKey ? 540 : 480))

@@ -758,6 +758,8 @@ struct GreetingView: View {
     var onInstallHelper: () -> Void = {}
     var onSave: (String) -> Void
     var onDayOff: () -> Void
+    /// Yesterday's frogs, taken on without typing anything.
+    var onEatFrogs: () -> Void = {}
     @State private var text = TaskParser.bullet
 
     var body: some View {
@@ -776,12 +778,32 @@ struct GreetingView: View {
                         .italic()
                         .foregroundStyle(GrannyTheme.text.opacity(0.55))
                     if !carried.isEmpty {
-                        HStack(alignment: .top, spacing: 7) {
-                            Text("🐸").font(.system(size: 14))
-                            Text(GrannyLines.carryOver(tasks: carried))
-                                .font(.system(size: 12, design: .serif))
-                                .foregroundStyle(GrannyTheme.gold)
-                                .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top, spacing: 7) {
+                                Text("🐸").font(.system(size: 14))
+                                Text(GrannyLines.carryOver(tasks: carried))
+                                    .font(.system(size: 12, design: .serif))
+                                    .foregroundStyle(GrannyTheme.gold)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            // A day of old work is a click, not a retyped list:
+                            // a bordered button, because a line of gold text
+                            // reads as one more sentence.
+                            Button {
+                                onEatFrogs()
+                            } label: {
+                                HStack(spacing: 9) {
+                                    // The glyph carries its own side bearing;
+                                    // at 6pt the plate sat in the capital E.
+                                    Text("🍽")
+                                        .font(.system(size: 12))
+                                        .frame(width: 15)
+                                    Text(GrannyLines.eatFrogsButton(count: carried.count))
+                                }
+                            }
+                            .buttonStyle(GrannySecondaryButtonStyle())
+                            .pointingHandOnHover()
+                            .padding(.leading, 21)
                         }
                         .padding(.top, 2)
                     }
@@ -896,8 +918,8 @@ struct TaskListView: View {
     @ObservedObject var viewModel: GrannyViewModel
     var onToggle: (String) -> Void
     var onMarkAllDone: () -> Void
-    var onAdd: (String) -> Void
-    var onUpdateTask: (String, String, String?, [String]) -> Void
+    var onAdd: (String, String?) -> Void
+    var onUpdateTask: (String, String, String?, String?, [String]) -> Void
     var onElaborate: (String, String?) async -> String?
     var onRemove: (String) -> Void
     /// Move a task to another hour of the timetable, or off the timetable.
@@ -907,6 +929,7 @@ struct TaskListView: View {
 
     @State private var adding = false
     @State private var newTask = ""
+    @State private var newDetail = ""
     @State private var editing: TaskItem?
     @FocusState private var addFocused: Bool
 
@@ -973,6 +996,13 @@ struct TaskListView: View {
                                 .foregroundStyle(GrannyTheme.text)
                                 .strikethrough(task.done)
                         }
+                        if let detail = task.detail, !detail.isEmpty {
+                            Text(detail)
+                                .font(.system(size: 11, design: .serif))
+                                .foregroundStyle(GrannyTheme.text.opacity(0.65))
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if let purpose = task.purpose, !purpose.isEmpty {
                             Text(purpose)
                                 .font(.system(size: 11, design: .serif))
@@ -1019,8 +1049,8 @@ struct TaskListView: View {
             .sheet(item: $editing) { task in
                 TaskEditorView(
                     task: task,
-                    onSave: { title, purpose, surfaces in
-                        onUpdateTask(task.id, title, purpose, surfaces)
+                    onSave: { title, purpose, detail, surfaces in
+                        onUpdateTask(task.id, title, purpose, detail, surfaces)
                         editing = nil
                     },
                     onElaborate: onElaborate,
@@ -1035,6 +1065,7 @@ struct TaskListView: View {
             }
 
             if adding {
+                VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     TextField(GrannyLines.addTaskPlaceholder, text: $newTask)
                         .textFieldStyle(.plain)
@@ -1060,6 +1091,41 @@ struct TaskListView: View {
                     .foregroundStyle(GrannyTheme.text.opacity(0.7))
                     .keyboardShortcut(.cancelAction)
                     .pointingHandOnHover()
+                }
+                    // A TextField with a vertical axis still submits on
+                    // Return; notes need real newlines, so this is an editor.
+                    TextEditor(text: $newDetail)
+                        .font(.system(size: 12, design: .serif))
+                        .foregroundStyle(GrannyTheme.text.opacity(0.9))
+                        .tint(GrannyTheme.gold)
+                        .lineSpacing(3)
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 62)
+                        .padding(7)
+                        .grannyCard(cornerRadius: 4)
+                        .overlay(alignment: .topLeading) {
+                            if newDetail.isEmpty {
+                                Text(GrannyLines.taskDetailPlaceholder)
+                                    .font(.system(size: 12, design: .serif))
+                                    .foregroundStyle(GrannyTheme.text.opacity(0.35))
+                                    .padding(.leading, 12)
+                                    .padding(.top, 10)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .onChange(of: newDetail) { _, value in
+                            // Enter after a bullet continues the list; on a
+                            // plain line it is just a new line. Notes are
+                            // notes, not a list with rules.
+                            guard value.hasSuffix("\n") else { return }
+                            let finished = value.dropLast()
+                                .split(separator: "\n", omittingEmptySubsequences: false)
+                                .last.map(String.init) ?? ""
+                            let trimmed = finished.trimmingCharacters(in: .whitespaces)
+                            if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
+                                newDetail = value + TaskParser.bullet
+                            }
+                        }
                 }
             } else {
                 Button {
@@ -1119,8 +1185,10 @@ struct TaskListView: View {
     private func commitAdd() {
         let text = newTask.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        onAdd(text)
+        let detail = newDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        onAdd(text, detail.isEmpty ? nil : detail)
         newTask = ""
+        newDetail = ""
         adding = false
     }
 
@@ -1174,19 +1242,20 @@ struct TaskListView: View {
 /// re-derived - and a hand-written purpose or surfaces list is left alone.
 struct TaskEditorView: View {
     let task: TaskItem
-    var onSave: (String, String?, [String]) -> Void
+    var onSave: (String, String?, String?, [String]) -> Void
     var onElaborate: (String, String?) async -> String?
     var onCancel: () -> Void
 
     @State private var title: String
     @State private var purpose: String
+    @State private var detail: String
     @State private var surfaces: [String]
     @State private var newSurface = ""
     @State private var elaborating = false
 
     init(
         task: TaskItem,
-        onSave: @escaping (String, String?, [String]) -> Void,
+        onSave: @escaping (String, String?, String?, [String]) -> Void,
         onElaborate: @escaping (String, String?) async -> String?,
         onCancel: @escaping () -> Void
     ) {
@@ -1196,6 +1265,7 @@ struct TaskEditorView: View {
         self.onCancel = onCancel
         _title = State(initialValue: task.title)
         _purpose = State(initialValue: task.purpose ?? "")
+        _detail = State(initialValue: task.detail ?? "")
         _surfaces = State(initialValue: task.allowedSurfaces)
     }
 
@@ -1248,6 +1318,42 @@ struct TaskEditorView: View {
                             ProgressView()
                                 .controlSize(.small)
                                 .padding(.trailing, 8)
+                        }
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(GrannyLines.taskDetailLabel)
+                    .font(.system(size: 11, weight: .semibold, design: .serif))
+                    .tracking(3)
+                    .foregroundStyle(GrannyTheme.gold)
+                TextEditor(text: $detail)
+                    .font(.system(size: 13, design: .serif))
+                    .foregroundStyle(GrannyTheme.text)
+                    .scrollContentBackground(.hidden)
+                    .frame(height: 76)
+                    .padding(6)
+                    .grannyCard(cornerRadius: 4)
+                    .onChange(of: detail) { _, value in
+                        // Same rule as the quick-add field: a bullet continues
+                        // itself, anything else just takes the new line.
+                        guard value.hasSuffix("\n") else { return }
+                        let finished = value.dropLast()
+                            .split(separator: "\n", omittingEmptySubsequences: false)
+                            .last.map(String.init) ?? ""
+                        let trimmed = finished.trimmingCharacters(in: .whitespaces)
+                        if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
+                            detail = value + TaskParser.bullet
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if detail.isEmpty {
+                            Text(GrannyLines.taskDetailPlaceholder)
+                                .font(.system(size: 12, design: .serif))
+                                .foregroundStyle(GrannyTheme.text.opacity(0.35))
+                                .padding(.leading, 11)
+                                .padding(.top, 12)
+                                .allowsHitTesting(false)
                         }
                     }
             }
@@ -1307,7 +1413,7 @@ struct TaskEditorView: View {
                 Button(GrannyLines.cancelButton) { onCancel() }
                 Button(GrannyLines.settingsSave) {
                     onSave(title.trimmingCharacters(in: .whitespacesAndNewlines),
-                           purpose, surfaces)
+                           purpose, detail, surfaces)
                 }
                 .buttonStyle(GrannyPrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
