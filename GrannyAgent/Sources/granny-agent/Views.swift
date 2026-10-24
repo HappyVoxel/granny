@@ -792,8 +792,12 @@ struct GreetingView: View {
                             Button {
                                 onEatFrogs()
                             } label: {
-                                HStack(spacing: 6) {
-                                    Text("🍽").font(.system(size: 11))
+                                HStack(spacing: 9) {
+                                    // The glyph carries its own side bearing;
+                                    // at 6pt the plate sat in the capital E.
+                                    Text("🍽")
+                                        .font(.system(size: 12))
+                                        .frame(width: 15)
                                     Text(GrannyLines.eatFrogsButton(count: carried.count))
                                 }
                             }
