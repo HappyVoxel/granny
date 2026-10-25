@@ -265,7 +265,8 @@ passing the corpus, and a rule change that forgets the corpus fails CI. One
 shared runtime would be rewritten within two releases; fixtures outlive the
 rewrite.
 
-The contract itself - methods, refusals, idempotency, budget, the bakeoff - is
+The contract itself - methods, refusals, idempotency, budget, the runtime
+choice - is
 `docs/ENGINE.md`. It is written before any engine exists so that the choice of
 runtime stays a decision about glue, not about the app.
 
@@ -415,14 +416,16 @@ runtime stays a decision about glue, not about the app.
   the only part that can be wrong, experimental, or dead, and it must not be
   able to make granny lenient. With no engine running, the day, the blocks and
   the streak are unchanged; only the conversation stops.
-- **Pi Durable is the first candidate, not a dependency**:
-  `@earendil-works/pi-durable` owns what is genuinely hard - durable runs,
-  checkpoints, recovery, waking a task after sleep - and its own docs pick the
-  case granny is ("pick it because your application owns a persistent
-  scheduler and storage lifecycle"). It is experimental, and it disclaims
-  exactly-once side effects, so tool mutations carry an idempotency key the
-  kernel dedupes. The app binds to the contract, never to Pi's types, and a
-  Rust engine (Rig, `uniffi` for the kernel) runs the same contract in a
-  bakeoff before either is adopted. Accepted cost on macOS: a Bun runtime
-  inside the `.app` (~80MB, signed). Not accepted on iOS, where no sidecar can
-  exist.
+- **The engine is Rust, and the kernel makes the model calls**: Pi Durable was
+  the first candidate and lost on one thing - an engine written for Node cannot
+  run in-process on a phone, and this plan already needs the engine as a
+  library on iOS. Rust compiles to a static library for iOS and Android, ships
+  as a 5-10MB binary instead of a vendored Bun runtime with `node_modules`, and
+  `rig_agent`'s run protocol is sans-IO - it hands back `CallModel`/`CallTools`
+  and the kernel drives it, so the engine never holds a key and the tier policy
+  (rules, Laya, jev, OpenRouter) stays in one place. Only `rig-agent` is
+  depended on, pinned, and rig's session format is not used for storage. From
+  Pi Durable we keep the semantics, not the code: the effect record before the
+  effect, result ids provisioned up front, `replay: "safe"` for reads only,
+  lanes for parallel work. Revisit Pi Durable if the engine ever moves to a
+  server for multi-user or multi-device.
