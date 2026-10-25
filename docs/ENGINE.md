@@ -241,11 +241,36 @@ The loser is deleted, not kept "for reference".
 
 ## Steps
 
-1. `EngineProtocol` + `EngineStub` + `tests/e2e-engine.sh` - contract, no
-   engine. App shows "granny can think, but she cannot talk yet".
-2. Chat tab on the stub: streaming, abort, errors, and the degraded state.
-3. Bakeoff, then the winning engine with the three Phase-1 capabilities.
-4. Intent table + budget + quiet hours in the kernel; rituals ride on it.
-5. Reflection job + `lessons.jsonl` + the accept/reject screen.
+Nothing here touches `blocksEnforced`, so every slice below is additive and
+can ship alone.
+
+```mermaid
+flowchart LR
+    S0["0 · contract as fixtures<br/>types + jsonl cases"] --> S1["1 · kernel server on a socket<br/>hello · state.read · refusals<br/>driven by a 40-line Node stub"]
+    S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state"]
+    S2 --> S3["3 · mutating capabilities<br/>task.add · round.start<br/>kill -9 mid-call"]
+    S3 --> S4["4 · bakeoff<br/>pi-durable vs Rust<br/>one winner, loser deleted"]
+    S4 --> S5["5 · budget · intents · reflection<br/>the coach gets a clock"]
+    S5 --> S6["6 · portability corpus<br/>a phone port can prove itself"]
+```
+
+0. Contract as data: `EngineProtocol.swift` types and
+   `tests/engine/*.jsonl` cases (hello, read, add, refusal, duplicate) that
+   encode and decode both ways. No process, no socket - just the shape, and a
+   target for any engine in any language.
+1. Kernel server over an `AF_UNIX` socket (`EngineServer.swift`): handshake,
+   `state.read`, every refusal path, the idempotency window persisted in the
+   day state. `tests/e2e-engine.sh` drives it with a 40-line Node stub using
+   nothing but `node:net` - if the contract needs a Swift-shaped client, it
+   is the wrong contract.
+2. Chat tab on the stub: streaming deltas, abort, and the degraded state when
+   no socket answers. Visible, reviewable, zero model spend.
+3. Mutating capabilities (`state.task.add`, `round.start`) and the crash test
+   that gives them meaning: `kill -9` the stub between the effect and the
+   reply, restart it, and the day holds one task.
+4. Bakeoff on the same contract, then adopt the winner (pinned) behind
+   `GRANNY_ENGINE_PATH`. The loser is deleted.
+5. Budget, quiet hours and the intent table in the kernel; rituals ride on
+   them. Reflection writes `lessons.jsonl`; accepting a lesson is a repo diff.
 6. `tests/portability/*.json` generated from the Swift rules, so a phone port
    has something to prove itself against.
