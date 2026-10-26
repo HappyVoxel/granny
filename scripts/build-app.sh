@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds dist/granny.app (ad-hoc signed, runs locally).
+# Builds dist/granny.app (signed with a local identity, or ad-hoc).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
@@ -59,7 +59,11 @@ cat >"$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "warning: ad-hoc codesign failed (app still runs locally)"
+# A stable identity keeps notifications, Automation and the Safari extension
+# granted across rebuilds; see scripts/codesign-identity.sh.
+IDENTITY=$(bash scripts/codesign-identity.sh)
+codesign --force --sign "$IDENTITY" "$APP" >/dev/null 2>&1 \
+  || echo "warning: codesign with '$IDENTITY' failed (app still runs locally)"
 
 # Keep the build output out of Launchpad / Open dialogs: the installed copy
 # in ~/Applications is the one that should be registered.
