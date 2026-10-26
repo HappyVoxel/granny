@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Safari lists an extension only when its appex is sandboxed:
+	     pluginkit refuses to register one without this key, and register is
+	     what puts "granny" in Safari's Extensions pane. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- The native handler talks to granny's loopback endpoint. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>
