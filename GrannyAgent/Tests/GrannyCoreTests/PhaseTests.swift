@@ -168,4 +168,16 @@ final class PhaseTests: XCTestCase {
         XCTAssertFalse(Phase.rewarded.blocksActive)
         XCTAssertFalse(Phase.dayOff.blocksActive)
     }
+
+    func testAnEmptyNotebookDoesNotAnswerTheIntake() {
+        // The day rolled over under an open window: tasks empty, not greeted.
+        XCTAssertTrue(IntakePrompt.shouldAsk(tasksEmpty: true, greeted: false, hasDraft: false))
+        // A half-typed task outranks the question - granny does not delete
+        // work to ask for work.
+        XCTAssertFalse(IntakePrompt.shouldAsk(tasksEmpty: true, greeted: false, hasDraft: true))
+        // Already asked today, or the list is written: nothing to ask.
+        XCTAssertFalse(IntakePrompt.shouldAsk(tasksEmpty: true, greeted: true, hasDraft: false))
+        XCTAssertFalse(IntakePrompt.shouldAsk(tasksEmpty: false, greeted: false, hasDraft: false))
+    }
+
 }
