@@ -569,6 +569,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             tabs.current = .notebook
             return
         }
+        if windowKind == .main, windowKind != .greeting,
+           IntakePrompt.shouldAsk(
+               tasksEmpty: context.store.state.tasks.isEmpty,
+               greeted: context.store.state.greeted,
+               hasDraft: context.hasDraft) {
+            // The day rolled over under an open notebook: an empty list is not
+            // an answer to "what are today's tasks", so granny asks. Not
+            // forced - once a day is enough, and a draft blocks it above.
+            presentGreeting()
+            return
+        }
         if windowKind != .greeting, windowKind != .main {
             presentGreeting(force: true)
         }

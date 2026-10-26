@@ -140,7 +140,8 @@ struct GrannyRootView: View {
                 context?.assignSlot(taskID: id, slotID: slot)
             },
             onResumeWork: { [weak context] in context?.clearDayOff() },
-            onTogglePomodoro: { [weak context] in context?.togglePomodoro() })
+            onTogglePomodoro: { [weak context] in context?.togglePomodoro() },
+            onDraftChanged: { [weak context] holds in context?.hasDraft = holds })
     }
 
     @ViewBuilder

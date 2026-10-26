@@ -926,12 +926,19 @@ struct TaskListView: View {
     var onAssignSlot: (String, String?) -> Void
     var onResumeWork: () -> Void
     var onTogglePomodoro: () -> Void
+    /// True while the add row holds text the user has not committed. The
+    /// greeting must not replace the notebook over an unsaved line.
+    var onDraftChanged: (Bool) -> Void
 
     @State private var adding = false
     @State private var newTask = ""
     @State private var newDetail = ""
     @State private var editing: TaskItem?
     @FocusState private var addFocused: Bool
+
+    private var hasDraft: Bool {
+        !newTask.isEmpty || !newDetail.isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1180,6 +1187,8 @@ struct TaskListView: View {
         .frame(minWidth: 520, minHeight: 420)
         .grannyWindowBackdrop()
         .preferredColorScheme(GrannyTheme.colorScheme)
+        .onChange(of: hasDraft) { _, holds in onDraftChanged(holds) }
+        .onDisappear { onDraftChanged(false) }
     }
 
     private func commitAdd() {

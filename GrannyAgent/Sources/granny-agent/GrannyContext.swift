@@ -100,6 +100,10 @@ final class GrannyContext {
     }
 
     /// A fresh install has no keys: the greeting nudges toward Settings.
+    /// Set by the notebook while its add row holds an unsaved line. The
+    /// greeting must never replace the window over one.
+    var hasDraft = false
+
     var needsSetupKey: Bool {
         (config.openRouterKey ?? "").isEmpty
     }
