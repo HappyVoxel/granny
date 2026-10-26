@@ -89,7 +89,9 @@ for browser in "${browsers[@]}"; do
         # The containing app only hosts the extension: hide it from
         # Launchpad and the Dock.
         run plutil -replace LSUIElement -bool true "$SAFARI_APP/Contents/Info.plist"
-        run codesign --force --deep --sign - "$SAFARI_APP"
+        # Same identity as the app: Safari refuses an extension whose
+        # signature moves on every build.
+        run codesign --force --deep --sign "$(bash scripts/codesign-identity.sh)" "$SAFARI_APP"
         run mkdir -p "$HOME/Applications"
         run rm -rf "$HOME/Applications/granny for Safari.app"
         run cp -R "$SAFARI_APP" "$HOME/Applications/granny for Safari.app"
