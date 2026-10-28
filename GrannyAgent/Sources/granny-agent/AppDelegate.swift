@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         context.scheduler.onGreetingNeeded = { [weak self] in
             self?.remindIntake()
         }
+        context.scheduler.onPhaseChanged = { [weak context] phase in
+            context?.viewModel.phase = phase
+        }
         context.scheduler.onStreakEvent = { [weak self] event in
             guard let self else { return }
             // The task list can be open across midnight; refresh the badge

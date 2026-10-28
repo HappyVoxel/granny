@@ -24,6 +24,9 @@ final class Scheduler {
     var onDayRollover: (() -> Void)?
     /// Fires when a rollover grew or killed a displayed streak.
     var onStreakEvent: ((StreakEvent) -> Void)?
+    /// Fired when the clock crosses wake, bedtime, or the day's payment, so a
+    /// window that has been open for hours stops showing the old phase.
+    var onPhaseChanged: ((Phase) -> Void)?
 
     /// Tick cadence, and how long a failed apply/clear waits before the
     /// next attempt (a cancelled authorization dialog must not re-prompt
@@ -87,6 +90,10 @@ final class Scheduler {
         if phase != lastPhase {
             lastPhase = phase
             Task { await engine.clearCache() }
+            // The windows drew their header from the phase they last saw: an
+            // app left open overnight kept last night's line all day. The
+            // clock crossing wake or bedtime is the event they need.
+            onPhaseChanged?(phase)
         }
         let enforced = blockEnforced?() ?? phase.blocksActive
         // A tick where the phase wants the block and enforcement says no can
