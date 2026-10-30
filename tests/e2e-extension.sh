@@ -156,4 +156,15 @@ case "$install_all_output" in
   *) fail "install.sh dry-run missing consent note" ;;
 esac
 
+# Safari lists an extension only when its appex is sandboxed: pluginkit
+# refuses to register one without com.apple.security.app-sandbox, and a
+# `codesign --deep` pass after the build silently drops that entitlement.
+has extension/safari/extension.entitlements "com.apple.security.app-sandbox"
+has scripts/install-extension.sh "--entitlements extension/safari/extension.entitlements"
+has scripts/install-extension.sh 'Contents/PlugIns/granny Extension.appex'
+if grep -Eq 'codesign[^#]*--deep' scripts/install-extension.sh; then
+  fail "install-extension.sh re-signs with --deep, which strips the appex entitlements"
+fi
+CHECKS=$((CHECKS + 1))
+
 echo "e2e-extension OK ($CHECKS checks)"

@@ -89,7 +89,18 @@ for browser in "${browsers[@]}"; do
         # The containing app only hosts the extension: hide it from
         # Launchpad and the Dock.
         run plutil -replace LSUIElement -bool true "$SAFARI_APP/Contents/Info.plist"
-        run codesign --force --deep --sign - "$SAFARI_APP"
+        # One identity for both bundles: Safari refuses an extension whose
+        # signature moves on every build.
+        #
+        # Xcode signs the bundle but writes no entitlement for the project's
+        # ENABLE_APP_SANDBOX, and pluginkit refuses to register an appex
+        # without com.apple.security.app-sandbox - which is how "granny" never
+        # appeared in Safari's Extensions pane. Sign the appex with the
+        # entitlement, then the host without --deep: --deep would replace the
+        # appex signature with an entitlement-free one.
+        IDENTITY=$(bash scripts/codesign-identity.sh)
+        run codesign --force --sign "$IDENTITY" --entitlements extension/safari/extension.entitlements "$SAFARI_APP/Contents/PlugIns/granny Extension.appex"
+        run codesign --force --sign "$IDENTITY" "$SAFARI_APP"
         run mkdir -p "$HOME/Applications"
         run rm -rf "$HOME/Applications/granny for Safari.app"
         run cp -R "$SAFARI_APP" "$HOME/Applications/granny for Safari.app"

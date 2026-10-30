@@ -34,3 +34,13 @@ public func computePhase(
     if state.rewarded { return awake ? .rewarded : .night }
     return awake ? .working : .night
 }
+
+/// Whether an open notebook counts as an answer to "what are today's tasks?".
+/// It does not: the list is empty, so the day is still unasked. A visible
+/// draft is the one exception - replacing the notebook would throw away a
+/// half-typed task, and granny does not delete work to ask for work.
+public enum IntakePrompt {
+    public static func shouldAsk(tasksEmpty: Bool, greeted: Bool, hasDraft: Bool) -> Bool {
+        tasksEmpty && !greeted && !hasDraft
+    }
+}

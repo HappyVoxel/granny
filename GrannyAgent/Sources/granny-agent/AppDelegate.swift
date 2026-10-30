@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         context.scheduler.onGreetingNeeded = { [weak self] in
             self?.remindIntake()
         }
+        context.scheduler.onPhaseChanged = { [weak context] phase in
+            context?.viewModel.phase = phase
+        }
         context.scheduler.onStreakEvent = { [weak self] event in
             guard let self else { return }
             // The task list can be open across midnight; refresh the badge
@@ -567,6 +570,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // notebook tab forward instead.
         if windowKind == .main, tabs.current != .notebook {
             tabs.current = .notebook
+            return
+        }
+        if windowKind == .main, windowKind != .greeting,
+           IntakePrompt.shouldAsk(
+               tasksEmpty: context.store.state.tasks.isEmpty,
+               greeted: context.store.state.greeted,
+               hasDraft: context.hasDraft) {
+            // The day rolled over under an open notebook: an empty list is not
+            // an answer to "what are today's tasks", so granny asks. Not
+            // forced - once a day is enough, and a draft blocks it above.
+            presentGreeting()
             return
         }
         if windowKind != .greeting, windowKind != .main {
