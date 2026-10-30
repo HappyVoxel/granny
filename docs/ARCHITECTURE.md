@@ -193,6 +193,83 @@ common case and would drown the signal.
 | 1c | Safari package | done (`scripts/make-safari.sh` + converter patched bundle id) |
 | 2 | hardening | partial - see deferred list |
 
+## The engine, and other platforms (planned)
+
+Swift was the first platform, not the shape of the product. Granny is three
+layers, and the day lives in the middle one:
+
+| layer | contents | what a port rewrites |
+| --- | --- | --- |
+| clients | SwiftUI windows, the extension, the CLI | everything above the contract |
+| kernel | phases, payment, slots, streak, decisions, the day log - `GrannyCore` | the interface; the rules stay the same |
+| engine | the harness: conversation, scheduled intents, reflection, lessons | the transport, not the protocol |
+
+```mermaid
+flowchart TB
+    CLIENTS["clients: macOS SwiftUI · iOS · Android · extension"]
+    ENGINE["engine: conversation, intents, reflection<br/>process on the Mac, library on the phone"]
+    KERNEL["kernel (GrannyCore): phases, payment, slots,<br/>streak, day log - the only authority"]
+    ENFORCE["enforcement, per OS:<br/>hosts + helper · ManagedSettings + DNS proxy · VpnService"]
+    CLIENTS -->|"chat, intents"| ENGINE
+    CLIENTS -->|"reads, commands"| KERNEL
+    ENGINE -->|"capabilities, re-validated"| KERNEL
+    KERNEL --> ENFORCE
+```
+
+`GrannyCore` is already pure Foundation - no AppKit, no SwiftUI - so a port
+re-expresses it; it does not first have to untangle it. The rules are the
+asset: they are what makes the app strict, and they must survive a rewrite of
+every line around them.
+
+**Enforcement is never portable.** The kernel decides *what* is closed (hosts,
+an app set, surfaces); each platform's own mechanism does the closing: `hosts`
+plus the root helper on macOS, `ManagedSettings`/`FamilyControls` with a DNS
+proxy network extension on iOS, `VpnService` on Android. A portable "blocker"
+would be a second enforcement truth, and two truths there already cost this
+repo a bug class: the hosts, `/decide`, the janitor and the killer disagree.
+
+**The engine is a process on the Mac and a library on the phone.** iOS has no
+child processes, so a sidecar engine cannot ship there. The contract is
+therefore transport-agnostic from its first commit: a Unix socket at
+`<state dir>/engine.sock` (mode 0600) on macOS, in-process on iOS, and the Mac
+(or a server) over the network when the phone can reach it. A phone that
+cannot reach an engine still coaches - it keeps the day, the rules and the
+reminder clock, and loses only the conversation.
+
+**The engine never holds authority.** It asks for capabilities - add a task,
+start a round, move a slot, speak - and the kernel re-validates every one of
+them. What that buys is not tidiness but a property the app must never lose:
+an engine that crashed, hung, hallucinated, or broke on an experimental
+release cannot make granny lenient. Blocks, payment and the streak live in the
+kernel; the engine can only propose.
+
+**Two storages, because they age differently.** The kernel owns the day
+(`state.json` and the append-only day log), which is the contract with the
+helper and the extension and must outlive every engine. The engine owns what
+it remembers - transcripts, documents, lessons - in its own SQLite under
+`<state dir>/engine/`. Facts come from the day log; the engine writes only
+notes about them.
+
+**Self-improvement is a diff, not a mutation.** The harness is files in this
+repo (`prompt.md`, `skills/*.md`, the tool policy), so a reflection job can
+write facts (`lessons.jsonl`, counted, not guessed) and an offline pi run can
+propose an edit to them as a pull request. A signed app that rewrites its own
+prompt at runtime cannot be reviewed, rolled back or tested; that is the line
+the coach does not cross.
+
+**The fixture corpus is the portability guarantee, not a shared language.**
+`tests/portability/*.json` holds cases of (config, state, event) -> expected
+verdict and resulting state, generated from the Swift rules and checked in.
+Any port - Kotlin, Rust, Dart, a phone build - proves it agrees with granny by
+passing the corpus, and a rule change that forgets the corpus fails CI. One
+shared runtime would be rewritten within two releases; fixtures outlive the
+rewrite.
+
+The contract itself - methods, refusals, idempotency, budget, the runtime
+choice - is
+`docs/ENGINE.md`. It is written before any engine exists so that the choice of
+runtime stays a decision about glue, not about the app.
+
 ## Deferred (designed, not built)
 
 - **Chrome force-install via managed preferences.** Extension is loaded
@@ -206,7 +283,9 @@ common case and would drown the signal.
   unchecked; accept for now, revisit if an app becomes a problem.
 - **Chat with granny.** Traces already flow to Langfuse; a chat window is a
   UI over the same client plus state context. The tracing layer is the
-  foundation, so this is additive.
+  foundation, so this is additive. It is the first client of the engine
+  contract (see "The engine, and other platforms"), which is why the contract
+  is written before the window.
 - **TTS is off by default.** `say -v Linh` is wired (config
   `speechEnabled`); Piper/cloud voices are a config value later, not a
   rewrite.
@@ -329,3 +408,24 @@ common case and would drown the signal.
   `killall -x networkserviceproxy` runs once on the lifted -> enforced
   transition (seam `GRANNY_KILLALL`): a Private Relay tunnel opened during a
   break cannot outlive the block that follows it.
+- **The thinking part gets a contract, not a rewrite**: the coach's harness
+  moves to `granny-engine` behind a versioned local contract (socket on
+  macOS, in-process on iOS), and `GrannyCore` becomes the capability kernel
+  the engine asks - `state.task.add`, `round.start`, `notify.speak` - each
+  re-validated in Swift. The reason is not architecture taste: the harness is
+  the only part that can be wrong, experimental, or dead, and it must not be
+  able to make granny lenient. With no engine running, the day, the blocks and
+  the streak are unchanged; only the conversation stops.
+- **The engine is Rust, and the kernel makes the model calls**: Pi Durable was
+  the first candidate and lost on one thing - an engine written for Node cannot
+  run in-process on a phone, and this plan already needs the engine as a
+  library on iOS. Rust compiles to a static library for iOS and Android, ships
+  as a 5-10MB binary instead of a vendored Bun runtime with `node_modules`, and
+  `rig_agent`'s run protocol is sans-IO - it hands back `CallModel`/`CallTools`
+  and the kernel drives it, so the engine never holds a key and the tier policy
+  (rules, Laya, jev, OpenRouter) stays in one place. Only `rig-agent` is
+  depended on, pinned, and rig's session format is not used for storage. From
+  Pi Durable we keep the semantics, not the code: the effect record before the
+  effect, result ids provisioned up front, `replay: "safe"` for reads only,
+  lanes for parallel work. Revisit Pi Durable if the engine ever moves to a
+  server for multi-user or multi-device.

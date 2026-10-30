@@ -1,0 +1,15 @@
+{"v":1,"id":"e-1","method":"hello","params":{"role":"engine","impl":"granny-engine/0.1.0","capabilities":["state.read","model.stream"]}}
+{"v":1,"id":"e-1","result":{"role":"kernel","impl":"granny/0.9.0","capabilities":["state.read","model.stream"],"limits":{"nudgesRemaining":3,"quietStart":22,"quietEnd":7}}}
+{"v":1,"id":"e-2","method":"state.read","params":{}}
+{"v":1,"id":"e-2","result":{"phase":"working","tasks":[],"rounds":0,"blocksEnforced":true}}
+{"v":1,"id":"e-3","key":"k-1","method":"state.task.add","params":{"title":"Apply job","detail":"CV done; portal link in the mail"}}
+{"v":1,"id":"e-3","result":{"taskID":"t-9"}}
+{"v":1,"id":"e-4","key":"k-1","method":"state.task.add","params":{"title":"Apply job","detail":"CV done; portal link in the mail"}}
+{"v":1,"id":"e-4","error":{"code":"duplicate","reason":"key already applied","retryable":false,"result":{"taskID":"t-9"}}}
+{"v":1,"id":"e-5","method":"notify.speak","params":{"text":"the frogs are waiting","reason":"morning"}}
+{"v":1,"id":"e-5","error":{"code":"refused","reason":"after quiet hours","retryable":false}}
+{"v":1,"id":"e-6","method":"model.stream","params":{"messages":[{"role":"user","content":"which step of the booking flow is stuck?"}]}}
+{"v":1,"event":"model.delta","params":{"text":"which step"}}
+{"v":1,"event":"model.done","params":{"text":"which step is stuck?","usage":{"in":42,"out":7}}}
+{"v":1,"id":"e-7","method":"state.task.giveup","params":{}}
+{"v":1,"id":"e-7","error":{"code":"invalid","reason":"unknown method state.task.giveup","retryable":false}}

@@ -63,7 +63,8 @@ scripts/                      install entrypoint, build/icon/app/helper/extensio
                               installers, package-chrome, make-safari,
                               build-release, sync-env, proto.sh (legacy)
 tests/                        e2e shell suites + legacy Phase 0 suite
-docs/                         ARCHITECTURE.md (design), INSTALL.md (guide)
+docs/                         ARCHITECTURE.md (design), ENGINE.md (the
+                              engine contract), INSTALL.md (guide)
 packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
 .github/                      CI workflow, issue templates, logo
 .agents/skills/               agent skills, one real copy each: granny-swift
