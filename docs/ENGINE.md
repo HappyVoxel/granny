@@ -1,7 +1,11 @@
 # Engine contract
 
-Status: Slices 0 and 1 implemented (`EngineProtocol.swift`, `EngineKernel.swift`,
-`EngineServer.swift`, `tests/e2e-engine.sh`); Slices 2-6 planned.
+Status: wire types (`EngineProtocol.swift`), the kernel rule table
+(`EngineKernel.swift`: `hello`, `state.read`, `state.task.add`,
+`state.task.tick`, `notify.speak`), and the local socket + child supervisor
+(`EngineServer.swift`, `GRANNY_ENGINE_PATH`, `day.woke`/`round.finished`/`day.rollover`
+pushes, `tests/e2e-engine.sh`) are implemented. The chat window, `round.start`,
+`slot.move`, `model.stream` tier wiring, and the Pi Durable runtime remain.
 `docs/ARCHITECTURE.md` carries the decision ("The engine, and other platforms"
 plus the last two decision-log entries).
 
@@ -102,7 +106,7 @@ and not built.
 
 | method | params | returns / refuses |
 | --- | --- | --- |
-| `state.read` | `{}` | the day: phase, tasks (id, title, done, slotID), slots, rounds, streak, blocksEnforced. Read-only. |
+| `state.read` | `{}` | the day: `phase`, `date`, `dayOff`, `tasks` (`id`, `title`, `done`, `slotID`, `detail`), `slots`, `rounds`, `streak`, `blocksEnforced`, `nudgesRemaining`. Read-only. |
 | `state.task.add` | `title`, `detail?`, `slotID?` | `{taskID}`. Refuses: empty title, a day that is rewarded and would be unlocked by it (the kernel relocks), a slotID that does not exist. |
 | `round.start` | `{}` | `{stage, endsAt}`. Refuses: a round already running, a break in progress. |
 | `state.task.tick` | `taskID`, `done` | the new phase. Refuses the unpaid last tick, as the UI does. |
@@ -245,7 +249,8 @@ sequenceDiagram
 The engine can ask to speak; the kernel decides. Named in `Config`:
 
 - `nudgesPerDayMax` - hard ceiling across every intent kind.
-- `quietHours` - a range in which `notify.speak` is refused with a reason.
+- `quietStart` / `quietEnd` - the hour range in which `notify.speak` is refused
+  with a reason (`nil` falls back to `bedtimeHour` -> `wakeHour`).
 - Priority: an intent tied to a task pinned to the current slot outranks a
   free-form nudge; over budget, the free-form one is what gets dropped.
 
@@ -254,7 +259,7 @@ strict coach into a nag; the ceiling is not configurable by the engine.
 
 ## Storage
 
-- Kernel: `state.json` (unchanged) plus a new `applied-keys` section.
+- Kernel: `state.json` (unchanged) plus `nudgesSent` and `appliedKeys`.
 - Engine: `<state dir>/engine/` (SQLite: transcripts, documents, tasks).
 - `state.json.log` stays the fact source for reflection; the engine may write
   `lessons.jsonl` (one counted fact per line) but never edits the log.

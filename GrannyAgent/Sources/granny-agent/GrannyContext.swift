@@ -828,7 +828,11 @@ final class GrannyContext {
                 self.scheduler.tick()
                 Task { await self.engine.clearCache() }
             })
-        try? server.start()
+        do {
+            try server.start()
+        } catch {
+            server.recordStartupFailure(error)
+        }
         self.engineServer = server
     }
 

@@ -333,8 +333,31 @@ final class EngineServer {
     private static func isDescriptorOpen(_ fd: Int32) -> Bool {
         guard fd >= 0 else { return false }
         var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
-        guard Darwin.poll(&pfd, 1, 0) >= 0 else { return false }
+        var rc: Int32
+        repeat {
+            pfd.revents = 0
+            rc = Darwin.poll(&pfd, 1, 0)
+        } while rc < 0 && errno == EINTR
+        guard rc >= 0 else { return true }
         return (pfd.revents & Int16(POLLHUP | POLLNVAL)) == 0
+    }
+
+    func recordStartupFailure(_ error: Error) {
+        let reason = error.localizedDescription
+        ioQueue.sync {
+            self.status = .degraded(reason: reason)
+        }
+        let logURL = socketURL.deletingLastPathComponent().appendingPathComponent("engine.log")
+        let line = "\(ISO8601DateFormatter().string(from: Date())) engine socket failed: \(reason)\n"
+        if let data = line.data(using: .utf8) {
+            if let handle = try? FileHandle(forWritingTo: logURL) {
+                defer { try? handle.close() }
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+            } else {
+                try? data.write(to: logURL, options: .atomic)
+            }
+        }
     }
 
     private func serveConnection(fd: Int32) {
@@ -387,11 +410,14 @@ final class EngineServer {
                 if !handshaked {
                     if envelope.method == "hello" {
                         let slotRefusal: String? = ioQueue.sync {
-                            if let child = self.childProcess, child.isRunning,
-                               let peerPID = Self.peerPID(of: fd),
-                               peerPID != child.processIdentifier
-                            {
-                                return "engine slot is owned by the spawned child"
+                            if let child = self.childProcess, child.isRunning {
+                                guard let peerPID = Self.peerPID(of: fd),
+                                      peerPID == child.processIdentifier
+                                else {
+                                    self.status = .degraded(
+                                        reason: "engine slot is owned by the spawned child")
+                                    return "engine slot is owned by the spawned child"
+                                }
                             }
                             if self.engineFD >= 0, self.engineFD != fd,
                                Self.isDescriptorOpen(self.engineFD)
@@ -426,7 +452,7 @@ final class EngineServer {
                         isRegisteredEngine = true
                         ioQueue.sync {
                             if self.engineFD >= 0, self.engineFD != fd {
-                                Darwin.close(self.engineFD)
+                                _ = Darwin.shutdown(self.engineFD, SHUT_RD)
                             }
                             self.engineFD = fd
                             self.restartAttempt = 0

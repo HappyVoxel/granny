@@ -31,6 +31,7 @@ jobs:
           bash tests/e2e.sh
           bash tests/e2e-helper.sh
           bash tests/e2e-agent.sh
+          bash tests/e2e-engine.sh
           bash tests/e2e-extension.sh
           bash tests/e2e-safari.sh
 
@@ -78,6 +79,8 @@ jobs:
             extension/chrome/manifest.json extension/safari/manifest.json
           sed -i '' -E "s/(\"name\": \"granny-agent\", \"version\": \")[0-9][0-9.]*/\1$VERSION/" \
             GrannyAgent/Sources/GrannyCore/TraceClient.swift
+          sed -i '' -E "s/(defaultVersion = \")[0-9][0-9.]*/\1$VERSION/" \
+            GrannyAgent/Sources/GrannyCore/EngineKernel.swift
           sed -i '' -E "s/^  version \".*\"$/  version \"$VERSION\"/" \
             packaging/homebrew/Casks/granny.rb
 

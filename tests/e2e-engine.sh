@@ -79,6 +79,10 @@ done
 [ -S "$SOCK" ] || { cat "$SANDBOX/serve.log" >&2; fail "engine.sock did not appear"; }
 CHECKS=$((CHECKS + 1))
 
+sock_mode="$(stat -f '%Lp' "$SOCK")"
+[ "$sock_mode" = "600" ] || fail "expected engine.sock mode 600, got $sock_mode"
+CHECKS=$((CHECKS + 1))
+
 # 6. Status and state.read work with the engine absent.
 status_out="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/status")"
 contains "$status_out" '"phase":"awaitingTasks"' "status without engine"
@@ -175,6 +179,10 @@ node "$SANDBOX/engine-stub.mjs" "$SOCK" "ok" &
 ENGINE_PID=$!
 sleep 0.2
 
+# A second engine hello while one is live is refused instead of stealing the slot.
+second_hello="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO")"
+contains "$second_hello" '"reason":"engine already connected"' "second hello refused while engine live"
+
 stream_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-1","method":"chat.prompt","params":{"text":"stuck on booking","stream":true}}')"
 contains "$stream_out" '"event":"chat.delta"' "chat.prompt streams delta"
@@ -252,6 +260,10 @@ sleep 0.2
 spawn_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-3","method":"chat.prompt","params":{"text":"hello","stream":true}}')"
 contains "$spawn_out" '"text":"spawned ok"' "spawned engine answers chat.prompt"
+
+# A non-child process cannot claim the engine slot when GRANNY_ENGINE_PATH owns it.
+impostor_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO")"
+contains "$impostor_out" '"reason":"engine slot is owned by the spawned child"' "non-child hello refused"
 
 first_pid="$(cat "$SANDBOX/engine.pid")"
 rm -f "$SANDBOX/engine.pid"

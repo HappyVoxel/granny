@@ -196,6 +196,8 @@ public enum EngineKernel {
                 allowedSurfaces: surfaces,
                 slotID: slotID,
                 detail: detail)
+            state.tasks.append(contentsOf: state.carried)
+            state.carried = []
             state.tasks.append(task)
             state.greeted = true
             let result: EngineJSON = .object(["taskID": .string(task.id)])

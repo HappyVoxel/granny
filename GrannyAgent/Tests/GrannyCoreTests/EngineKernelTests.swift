@@ -62,6 +62,39 @@ final class EngineKernelTests: XCTestCase {
         XCTAssertEqual(second.reply.error?.result, firstResult)
     }
 
+    func testTaskAddPullsCarriedFrogsIntoTasksSoAllDoneCannotSkipThem() {
+        let config = GrannyConfig(wakeHour: 7, bedtimeHour: 23)
+        let frog = TaskItem(title: "Yesterday's frog", carriedOver: true)
+        var state = DayState(
+            date: "2026-11-10",
+            carried: [frog],
+            pomodoro: PomodoroRun(stage: .deepWork, finished: 1))
+
+        let add = EngineKernel.handle(
+            .request(
+                id: "e-add",
+                method: EngineCapability.stateTaskAdd.rawValue,
+                params: .object(["title": .string("Today's task")]),
+                key: "k-frog"),
+            config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertTrue(add.mutated)
+        XCTAssertTrue(state.carried.isEmpty)
+        XCTAssertEqual(state.tasks.map(\.title), ["Yesterday's frog", "Today's task"])
+
+        let addedID = state.tasks[1].id
+        let tick = EngineKernel.handle(
+            .request(
+                id: "e-tick",
+                method: EngineCapability.stateTaskTick.rawValue,
+                params: .object(["taskID": .string(addedID), "done": .bool(true)]),
+                key: "k-frog-tick"),
+            config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(tick.reply.result, .object(["phase": .string("working")]))
+        XCTAssertFalse(state.rewarded)
+    }
+
     func testLastTaskTickRefusedWithoutARoundAndAllowedOncePaid() {
         let config = GrannyConfig(wakeHour: 7, bedtimeHour: 23)
         let task = TaskItem(title: "Ship Slice 1")
