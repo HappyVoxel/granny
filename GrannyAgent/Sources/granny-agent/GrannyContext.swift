@@ -97,6 +97,19 @@ final class GrannyContext {
         }
     }
 
+    func stop() {
+        engineServer?.stop()
+    }
+
+    func pushDayWoke() {
+        engineServer?.push(
+            domainEvent: .dayWoke,
+            params: .object([
+                "date": .string(store.state.date),
+                "frogs": .number(Double(store.state.carried.count)),
+            ]))
+    }
+
     func snapshot() -> (DayState, Phase) {
         (store.state, phase())
     }
@@ -707,6 +720,12 @@ final class GrannyContext {
         // behind another app or the screen asleep.
         if over == .deepWork {
             chime.breakTime()
+            engineServer?.push(
+                domainEvent: .roundFinished,
+                params: .object([
+                    "rounds": .number(Double(store.state.pomodoro.finished)),
+                    "stage": .string(next.stage.rawValue),
+                ]))
             // The break lifts the block: the line says what to do with it,
             // and when the door closes again. Only the round that first paid
             // the day says "go play" - every later round is a break again,
@@ -741,6 +760,12 @@ final class GrannyContext {
         syncPomodoro()
         // The rollover just logged yesterday: the line may say something new.
         rhythmReport = store.rhythm()
+        engineServer?.push(
+            domainEvent: .dayRollover,
+            params: .object([
+                "date": .string(store.state.date),
+                "open": .number(Double(store.state.carried.count)),
+            ]))
     }
 
     private func stageName(_ stage: PomodoroStage) -> String {

@@ -87,6 +87,7 @@ versions = {
     "packaging/homebrew/Casks/granny.rb": version_of("packaging/homebrew/Casks/granny.rb", r'version "([^"]+)"'),
     "extension/chrome/manifest.json": version_of("extension/chrome/manifest.json", r'"version": "([^"]+)"'),
     "extension/safari/manifest.json": version_of("extension/safari/manifest.json", r'"version": "([^"]+)"'),
+    "GrannyAgent/Sources/GrannyCore/EngineKernel.swift": version_of("GrannyAgent/Sources/GrannyCore/EngineKernel.swift", r'defaultVersion = "([^"]+)"'),
 }
 distinct = set(v for v in versions.values() if v)
 if len(distinct) != 1:

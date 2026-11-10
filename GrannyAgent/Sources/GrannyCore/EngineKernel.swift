@@ -22,7 +22,18 @@ public struct EngineOutcome: Equatable, Sendable {
 /// table, the quiet-hours clock, the daily nudge ceiling and the idempotency
 /// window without opening a socket.
 public enum EngineKernel {
-    public static let implVersion = "granny/0.9.0"
+    public static let defaultVersion = "0.1.2"
+
+    public static var implVersion: String {
+        if let bundleID = Bundle.main.bundleIdentifier,
+           bundleID.hasPrefix("io.github.happyvoxel.granny"),
+           let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+           !short.isEmpty
+        {
+            return "granny/\(short)"
+        }
+        return "granny/\(defaultVersion)"
+    }
 
     /// Quiet hours may cross midnight (22 -> 7) or sit inside one day (1 -> 6).
     /// When start == end the window is empty.
@@ -222,6 +233,13 @@ public enum EngineKernel {
             guard !text.isEmpty else {
                 return EngineOutcome(reply: .failure(id: id, error: .invalid("empty text")))
             }
+            guard case .string(let rawReason) = fields["reason"] else {
+                return EngineOutcome(reply: .failure(id: id, error: .invalid("missing reason")))
+            }
+            let reason = rawReason.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !reason.isEmpty else {
+                return EngineOutcome(reply: .failure(id: id, error: .invalid("empty reason")))
+            }
             let hour = calendar.component(.hour, from: now)
             if isQuietHour(
                 hour: hour,
@@ -232,6 +250,23 @@ public enum EngineKernel {
             }
             guard state.nudgesSent < config.nudgesPerDayMax else {
                 return EngineOutcome(reply: .failure(id: id, error: .refused("nudge budget spent")))
+            }
+            let hasPinnedOpenTask = state.tasks.contains {
+                !$0.done && ($0.slotID?.isEmpty == false)
+            }
+            let isSlotPinned = reason == "slot" || {
+                guard case .string(let slotID) = fields["slotID"], !slotID.isEmpty else {
+                    return false
+                }
+                return state.tasks.contains { !$0.done && $0.slotID == slotID }
+            }()
+            if hasPinnedOpenTask, config.nudgesPerDayMax > 1,
+               !isSlotPinned, state.nudgesSent >= config.nudgesPerDayMax - 1
+            {
+                return EngineOutcome(
+                    reply: .failure(
+                        id: id,
+                        error: .refused("nudge budget reserved for slot task")))
             }
             state.nudgesSent += 1
             let result: EngineJSON = .object(["delivered": .bool(true)])

@@ -1,5 +1,5 @@
 {"v":1,"id":"e-1","method":"hello","params":{"role":"engine","impl":"granny-engine/0.1.0","capabilities":["state.read","model.stream"]}}
-{"v":1,"id":"e-1","result":{"role":"kernel","impl":"granny/0.9.0","capabilities":["state.read","model.stream"],"limits":{"nudgesRemaining":3,"quietStart":22,"quietEnd":7}}}
+{"v":1,"id":"e-1","result":{"role":"kernel","impl":"granny/0.1.2","capabilities":["notify.speak","state.read","state.task.add","state.task.tick"],"limits":{"nudgesRemaining":3,"quietStart":22,"quietEnd":7}}}
 {"v":1,"id":"e-2","method":"state.read","params":{}}
 {"v":1,"id":"e-2","result":{"phase":"working","tasks":[],"rounds":0,"blocksEnforced":true}}
 {"v":1,"id":"e-3","key":"k-1","method":"state.task.add","params":{"title":"Apply job","detail":"CV done; portal link in the mail"}}

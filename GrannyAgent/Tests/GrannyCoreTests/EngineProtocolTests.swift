@@ -45,7 +45,7 @@ final class EngineProtocolTests: XCTestCase {
     func testHandshakeAcceptsAKernelHello() throws {
         let envelope = try EngineLine.decode(Self.contractLines[1])
         let hello = try EngineHandshake.accept(envelope, expecting: .kernel).get()
-        XCTAssertEqual(hello.impl, "granny/0.9.0")
+        XCTAssertEqual(hello.impl, "granny/0.1.2")
         XCTAssertEqual(hello.limits?.nudgesRemaining, 3)
         XCTAssertEqual(hello.limits?.quietStart, 22)
     }
@@ -76,7 +76,8 @@ final class EngineProtocolTests: XCTestCase {
 
     func testDesignedButUnbuiltMethodsAreNotAvailableYet() {
         XCTAssertTrue(EngineProtocol.available.contains(.stateRead))
-        XCTAssertTrue(EngineProtocol.available.contains(.modelStream))
+        XCTAssertTrue(EngineProtocol.available.contains(.stateTaskAdd))
+        XCTAssertFalse(EngineProtocol.available.contains(.modelStream))
         XCTAssertFalse(EngineProtocol.available.contains(.roundStart))
     }
 

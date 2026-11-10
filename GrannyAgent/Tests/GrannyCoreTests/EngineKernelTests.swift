@@ -123,6 +123,69 @@ final class EngineKernelTests: XCTestCase {
         XCTAssertNil(overBudget.spokenText)
     }
 
+    func testQuietHoursPredicateTable() {
+        // Overnight window (22 -> 7): 22 is inclusive, 7 is exclusive.
+        XCTAssertFalse(EngineKernel.isQuietHour(hour: 21, quietStart: 22, quietEnd: 7))
+        XCTAssertTrue(EngineKernel.isQuietHour(hour: 22, quietStart: 22, quietEnd: 7))
+        XCTAssertTrue(EngineKernel.isQuietHour(hour: 0, quietStart: 22, quietEnd: 7))
+        XCTAssertTrue(EngineKernel.isQuietHour(hour: 6, quietStart: 22, quietEnd: 7))
+        XCTAssertFalse(EngineKernel.isQuietHour(hour: 7, quietStart: 22, quietEnd: 7))
+
+        // Within-day window (1 -> 6): 1 is inclusive, 6 is exclusive.
+        XCTAssertFalse(EngineKernel.isQuietHour(hour: 0, quietStart: 1, quietEnd: 6))
+        XCTAssertTrue(EngineKernel.isQuietHour(hour: 1, quietStart: 1, quietEnd: 6))
+        XCTAssertTrue(EngineKernel.isQuietHour(hour: 5, quietStart: 1, quietEnd: 6))
+        XCTAssertFalse(EngineKernel.isQuietHour(hour: 6, quietStart: 1, quietEnd: 6))
+
+        // Empty window (quietStart == quietEnd).
+        XCTAssertFalse(EngineKernel.isQuietHour(hour: 14, quietStart: 0, quietEnd: 0))
+        XCTAssertFalse(EngineKernel.isQuietHour(hour: 14, quietStart: 14, quietEnd: 14))
+    }
+
+    func testDecodedConfigQuietHoursOverrideRefusesAfternoonNudge() throws {
+        let raw = #"{"wakeHour":7,"bedtimeHour":23,"quietStart":14,"quietEnd":15}"#
+        let config = try JSONDecoder().decode(GrannyConfig.self, from: Data(raw.utf8))
+        var state = DayState.fresh(date: "2026-11-10")
+        let afternoon = calendar.date(
+            from: DateComponents(year: 2026, month: 11, day: 10, hour: 14, minute: 30))!
+        let speak = EngineEnvelope.request(
+            id: "q-1",
+            method: EngineCapability.notifySpeak.rawValue,
+            params: .object(["text": .string("Afternoon check"), "reason": .string("slot")]))
+        let outcome = EngineKernel.handle(
+            speak, config: config, state: &state, blocksEnforced: true,
+            now: afternoon, calendar: calendar)
+        XCTAssertEqual(outcome.reply.error?.code, .refused)
+        XCTAssertEqual(outcome.reply.error?.reason, "after quiet hours")
+    }
+
+    func testSlotPinnedNudgeOutranksFreeFormNudgeAtBudgetEdge() {
+        let config = GrannyConfig(wakeHour: 7, bedtimeHour: 22, nudgesPerDayMax: 2)
+        let pinnedTask = TaskItem(title: "Deep work", slotID: "morning")
+        var state = DayState(date: "2026-11-10", greeted: true, tasks: [pinnedTask], nudgesSent: 1)
+
+        let freeForm = EngineEnvelope.request(
+            id: "p-1",
+            method: EngineCapability.notifySpeak.rawValue,
+            params: .object(["text": .string("Random nudge"), "reason": .string("idle")]))
+        let dropped = EngineKernel.handle(
+            freeForm, config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(dropped.reply.error?.code, .refused)
+        XCTAssertEqual(dropped.reply.error?.reason, "nudge budget reserved for slot task")
+        XCTAssertEqual(state.nudgesSent, 1)
+
+        let slotNudge = EngineEnvelope.request(
+            id: "p-2",
+            method: EngineCapability.notifySpeak.rawValue,
+            params: .object(["text": .string("Slot started"), "reason": .string("slot")]))
+        let delivered = EngineKernel.handle(
+            slotNudge, config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(delivered.spokenText, "Slot started")
+        XCTAssertEqual(state.nudgesSent, 2)
+    }
+
     func testDayOffRefusesMutationsWhileStateReadWorks() {
         let config = GrannyConfig(wakeHour: 7, bedtimeHour: 23)
         var state = DayState(date: "2026-11-10", dayOff: true)

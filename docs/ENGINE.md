@@ -1,8 +1,9 @@
 # Engine contract
 
-Status: spec. Nothing below is built; `docs/ARCHITECTURE.md` carries the
-decision ("The engine, and other platforms" plus the last two decision-log
-entries).
+Status: Slices 0 and 1 implemented (`EngineProtocol.swift`, `EngineKernel.swift`,
+`EngineServer.swift`, `tests/e2e-engine.sh`); Slices 2-6 planned.
+`docs/ARCHITECTURE.md` carries the decision ("The engine, and other platforms"
+plus the last two decision-log entries).
 
 Why a contract and not a framework choice: the harness is the only part of
 granny that can be wrong, experimental, or dead, and it must never be able to

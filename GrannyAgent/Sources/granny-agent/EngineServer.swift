@@ -15,6 +15,9 @@ final class EngineServer {
         case degraded(reason: String)
     }
 
+    private static let promptTimeout: TimeInterval = 30
+    private static let maxRestartAttempts = 6
+
     private let socketURL: URL
     private let configProvider: () -> GrannyConfig
     private let stateStore: StateStore
@@ -24,6 +27,7 @@ final class EngineServer {
 
     private let ioQueue = DispatchQueue(label: "io.github.happyvoxel.granny.engine-io")
     private var listenFD: Int32 = -1
+    private var boundInode: ino_t = 0
     private var acceptSource: DispatchSourceRead?
     private var engineFD: Int32 = -1
     private var activePromptWaiters: [String: (EngineEnvelope) -> Void] = [:]
@@ -57,22 +61,12 @@ final class EngineServer {
     func start() throws {
         GrannyPaths.ensureDirectories()
         let path = socketURL.path
-        unlink(path)
-
-        let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else {
-            throw NSError(
-                domain: NSPOSIXErrorDomain,
-                code: Int(errno),
-                userInfo: [NSLocalizedDescriptionKey: "socket(AF_UNIX) failed"])
-        }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let utf8 = Array(path.utf8CString)
         let maxLen = MemoryLayout.size(ofValue: addr.sun_path)
         guard utf8.count <= maxLen else {
-            Darwin.close(fd)
             throw NSError(
                 domain: "granny",
                 code: 2,
@@ -84,6 +78,26 @@ final class EngineServer {
                     dst[index] = byte
                 }
             }
+        }
+
+        // Never unlink a socket another live granny-agent still owns.
+        var existing = stat()
+        if Darwin.lstat(path, &existing) == 0 {
+            guard (existing.st_mode & S_IFMT) == S_IFSOCK, !Self.isSocketLive(addr: &addr) else {
+                throw NSError(
+                    domain: "granny",
+                    code: Int(EADDRINUSE),
+                    userInfo: [NSLocalizedDescriptionKey: "another granny owns \(path)"])
+            }
+            unlink(path)
+        }
+
+        let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else {
+            throw NSError(
+                domain: NSPOSIXErrorDomain,
+                code: Int(errno),
+                userInfo: [NSLocalizedDescriptionKey: "socket(AF_UNIX) failed"])
         }
 
         let bindResult = withUnsafePointer(to: &addr) { ptr in
@@ -100,7 +114,21 @@ final class EngineServer {
                 userInfo: [NSLocalizedDescriptionKey: "bind(\(path)) failed"])
         }
 
-        _ = Darwin.chmod(path, mode_t(0o600))
+        guard Darwin.chmod(path, mode_t(0o600)) == 0 else {
+            let code = Int(errno)
+            Darwin.close(fd)
+            unlink(path)
+            throw NSError(
+                domain: NSPOSIXErrorDomain,
+                code: code,
+                userInfo: [NSLocalizedDescriptionKey: "chmod(\(path), 0600) failed"])
+        }
+
+        var boundStat = stat()
+        if Darwin.lstat(path, &boundStat) == 0 {
+            self.boundInode = boundStat.st_ino
+        }
+
         guard Darwin.listen(fd, 16) == 0 else {
             let code = Int(errno)
             Darwin.close(fd)
@@ -142,8 +170,30 @@ final class EngineServer {
                 child.terminate()
             }
             childProcess = nil
-            unlink(socketURL.path)
+            if boundInode != 0 {
+                var current = stat()
+                if Darwin.lstat(socketURL.path, &current) == 0, current.st_ino == boundInode {
+                    unlink(socketURL.path)
+                }
+                boundInode = 0
+            }
         }
+    }
+
+    private static func isSocketLive(addr: inout sockaddr_un) -> Bool {
+        let probe = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        guard probe >= 0 else { return false }
+        defer { Darwin.close(probe) }
+        let flags = fcntl(probe, F_GETFL, 0)
+        if flags >= 0 { _ = fcntl(probe, F_SETFL, flags | O_NONBLOCK) }
+        let rc = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                Darwin.connect(probe, sa, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        if rc == 0 { return true }
+        let err = errno
+        return err != ECONNREFUSED && err != ENOENT
     }
 
     /// Pushes a kernel domain event (`day.woke`, `slot.entered`, `round.idle`,
@@ -208,17 +258,20 @@ final class EngineServer {
         guard !stopped else { return }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
-        var env = ProcessInfo.processInfo.environment
-        env["GRANNY_ENGINE_SOCKET"] = socketURL.path
+        let hostEnv = ProcessInfo.processInfo.environment
+        var env: [String: String] = [
+            GrannyEnv.engineSocket: socketURL.path,
+        ]
+        for key in ["PATH", "HOME", "TMPDIR", "LANG"] {
+            if let value = hostEnv[key] { env[key] = value }
+        }
+        for (key, value) in hostEnv where key.hasPrefix("GRANNY_TEST_") {
+            env[key] = value
+        }
         process.environment = env
         process.terminationHandler = { [weak self] _ in
             self?.ioQueue.async { [weak self] in
-                guard let self, !self.stopped else { return }
-                let delay = min(10.0, 0.25 * pow(2.0, Double(min(self.restartAttempt, 5))))
-                self.restartAttempt += 1
-                self.ioQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    self?.launchEngineProcess(at: path)
-                }
+                self?.scheduleRestart(at: path)
             }
         }
         do {
@@ -226,6 +279,16 @@ final class EngineServer {
             self.childProcess = process
         } catch {
             self.status = .degraded(reason: "failed to launch engine: \(error.localizedDescription)")
+            scheduleRestart(at: path)
+        }
+    }
+
+    private func scheduleRestart(at path: String) {
+        guard !stopped, restartAttempt < Self.maxRestartAttempts else { return }
+        let delay = min(10.0, 0.25 * pow(2.0, Double(min(restartAttempt, 5))))
+        restartAttempt += 1
+        ioQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.launchEngineProcess(at: path)
         }
     }
 
@@ -256,6 +319,22 @@ final class EngineServer {
                 self?.serveConnection(fd: clientFD)
             }
         }
+    }
+
+    private static func peerPID(of fd: Int32) -> pid_t? {
+        var pid: pid_t = 0
+        var len = socklen_t(MemoryLayout<pid_t>.size)
+        guard getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &len) == 0, pid > 0 else {
+            return nil
+        }
+        return pid
+    }
+
+    private static func isDescriptorOpen(_ fd: Int32) -> Bool {
+        guard fd >= 0 else { return false }
+        var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        guard Darwin.poll(&pfd, 1, 0) >= 0 else { return false }
+        return (pfd.revents & Int16(POLLHUP | POLLNVAL)) == 0
     }
 
     private func serveConnection(fd: Int32) {
@@ -307,6 +386,28 @@ final class EngineServer {
 
                 if !handshaked {
                     if envelope.method == "hello" {
+                        let slotRefusal: String? = ioQueue.sync {
+                            if let child = self.childProcess, child.isRunning,
+                               let peerPID = Self.peerPID(of: fd),
+                               peerPID != child.processIdentifier
+                            {
+                                return "engine slot is owned by the spawned child"
+                            }
+                            if self.engineFD >= 0, self.engineFD != fd,
+                               Self.isDescriptorOpen(self.engineFD)
+                            {
+                                return "engine already connected"
+                            }
+                            return nil
+                        }
+                        if let reason = slotRefusal {
+                            _ = ioQueue.sync {
+                                self.writeLine(
+                                    .failure(id: envelope.id ?? "hello", error: .refused(reason)),
+                                    to: fd)
+                            }
+                            return
+                        }
                         let (reply, peer) = onMain {
                             EngineKernel.hello(
                                 from: envelope,
@@ -337,11 +438,22 @@ final class EngineServer {
                         // through the kernel to the connected engine.
                         handleClientPromptOverSocket(envelope: envelope, clientFD: fd)
                         return
-                    } else {
+                    } else if envelope.method == EngineCapability.stateRead.rawValue {
+                        // Reads are replay-safe and serve the app's own status
+                        // path; a mutation waits for the handshake.
                         let outcome = onMain {
                             self.evaluateKernelRequest(envelope)
                         }
                         _ = ioQueue.sync { self.writeLine(outcome.reply, to: fd) }
+                        return
+                    } else {
+                        _ = ioQueue.sync {
+                            self.writeLine(
+                                .failure(
+                                    id: envelope.id ?? "",
+                                    error: .refused("hello handshake required first")),
+                                to: fd)
+                        }
                         return
                     }
                 }
@@ -419,7 +531,19 @@ final class EngineServer {
                 done.signal()
             }
         }
-        done.wait()
+        if done.wait(timeout: .now() + Self.promptTimeout) == .timedOut {
+            ioQueue.sync {
+                self.activePromptWaiters.removeValue(forKey: id)
+                _ = self.writeLine(
+                    .failure(
+                        id: id,
+                        error: EngineError(
+                            code: .internal,
+                            reason: "engine prompt timed out",
+                            retryable: false)),
+                    to: clientFD)
+            }
+        }
     }
 
     @discardableResult

@@ -94,14 +94,20 @@ contains "$bad_hello" '"code":"refused"' "wrong protocol refused"
 status_after_bad="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/status")"
 contains "$status_after_bad" '"phase":"awaitingTasks"' "app still coaching after bad handshake"
 
+# Mutations before hello are refused.
+unhandshaked="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"e-nohello","key":"k-nohello","method":"state.task.add","params":{"title":"Sneak in"}}')"
+contains "$unhandshaked" '"reason":"hello handshake required first"' "mutation without hello refused"
+
 # 2. state.task.add twice with the same key adds one task; second returns duplicate + original result.
+CASK_VER="$(sed -n 's/^  version "\([^"]*\)".*/\1/p' "$REPO/packaging/homebrew/Casks/granny.rb")"
 HELLO='{"v":1,"id":"e-1","method":"hello","params":{"role":"engine","impl":"pi-durable/0.1.0","capabilities":["state.read","state.task.add","state.task.tick","notify.speak"]}}'
 ADD='{"v":1,"id":"e-2","key":"k-same","method":"state.task.add","params":{"title":"Apply 5 jobs"}}'
 ADD_DUP='{"v":1,"id":"e-3","key":"k-same","method":"state.task.add","params":{"title":"Apply 5 jobs"}}'
 READ='{"v":1,"id":"e-4","method":"state.read","params":{}}'
 
 out="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO" "$ADD" "$ADD_DUP" "$READ")"
-contains "$out" '"impl":"granny/0.9.0"' "handshake reply"
+contains "$out" "\"impl\":\"granny/$CASK_VER\"" "handshake reply"
 contains "$out" '"code":"duplicate"' "second add with same key is duplicate"
 
 task_id="$(printf '%s\n' "$out" | sed -n '2p' | node -e 'const fs=require("fs");console.log(JSON.parse(fs.readFileSync(0,"utf8")).result.taskID)')"

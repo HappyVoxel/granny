@@ -30,4 +30,6 @@ public enum GrannyEnv {
     /// Path to the `granny-engine` executable the app spawns as a sidecar.
     /// The e2e engine suite points this at its Node stub.
     public static let enginePath = "GRANNY_ENGINE_PATH"
+    /// Path to `<state dir>/engine.sock` passed to the spawned engine child.
+    public static let engineSocket = "GRANNY_ENGINE_SOCKET"
 }

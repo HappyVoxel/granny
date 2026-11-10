@@ -138,7 +138,12 @@ if arguments.contains("--serve") {
             stateStore: store,
             enforcementProvider: { onMain { pomodoro.enforced } })
         try server.start()
-        try engineServer.start()
+        do {
+            try engineServer.start()
+        } catch {
+            FileHandle.standardError.write(
+                Data("engine socket failed: \(error.localizedDescription)\n".utf8))
+        }
         _ = engineServer
         print("granny-agent serving on 127.0.0.1:\(config.decidePortNumber)")
         // A redirected stdout is block-buffered: a script waiting for the

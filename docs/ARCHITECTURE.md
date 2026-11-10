@@ -191,6 +191,7 @@ common case and would drown the signal.
 | 1a | Swift app: greeting window, OpenRouter brain, day off, reward scheduler, root helper | done |
 | 1b | Extension: interception via daemon, rules + DeepSeek tiers, Chrome package | done |
 | 1c | Safari package | done (`scripts/make-safari.sh` + converter patched bundle id) |
+| 1d | Engine contract & local socket kernel (`EngineProtocol`, `EngineKernel`, `EngineServer`) | Slices 0-1 done (`docs/ENGINE.md`) |
 | 2 | hardening | partial - see deferred list |
 
 ## The engine, and other platforms (planned)

@@ -21,7 +21,6 @@ public enum EngineProtocol {
         .stateTaskAdd,
         .stateTaskTick,
         .notifySpeak,
-        .modelStream,
     ]
 }
 
