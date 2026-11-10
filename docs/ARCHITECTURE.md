@@ -207,11 +207,12 @@ layers, and the day lives in the middle one:
 ```mermaid
 flowchart TB
     CLIENTS["clients: macOS SwiftUI · iOS · Android · extension"]
-    ENGINE["engine: conversation, intents, reflection<br/>process on the Mac, library on the phone"]
+    ENGINE["engine (Pi Durable): conversation, proactive intents, reflection<br/>sidecar on the Mac · reachable over relay from the phone"]
     KERNEL["kernel (GrannyCore): phases, payment, slots,<br/>streak, day log - the only authority"]
     ENFORCE["enforcement, per OS:<br/>hosts + helper · ManagedSettings + DNS proxy · VpnService"]
     CLIENTS -->|"chat, intents"| ENGINE
     CLIENTS -->|"reads, commands"| KERNEL
+    KERNEL -->|"domain events"| ENGINE
     ENGINE -->|"capabilities, re-validated"| KERNEL
     KERNEL --> ENFORCE
 ```
@@ -228,13 +229,15 @@ proxy network extension on iOS, `VpnService` on Android. A portable "blocker"
 would be a second enforcement truth, and two truths there already cost this
 repo a bug class: the hosts, `/decide`, the janitor and the killer disagree.
 
-**The engine is a process on the Mac and a library on the phone.** iOS has no
-child processes, so a sidecar engine cannot ship there. The contract is
-therefore transport-agnostic from its first commit: a Unix socket at
-`<state dir>/engine.sock` (mode 0600) on macOS, in-process on iOS, and the Mac
-(or a server) over the network when the phone can reach it. A phone that
-cannot reach an engine still coaches - it keeps the day, the rules and the
-reminder clock, and loses only the conversation.
+**The engine is a sidecar on the Mac and reachable from the phone.** iOS has no
+child processes and throttles background tasks (`BGTaskScheduler`), so a
+proactive durable loop cannot run reliably inside a phone app anyway. The
+contract is therefore transport-agnostic from its first commit: a Unix socket
+at `<state dir>/engine.sock` (mode 0600) on macOS, and the Mac (or a server)
+over the authenticated relay when the phone can reach it. A phone that cannot
+reach an engine still coaches - it keeps the day, the rules, OS enforcement
+and the reminder clock in-process, and loses only conversation and free-form
+nudges.
 
 **The engine never holds authority.** It asks for capabilities - add a task,
 start a round, move a slot, speak - and the kernel re-validates every one of
@@ -410,22 +413,27 @@ runtime stays a decision about glue, not about the app.
   break cannot outlive the block that follows it.
 - **The thinking part gets a contract, not a rewrite**: the coach's harness
   moves to `granny-engine` behind a versioned local contract (socket on
-  macOS, in-process on iOS), and `GrannyCore` becomes the capability kernel
-  the engine asks - `state.task.add`, `round.start`, `notify.speak` - each
-  re-validated in Swift. The reason is not architecture taste: the harness is
-  the only part that can be wrong, experimental, or dead, and it must not be
-  able to make granny lenient. With no engine running, the day, the blocks and
-  the streak are unchanged; only the conversation stops.
-- **The engine is Rust, and the kernel makes the model calls**: Pi Durable was
-  the first candidate and lost on one thing - an engine written for Node cannot
-  run in-process on a phone, and this plan already needs the engine as a
-  library on iOS. Rust compiles to a static library for iOS and Android, ships
-  as a 5-10MB binary instead of a vendored Bun runtime with `node_modules`, and
-  `rig_agent`'s run protocol is sans-IO - it hands back `CallModel`/`CallTools`
-  and the kernel drives it, so the engine never holds a key and the tier policy
-  (rules, Laya, jev, OpenRouter) stays in one place. Only `rig-agent` is
-  depended on, pinned, and rig's session format is not used for storage. From
-  Pi Durable we keep the semantics, not the code: the effect record before the
-  effect, result ids provisioned up front, `replay: "safe"` for reads only,
-  lanes for parallel work. Revisit Pi Durable if the engine ever moves to a
-  server for multi-user or multi-device.
+  macOS, authenticated relay from a phone), and `GrannyCore` becomes the
+  capability kernel the engine asks - `state.task.add`, `round.start`,
+  `notify.speak` - each re-validated in Swift. The reason is not architecture
+  taste: the harness is the only part that can be wrong, experimental, or dead,
+  and it must not be able to make granny lenient. With no engine running, the
+  day, the blocks and the streak are unchanged; only the conversation stops.
+- **The engine is Pi Durable, and the kernel still makes the model calls**:
+  Rust (`rig-agent`) was considered so the engine could compile into an iOS app
+  as a static library, and lost once **proactive durability** became the point
+  of the engine. A reactive turn is a step machine; a proactive coach is a
+  persistent scheduler, durable timers that survive Mac sleep, crash recovery,
+  and lane isolation (`interactive`, `proactive`, `reflection`) so background
+  checks never collide with a live chat. Writing that in Rust means rebuilding
+  Pi Durable before writing a line of granny - and iOS `BGTaskScheduler`
+  throttles background LLM turns on a phone anyway, so the phone keeps the
+  kernel and OS enforcement locally and reaches the engine over the relay.
+  `@earendil-works/pi-durable` runs as the sidecar behind `GRANNY_ENGINE_PATH`,
+  woken by kernel domain events (`day.woke`, `slot.entered`, `round.idle`,
+  `warn.continued`, `day.rollover`) and its own durable timers. Model calls
+  still go through a thin custom Pi provider backed by the kernel's
+  `model.stream` capability, so the engine holds no API keys, the tier policy
+  (rules, Laya, jev, OpenRouter) and Langfuse tracing stay in `GrannyCore`, and
+  every proactive side effect is gated by the kernel's idempotency window,
+  `nudgesPerDayMax` and `quietHours`.

@@ -88,6 +88,17 @@ public enum EngineCapability: String, CaseIterable, Codable, Sendable {
     case modelStream = "model.stream"
 }
 
+/// Domain events the kernel pushes to wake the engine's `proactive` or
+/// `reflection` lanes in Pi Durable when the day changes shape.
+public enum EngineDomainEvent: String, CaseIterable, Codable, Sendable {
+    case dayWoke = "day.woke"
+    case slotEntered = "slot.entered"
+    case roundIdle = "round.idle"
+    case roundFinished = "round.finished"
+    case warnContinued = "warn.continued"
+    case dayRollover = "day.rollover"
+}
+
 public struct EngineError: Codable, Equatable, Sendable {
     public enum Code: String, Codable, Sendable {
         case refused
@@ -181,6 +192,10 @@ public struct EngineEnvelope: Codable, Equatable, Sendable {
         EngineEnvelope(params: params, event: event)
     }
 
+    public static func push(domainEvent: EngineDomainEvent, params: EngineJSON) -> EngineEnvelope {
+        EngineEnvelope(params: params, event: domainEvent.rawValue)
+    }
+
     public var isRequest: Bool { method != nil }
 
     public var isReply: Bool { method == nil && event == nil && (result != nil || error != nil) }
@@ -188,6 +203,11 @@ public struct EngineEnvelope: Codable, Equatable, Sendable {
     /// The capability this request names, or nil when the engine invented one.
     public var capability: EngineCapability? {
         method.flatMap(EngineCapability.init(rawValue:))
+    }
+
+    /// The kernel domain event this push carries, or nil for engine stream events.
+    public var domainEvent: EngineDomainEvent? {
+        event.flatMap(EngineDomainEvent.init(rawValue:))
     }
 
     public enum CodingKeys: String, CodingKey {

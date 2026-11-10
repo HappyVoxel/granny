@@ -13,3 +13,4 @@
 {"v":1,"event":"model.done","params":{"text":"which step is stuck?","usage":{"in":42,"out":7}}}
 {"v":1,"id":"e-7","method":"state.task.giveup","params":{}}
 {"v":1,"id":"e-7","error":{"code":"invalid","reason":"unknown method state.task.giveup","retryable":false}}
+{"v":1,"event":"slot.entered","params":{"rounds":0,"slotID":"morning-deep","taskIDs":["t-9"]}}
