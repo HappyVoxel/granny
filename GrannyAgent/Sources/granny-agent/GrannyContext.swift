@@ -31,6 +31,7 @@ final class GrannyContext {
     private(set) var rhythmReport: RhythmReport?
 
     private var server: DecisionServer?
+    private(set) var engineServer: EngineServer?
     private var killer: AppKiller?
     private var janitor: BrowserJanitor?
     private var updateTimer: Timer?
@@ -45,6 +46,7 @@ final class GrannyContext {
     private var pomodoroRemaining: TimeInterval = 0
     private var pomodoroRunning = false
     private var pomodoroTimer: Timer?
+    private var lastRolloverDate: String?
 
     init() {
         GrannyPaths.ensureDirectories()
@@ -53,6 +55,7 @@ final class GrannyContext {
         GrannyLines.language = config.language
         GrannyTheme.configure(appearance: config.appearance)
         self.store = StateStore()
+        self.lastRolloverDate = store.state.date
         self.rhythmReport = store.rhythm()
         self.schedule = Schedule(slots: config.schedule)
         self.tags = config.tags
@@ -83,6 +86,7 @@ final class GrannyContext {
         // like, and why the clock is reset here instead of by comparing
         // stages.
         scheduler.onDayRollover = { [weak self] in self?.startPomodoroDay() }
+        startEngineServer()
         scheduler.start()
         startDecisionServer()
         startAppKiller()
@@ -93,6 +97,14 @@ final class GrannyContext {
         if ProcessInfo.processInfo.environment[GrannyEnv.pomodoroAutostart] == "1" {
             startPomodoro()
         }
+    }
+
+    func stop() {
+        engineServer?.stop()
+    }
+
+    func pushDayWoke() {
+        engineServer?.pushDayWokeIfNeeded()
     }
 
     func snapshot() -> (DayState, Phase) {
@@ -705,6 +717,12 @@ final class GrannyContext {
         // behind another app or the screen asleep.
         if over == .deepWork {
             chime.breakTime()
+            engineServer?.push(
+                domainEvent: .roundFinished,
+                params: .object([
+                    "rounds": .number(Double(store.state.pomodoro.finished)),
+                    "stage": .string(next.stage.rawValue),
+                ]))
             // The break lifts the block: the line says what to do with it,
             // and when the door closes again. Only the round that first paid
             // the day says "go play" - every later round is a break again,
@@ -739,6 +757,15 @@ final class GrannyContext {
         syncPomodoro()
         // The rollover just logged yesterday: the line may say something new.
         rhythmReport = store.rhythm()
+        let today = store.state.date
+        guard lastRolloverDate != today else { return }
+        lastRolloverDate = today
+        engineServer?.push(
+            domainEvent: .dayRollover,
+            params: .object([
+                "date": .string(today),
+                "open": .number(Double(store.state.carried.count)),
+            ]))
     }
 
     private func stageName(_ stage: PomodoroStage) -> String {
@@ -786,6 +813,27 @@ final class GrannyContext {
         } catch {
             postNotification(body: GrannyLines.decisionServerFailed(port: config.decidePort))
         }
+    }
+
+    private func startEngineServer() {
+        let server = EngineServer(
+            configProvider: { [unowned self] in self.config },
+            stateStore: store,
+            enforcementProvider: { [unowned self] in self.blocksEnforced() },
+            onSpeak: { [weak self] line in self?.announce(line) },
+            onMutated: { [weak self] in
+                guard let self else { return }
+                self.viewModel.refresh(from: self)
+                self.syncPomodoro()
+                self.scheduler.tick()
+                Task { await self.engine.clearCache() }
+            })
+        do {
+            try server.start()
+        } catch {
+            server.recordStartupFailure(error)
+        }
+        self.engineServer = server
     }
 
     private func startBrowserJanitor() {

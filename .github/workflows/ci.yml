@@ -24,5 +24,6 @@ jobs:
           bash tests/e2e.sh
           bash tests/e2e-helper.sh
           bash tests/e2e-agent.sh
+          bash tests/e2e-engine.sh
           bash tests/e2e-extension.sh
           bash tests/e2e-safari.sh

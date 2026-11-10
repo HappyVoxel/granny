@@ -16,6 +16,7 @@ Run before claiming any change works:
 (cd GrannyAgent && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test)
 bash tests/e2e-helper.sh      # helper binary against a sandbox hosts file
 bash tests/e2e-agent.sh       # agent CLI + HTTP decision server
+bash tests/e2e-engine.sh      # kernel <-> engine AF_UNIX socket contract
 bash tests/e2e-extension.sh   # extension syntax, manifests, packaging
 bash tests/e2e-safari.sh      # slow (~1 min): converter + unsigned xcodebuild
 bash tests/e2e-safari-webdriver.sh  # real Safari via safaridriver (no Chrome)
@@ -98,8 +99,8 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   override - the app itself never shells out to `pkill`), `GRANNY_CHIME`,
   `GRANNY_KILLALL` (the Private Relay proxy killed when the block returns
   after a break - the e2e suites point it at a sentinel),
-  `GRANNY_POMODORO_AUTOSTART`, and the
-  updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
+  `GRANNY_POMODORO_AUTOSTART`, `GRANNY_ENGINE_PATH`, `GRANNY_ENGINE_SOCKET`,
+  and the updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
   system calls must get an override or the e2e suites cannot reach them.
   `GRANNY_HOSTS_FILE` is the one that changes behaviour, not just a path: a run
   pointed at another file writes *that* file as the user (the local helper, no

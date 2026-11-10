@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Notifier.shared.onOpen = { [weak self] in self?.presentInitialWindow() }
         buildMainMenu()
         context.scheduler.onGreetingNeeded = { [weak self] in
+            self?.context.pushDayWoke()
             self?.remindIntake()
         }
         context.scheduler.onPhaseChanged = { [weak context] phase in
@@ -49,6 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if ProcessInfo.processInfo.environment[GrannyEnv.showWindow] == "1", window == nil {
             presentInitialWindow()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        context.stop()
     }
 
     /// The streak notification: granny's own line from the model tier when

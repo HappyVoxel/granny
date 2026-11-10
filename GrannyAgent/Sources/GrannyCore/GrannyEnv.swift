@@ -27,4 +27,9 @@ public enum GrannyEnv {
     /// (install-app.sh's shell override), and the one the suites point at a
     /// sentinel so no run can ever signal the real proxy.
     public static let killall = "GRANNY_KILLALL"
+    /// Path to the `granny-engine` executable the app spawns as a sidecar.
+    /// The e2e engine suite points this at its Node stub.
+    public static let enginePath = "GRANNY_ENGINE_PATH"
+    /// Path to `<state dir>/engine.sock` passed to the spawned engine child.
+    public static let engineSocket = "GRANNY_ENGINE_SOCKET"
 }

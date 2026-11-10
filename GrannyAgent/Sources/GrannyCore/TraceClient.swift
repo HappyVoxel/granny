@@ -4,6 +4,8 @@ import Foundation
 /// traces. No Swift SDK exists; the ingestion API is one HTTP POST, and a
 /// framework would be more code than this.
 public final class TraceClient: @unchecked Sendable {
+    public static let version = "0.1.2"
+
     public struct Span: Sendable {
         public var name: String
         public var traceName: String
@@ -112,7 +114,7 @@ public final class TraceClient: @unchecked Sendable {
                     ],
                     "scopeSpans": [
                         [
-                            "scope": ["name": "granny-agent", "version": "0.1.2"],
+                            "scope": ["name": "granny-agent", "version": version],
                             "spans": [otlpSpan],
                         ],
                     ],
