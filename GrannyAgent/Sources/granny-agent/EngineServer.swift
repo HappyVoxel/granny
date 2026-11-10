@@ -284,6 +284,22 @@ final class EngineServer {
         }
     }
 
+    /// Cancels an in-flight `chat.prompt` run on the connected engine.
+    func abort(id: String) {
+        ioQueue.async { [weak self] in
+            guard let self else { return }
+            let waiter = self.activePromptWaiters.removeValue(forKey: id)
+            if self.engineFD >= 0 {
+                let request = EngineEnvelope.request(
+                    id: id,
+                    method: "chat.abort",
+                    params: .object(["id": .string(id)]))
+                _ = self.writeLine(request, to: self.engineFD)
+            }
+            waiter?(.reply(id: id, result: .object(["aborted": .bool(true)])))
+        }
+    }
+
     // MARK: - Child supervision
 
     private func spawnEngineIfConfigured() {
@@ -510,6 +526,20 @@ final class EngineServer {
                         // A local client (CLI or e2e test) driving `chat.prompt`
                         // through the kernel to the connected engine.
                         handleClientPromptOverSocket(envelope: envelope, clientFD: fd)
+                        return
+                    } else if envelope.method == "chat.abort" {
+                        var targetID = envelope.id ?? ""
+                        if case .object(let fields) = envelope.params,
+                           case .string(let runID) = fields["id"], !runID.isEmpty
+                        {
+                            targetID = runID
+                        }
+                        abort(id: targetID)
+                        _ = ioQueue.sync {
+                            self.writeLine(
+                                .reply(id: envelope.id ?? targetID, result: .object(["aborted": .bool(true)])),
+                                to: fd)
+                        }
                         return
                     } else if envelope.method == EngineCapability.stateRead.rawValue {
                         // Reads are replay-safe and serve the app's own status

@@ -2,9 +2,10 @@
 
 Status: wire types (`EngineProtocol.swift`), the kernel rule table
 (`EngineKernel.swift`: `hello`, `state.read`, `state.task.add`,
-`state.task.tick`, `notify.speak`), and the local socket + child supervisor
+`state.task.tick`, `notify.speak`), the local socket + child supervisor
 (`EngineServer.swift`, `GRANNY_ENGINE_PATH`, `day.woke`/`round.finished`/`day.rollover`
-pushes, `tests/e2e-engine.sh`) are implemented. The chat window, `round.start`,
+pushes, `tests/e2e-engine.sh`), and the native chat tab (`ChatView.swift`:
+streaming deltas, `chat.abort`, degraded state) are implemented. `round.start`,
 `slot.move`, `model.stream` tier wiring, and the Pi Durable runtime remain.
 `docs/ARCHITECTURE.md` carries the decision ("The engine, and other platforms"
 plus the last two decision-log entries).
@@ -328,7 +329,7 @@ can ship alone.
 ```mermaid
 flowchart LR
     S0["0 · contract as fixtures<br/>types + jsonl cases (done)"] --> S1["1 · kernel socket + rule table<br/>hello · read · task.add/tick · speak<br/>child supervisor (done)"]
-    S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state"]
+    S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state (done)"]
     S2 --> S3["3 · remaining capabilities<br/>round.start · slot.move · model.stream"]
     S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH"]
     S4 --> S5["5 · proactive events · reflection<br/>slot.entered · round.idle · warn.continued"]
@@ -345,8 +346,9 @@ flowchart LR
    supervision behind `GRANNY_ENGINE_PATH`, and `day.woke` / `round.finished` /
    `day.rollover` pushes. Driven by `tests/e2e-engine.sh` using a `node:net`
    stub.
-2. Chat tab on the stub: streaming deltas, abort, and the degraded state when
-   no socket answers. Visible, reviewable, zero model spend.
+2. Chat tab on the stub (done, `ChatView.swift` + `RootView.swift`): streaming
+   deltas, `chat.abort`, and the degraded state when no socket answers.
+   Visible, reviewable, zero model spend.
 3. Remaining kernel capabilities: `round.start`, `slot.move`, `trace.emit` and
    `model.stream` wired to `OpenRouterClient`.
 4. Engine #1: Pi Durable (`@earendil-works/pi-durable`, pinned), three lanes

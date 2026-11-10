@@ -169,6 +169,9 @@ conn.on("data", (chunk) => {
       if (mode === "crash") {
         process.exit(1);
       }
+      if (mode === "slow") {
+        return;
+      }
       conn.write(JSON.stringify({ v: 1, id: msg.id, event: "chat.done", params: { text: "which step is stuck?" } }) + "\n");
     }
   }
@@ -187,6 +190,27 @@ stream_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-1","method":"chat.prompt","params":{"text":"stuck on booking","stream":true}}')"
 contains "$stream_out" '"event":"chat.delta"' "chat.prompt streams delta"
 contains "$stream_out" '"event":"chat.done"' "chat.prompt ends with chat.done"
+kill "$ENGINE_PID" 2>/dev/null || true
+wait "$ENGINE_PID" 2>/dev/null || true
+ENGINE_PID=""
+
+# Start stub in slow mode: chat.abort cancels the in-flight prompt.
+node "$SANDBOX/engine-stub.mjs" "$SOCK" "slow" &
+ENGINE_PID=$!
+sleep 0.2
+
+node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-slow","method":"chat.prompt","params":{"text":"long answer","stream":true}}' >"$SANDBOX/slow.out" &
+SLOW_CLIENT_PID=$!
+sleep 0.2
+
+abort_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-abort","method":"chat.abort","params":{"id":"c-slow"}}')"
+contains "$abort_out" '"aborted":true' "chat.abort ack"
+wait "$SLOW_CLIENT_PID" 2>/dev/null || true
+slow_stream="$(cat "$SANDBOX/slow.out")"
+contains "$slow_stream" '"event":"chat.delta"' "slow prompt delivered delta before abort"
+contains "$slow_stream" '"aborted":true' "slow prompt released on abort"
 kill "$ENGINE_PID" 2>/dev/null || true
 wait "$ENGINE_PID" 2>/dev/null || true
 ENGINE_PID=""

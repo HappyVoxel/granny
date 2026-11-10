@@ -95,7 +95,17 @@ public enum GrannyLines {
     public static var slotClear: String { strings.slotClear }
     public static var scheduleInvalid: String { strings.scheduleInvalid }
     public static var tabTasks: String { strings.tabTasks }
+    public static var tabChat: String { strings.tabChat }
     public static var tabTimetable: String { strings.tabTimetable }
+    public static var chatTitle: String { strings.chatTitle }
+    public static var chatSubtitle: String { strings.chatSubtitle }
+    public static var chatPlaceholder: String { strings.chatPlaceholder }
+    public static var chatSendButton: String { strings.chatSendButton }
+    public static var chatAbortButton: String { strings.chatAbortButton }
+    public static var chatEmpty: String { strings.chatEmpty }
+    public static var chatDegraded: String { strings.chatDegraded }
+    public static var chatSpeakerYou: String { strings.chatSpeakerYou }
+    public static var chatSpeakerGranny: String { strings.chatSpeakerGranny }
     public static var tagsTitle: String { strings.tagsTitle }
     public static var tagAdd: String { strings.tagAdd }
     public static var tagNamePlaceholder: String { strings.tagNamePlaceholder }

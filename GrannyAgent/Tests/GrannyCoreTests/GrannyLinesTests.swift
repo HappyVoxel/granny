@@ -127,4 +127,18 @@ extension GrannyLinesTests {
         XCTAssertTrue(finnish.contains("pois näytöltä"))
         XCTAssertTrue(finnish.contains("5 minuutin"))
     }
+
+    func testChatTabAndDegradedLinesSpeakEveryLanguage() {
+        GrannyLines.language = "en"
+        XCTAssertEqual(GrannyLines.tabChat, "Talk to Granny")
+        XCTAssertTrue(GrannyLines.chatDegraded.contains("notebook"))
+
+        GrannyLines.language = "vi"
+        XCTAssertEqual(GrannyLines.tabChat, "Đôi co với Ngoại")
+        XCTAssertTrue(GrannyLines.chatDegraded.contains("sổ việc"))
+
+        GrannyLines.language = "fi"
+        XCTAssertEqual(GrannyLines.tabChat, "Juttele mummon kanssa")
+        XCTAssertTrue(GrannyLines.chatDegraded.contains("vihko"))
+    }
 }
