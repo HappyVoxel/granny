@@ -160,7 +160,7 @@ final class EngineServer {
         ioQueue.sync {
             stopped = true
             if engineFD >= 0 {
-                Darwin.close(engineFD)
+                _ = Darwin.shutdown(engineFD, SHUT_RDWR)
                 engineFD = -1
             }
             acceptSource?.cancel()

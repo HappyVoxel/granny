@@ -193,14 +193,30 @@ final class EngineKernelTests: XCTestCase {
     }
 
     func testSlotPinnedNudgeOutranksFreeFormNudgeAtBudgetEdge() {
-        let config = GrannyConfig(wakeHour: 7, bedtimeHour: 22, nudgesPerDayMax: 2)
-        let pinnedTask = TaskItem(title: "Deep work", slotID: "morning")
-        var state = DayState(date: "2026-11-10", greeted: true, tasks: [pinnedTask], nudgesSent: 1)
+        let schedule = [
+            ScheduleSlot(id: "morning", time: "09:00", label: "Deep work", tag: "deepWork"),
+            ScheduleSlot(id: "afternoon", time: "15:00", label: "Admin", tag: "admin"),
+        ]
+        let config = GrannyConfig(
+            wakeHour: 7, bedtimeHour: 22, schedule: schedule, nudgesPerDayMax: 2)
 
+        // A task pinned to a later slot (15:00) does not suppress a free-form nudge at 10:00.
+        let laterTask = TaskItem(title: "Admin", slotID: "afternoon")
+        var laterState = DayState(
+            date: "2026-11-10", greeted: true, tasks: [laterTask], nudgesSent: 1)
         let freeForm = EngineEnvelope.request(
             id: "p-1",
             method: EngineCapability.notifySpeak.rawValue,
             params: .object(["text": .string("Random nudge"), "reason": .string("idle")]))
+        let allowedWhenFutureSlot = EngineKernel.handle(
+            freeForm, config: config, state: &laterState, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(allowedWhenFutureSlot.spokenText, "Random nudge")
+
+        // A carried frog pinned to the current slot (09:00 at 10:00) reserves the last nudge.
+        let currentFrog = TaskItem(title: "Deep work", carriedOver: true, slotID: "morning")
+        var state = DayState(
+            date: "2026-11-10", greeted: true, carried: [currentFrog], nudgesSent: 1)
         let dropped = EngineKernel.handle(
             freeForm, config: config, state: &state, blocksEnforced: true,
             now: date(hour: 10), calendar: calendar)

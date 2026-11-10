@@ -253,17 +253,20 @@ public enum EngineKernel {
             guard state.nudgesSent < config.nudgesPerDayMax else {
                 return EngineOutcome(reply: .failure(id: id, error: .refused("nudge budget spent")))
             }
-            let hasPinnedOpenTask = state.tasks.contains {
-                !$0.done && ($0.slotID?.isEmpty == false)
+            let currentSlotID = Schedule(slots: config.schedule)
+                .current(at: now, calendar: calendar)?.id
+            let openWork = state.tasks + state.carried
+            let hasCurrentSlotTask = currentSlotID != nil && openWork.contains {
+                !$0.done && $0.slotID == currentSlotID
             }
-            let isSlotPinned = reason == "slot" || {
-                guard case .string(let slotID) = fields["slotID"], !slotID.isEmpty else {
+            let isCurrentSlotNudge = hasCurrentSlotTask && (reason == "slot" || {
+                guard case .string(let slotID) = fields["slotID"] else {
                     return false
                 }
-                return state.tasks.contains { !$0.done && $0.slotID == slotID }
-            }()
-            if hasPinnedOpenTask, config.nudgesPerDayMax > 1,
-               !isSlotPinned, state.nudgesSent >= config.nudgesPerDayMax - 1
+                return slotID == currentSlotID
+            }())
+            if hasCurrentSlotTask, config.nudgesPerDayMax > 1,
+               !isCurrentSlotNudge, state.nudgesSent >= config.nudgesPerDayMax - 1
             {
                 return EngineOutcome(
                     reply: .failure(

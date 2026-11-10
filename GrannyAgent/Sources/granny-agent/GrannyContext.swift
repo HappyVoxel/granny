@@ -46,6 +46,8 @@ final class GrannyContext {
     private var pomodoroRemaining: TimeInterval = 0
     private var pomodoroRunning = false
     private var pomodoroTimer: Timer?
+    private var lastDayWokeDate: String?
+    private var lastRolloverDate: String?
 
     init() {
         GrannyPaths.ensureDirectories()
@@ -54,6 +56,7 @@ final class GrannyContext {
         GrannyLines.language = config.language
         GrannyTheme.configure(appearance: config.appearance)
         self.store = StateStore()
+        self.lastRolloverDate = store.state.date
         self.rhythmReport = store.rhythm()
         self.schedule = Schedule(slots: config.schedule)
         self.tags = config.tags
@@ -102,10 +105,13 @@ final class GrannyContext {
     }
 
     func pushDayWoke() {
+        let today = store.state.date
+        guard lastDayWokeDate != today else { return }
+        lastDayWokeDate = today
         engineServer?.push(
             domainEvent: .dayWoke,
             params: .object([
-                "date": .string(store.state.date),
+                "date": .string(today),
                 "frogs": .number(Double(store.state.carried.count)),
             ]))
     }
@@ -760,10 +766,13 @@ final class GrannyContext {
         syncPomodoro()
         // The rollover just logged yesterday: the line may say something new.
         rhythmReport = store.rhythm()
+        let today = store.state.date
+        guard lastRolloverDate != today else { return }
+        lastRolloverDate = today
         engineServer?.push(
             domainEvent: .dayRollover,
             params: .object([
-                "date": .string(store.state.date),
+                "date": .string(today),
                 "open": .number(Double(store.state.carried.count)),
             ]))
     }
