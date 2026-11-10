@@ -7,8 +7,9 @@ entries).
 Why a contract and not a framework choice: the harness is the only part of
 granny that can be wrong, experimental, or dead, and it must never be able to
 make granny lenient. Binding the app to a socket makes the harness replaceable
-(a Rust engine on macOS, the same code in-process on iOS) and
-keeps the enforcement kernel - the one thing that must stay true - in Swift.
+(Pi Durable on macOS or a small server, reachable over the same protocol from a
+phone) and keeps the enforcement kernel - the one thing that must stay true -
+in Swift.
 
 ## The line
 
@@ -44,9 +45,10 @@ flowchart LR
 
 The engine has no arrow to `granny-helper`, no arrow to a provider, and no key:
 the only way it changes the day is a capability the kernel re-checks, and even
-its model calls are a capability (`model.stream`). The binary can therefore be
-built with no HTTP client, which is what makes the sandbox story trivial and
-the same code runnable in-process on a phone.
+its model calls are a capability (`model.stream`), wired into Pi Durable as a
+custom model provider over the socket. The engine process holds no secrets and
+needs no outbound network access, which keeps the tier policy and Langfuse
+tracing in one place (`GrannyCore`).
 
 ## Transport
 
@@ -54,9 +56,13 @@ the same code runnable in-process on a phone.
   user. The app spawns the engine as a child (`GRANNY_ENGINE_PATH` seam),
   restarts it with backoff, and never blocks on it. Nothing binds TCP. The
   engine has no TTY, no sudo, no TCC grants.
-- iOS: the same methods in-process (the harness as a library). No socket.
-- Remote (later): the same JSON over the app's authenticated loopback/relay
-  path, so the phone can ask the Mac. Same protocol, different carrier.
+- Phone (iOS / Android): the kernel and OS enforcement (`ManagedSettings` +
+  DNS proxy on iOS, `VpnService` on Android) run in-process; the phone reaches
+  the Mac's (or a server's) engine over the authenticated relay using the same
+  JSON lines. iOS suspends background processes and throttles `BGTaskScheduler`,
+  so a proactive durable loop cannot live inside a phone app anyway. When the
+  engine is unreachable, the phone still enforces the day and the timetable
+  clock, and loses only conversation and free-form nudges.
 
 Framing: newline-delimited JSON objects, one per line, both directions. No
 binary, no framing headers - a human can `nc -U` the socket and read it.
@@ -150,6 +156,44 @@ sequenceDiagram
 Events pushed by the engine: `chat.delta`, `chat.done`, `chat.error`,
 `intent.fired`, `engine.status` (ready / degraded / shutting down).
 
+## Kernel -> engine: proactive events and lanes
+
+A proactive coach cannot wait for the grandchild to open a chat window. Two
+things wake a background turn in `granny-engine`:
+
+1. **Domain events pushed by the kernel** when the day changes shape:
+
+```json
+{"v":1,"event":"slot.entered","params":{"slotID":"morning-deep","taskIDs":["t-1"],"rounds":0}}
+```
+
+| event | params | when it fires |
+| --- | --- | --- |
+| `day.woke` | `date`, `frogs` | First wake after `wakeHour`, alongside the greeting. |
+| `slot.entered` | `slotID`, `taskIDs`, `rounds` | The timetable enters a slot that has open tasks pinned to it. |
+| `round.idle` | `minutesSinceWake`, `openTasks` | Work mode has been open with `rounds == 0` past the idle threshold. |
+| `round.finished` | `rounds`, `stage` | A deep-work round completed and handed over to its break. |
+| `warn.continued` | `url`, `title`, `taskIDs` | The user clicked "Continue" on a negotiable `warn` interstitial. |
+| `day.rollover` | `date`, `done`, `open`, `rounds` | Midnight rollover wrote the day's line to `state.json.log`. |
+
+2. **Durable timers (`intent.schedule`)** persisted in Pi Durable's own SQLite
+   journal. During intake or a negotiation ("cho cháu 20 phút đọc tài liệu
+   này"), the engine schedules a follow-up intent at `fireAt`. Because the
+   timer lives in Pi Durable's journal, it survives Mac sleep, app relaunches
+   and engine restarts; when the clock catches up, the intent fires once.
+
+**Three lanes in Pi Durable** keep proactive work from stepping on a live
+conversation:
+
+- `interactive` - user-initiated `chat.prompt` (intake challenge, negotiation,
+  stuck-task coaching). Always takes priority.
+- `proactive` - consumes kernel domain events and fired durable intents, calls
+  `state.read` (`replay: "safe"`), and decides whether to propose
+  `notify.speak` or `slot.move`. The kernel still enforces `nudgesPerDayMax`
+  and `quietHours`.
+- `reflection` - runs on `day.rollover` or `reflection.run`, reads
+  `state.json.log` and appends counted patterns to `lessons.jsonl`.
+
 ## Errors
 
 ```json
@@ -230,41 +274,45 @@ strict coach into a nag; the ceiling is not configurable by the engine.
 Unit tests in `GrannyCoreTests`: the budget, the quiet-hours predicate, the
 key window, and each refusal path - they are rule-table logic, not RPC.
 
-## The runtime: Rust, decided
+## The runtime: Pi Durable, decided
 
-One candidate remains: **a Rust engine, with `rig_agent`'s run protocol and no
-JavaScript runtime**. Pi Durable was the first candidate and lost on one thing
-only - the platform floor:
+One candidate is chosen: **Pi Durable (`@earendil-works/pi-durable`), running
+as the sidecar engine on macOS (and on a server when multi-device sync is on),
+with model calls routed through the kernel's `model.stream` capability**.
+
+Rust (`rig-agent`) was considered for in-process iOS builds and lost once
+**proactive durability** became a first-class requirement:
 
 | | Pi Durable | Rust + `rig-agent` |
 | --- | --- | --- |
-| runs on a phone (in-process) | no - Node cannot be embedded in an iOS app | yes - a static library |
-| what ships in the `.app` | a Bun runtime (~80MB), vendored `node_modules` | a 5-10MB static binary, no GC |
-| durability fit | the whole substrate, with an experimental API | a sans-IO step machine; we keep our own entries |
-| model access | the engine holds keys and calls out | `model.stream` is a kernel capability |
+| proactive durability | built-in: journaled runs, durable timers across sleep, crash recovery | none - `AgentRun` is a single-turn step machine; we would rewrite Pi Durable in Rust |
+| concurrency & isolation | lanes (`interactive`, `proactive`, `reflection`) out of the box | hand-rolled queues, cancellation and SQLite locking |
+| phone story | kernel + enforcement run natively on phone; engine is reached over the relay | compiles to a static lib, but iOS `BGTaskScheduler` still blocks proactive background turns |
+| model access & keys | custom Pi provider over `model.stream` - kernel keeps keys, tiers and traces | `model.stream` is a kernel capability |
+| what ships on macOS | sidecar via `GRANNY_ENGINE_PATH` (Bun single-file compile or local runtime) | a 5-10MB static binary |
 
-An engine that cannot run on a phone cannot be granny's only engine, and the
-plan already says the engine is a *library* on iOS. That sentence picks Rust by
-itself; everything else is a bonus.
+Why this flips the decision:
 
-**What we depend on**: `rig-agent` only, default features off, exact version
-pinned - `AgentRun` is a serializable step machine that returns
-`CallModel`/`CallTools`/`Done` and performs no IO, so *the kernel is the
-driver*: it executes the model call and answers with the response. That is what
-keeps the engine network-free and the tier policy in one place. Rig's own
-session format is not used for storage (`rig-session/2`, and its envelope is
-not compatible across versions); our SQLite holds our entries, and a run's
-state lives for one turn. A thin `ModelStep` trait wraps the crate so a
-hand-written loop can replace it in a day if the pin becomes a problem.
-
-**What we take from Pi Durable - the semantics, not the code**: an effect is
-recorded before it happens and its result carries the id it promised; only
-reads are `replay: "safe"`; a run is accepted before it executes; parallel work
-lives in lanes. Those four are already in this contract's idempotency section,
-and Pi's documented failure modes stay the checklist we test against.
-
-Revisit only if the engine ever moves to a server (multi-user, multi-device);
-then Pi Durable becomes a candidate again for that server-side piece.
+1. **A proactive coach is a scheduler and a journal, not a one-turn loop.**
+   Waking up 25 minutes after a negotiated `warn.continued`, surviving Mac
+   sleep, resuming an interrupted multi-step check without double-adding a
+   task, and keeping background reflection out of an active chat turn are the
+   exact problems Pi Durable already solves. Building them around a bare
+   `rig-agent` step machine means maintaining a bespoke durable runtime before
+   shipping a single proactive nudge.
+2. **A phone cannot run a proactive LLM daemon in the background anyway.**
+   iOS suspends background tasks and delays `BGTaskScheduler` runs at the
+   system's discretion, so an in-process Rust engine on a phone still cannot
+   wake on slot boundaries to coach. Keeping the enforcement kernel native on
+   each OS (`GrannyCore` + `ManagedSettings`) and running the proactive Pi
+   Durable engine on the Mac (or a small relay server) puts each piece where
+   the OS actually lets it work.
+3. **The kernel still owns the keys and the safety rails.** Pi Durable talks to
+   models through a thin custom provider that emits `model.stream` requests on
+   `engine.sock`, and every proactive side effect (`notify.speak`,
+   `state.task.add`, `slot.move`) passes through the kernel's idempotency
+   window, `nudgesPerDayMax` budget and `quietHours` gate. Even a runaway
+   proactive loop in the engine cannot spam the user or lift a block.
 
 ## Steps
 
@@ -276,15 +324,15 @@ flowchart LR
     S0["0 · contract as fixtures<br/>types + jsonl cases"] --> S1["1 · kernel server on a socket<br/>hello · state.read · refusals<br/>driven by a 40-line Node stub"]
     S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state"]
     S2 --> S3["3 · mutating capabilities<br/>task.add · round.start<br/>kill -9 mid-call"]
-    S3 --> S4["4 · engine #1 in Rust<br/>rig-agent + model.stream,<br/>behind GRANNY_ENGINE_PATH"]
-    S4 --> S5["5 · budget · intents · reflection<br/>the coach gets a clock"]
+    S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH"]
+    S4 --> S5["5 · proactive events · budget · reflection<br/>the coach gets a clock"]
     S5 --> S6["6 · portability corpus<br/>a phone port can prove itself"]
 ```
 
 0. Contract as data: `EngineProtocol.swift` types and
-   `tests/engine/*.jsonl` cases (hello, read, add, refusal, duplicate) that
-   encode and decode both ways. No process, no socket - just the shape, and a
-   target for any engine in any language.
+   `tests/engine/*.jsonl` cases (hello, read, add, refusal, duplicate,
+   proactive events) that encode and decode both ways. No process, no socket -
+   just the shape, and a target for the engine.
 1. Kernel server over an `AF_UNIX` socket (`EngineServer.swift`): handshake,
    `state.read`, every refusal path, the idempotency window persisted in the
    day state. `tests/e2e-engine.sh` drives it with a 40-line Node stub using
@@ -295,10 +343,13 @@ flowchart LR
 3. Mutating capabilities (`state.task.add`, `round.start`) and the crash test
    that gives them meaning: `kill -9` the stub between the effect and the
    reply, restart it, and the day holds one task.
-4. Engine #1: Rust, `rig-agent` pinned, model calls through `model.stream`,
-   started by the app behind `GRANNY_ENGINE_PATH`. Crash test first, features
-   second.
-5. Budget, quiet hours and the intent table in the kernel; rituals ride on
-   them. Reflection writes `lessons.jsonl`; accepting a lesson is a repo diff.
+4. Engine #1: Pi Durable (`@earendil-works/pi-durable`, pinned), three lanes
+   (`interactive`, `proactive`, `reflection`), model calls routed through
+   `model.stream`, started by the app behind `GRANNY_ENGINE_PATH`. Crash and
+   sleep-resume tests first, features second.
+5. Kernel domain events (`day.woke`, `slot.entered`, `round.idle`,
+   `warn.continued`, `day.rollover`), budget, quiet hours and durable scheduled
+   intents; rituals ride on them. Reflection writes `lessons.jsonl`; accepting
+   a lesson is a repo diff.
 6. `tests/portability/*.json` generated from the Swift rules, so a phone port
    has something to prove itself against.

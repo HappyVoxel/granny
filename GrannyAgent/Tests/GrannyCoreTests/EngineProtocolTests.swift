@@ -1,8 +1,8 @@
 import XCTest
 @testable import GrannyCore
 
-/// The contract is data, not Swift: these cases are also the target a Rust or
-/// TypeScript engine develops against, so they live outside the test bundle at
+/// The contract is data, not Swift: these cases are also the target the Pi
+/// Durable engine develops against, so they live outside the test bundle at
 /// `tests/engine/contract.jsonl`.
 final class EngineProtocolTests: XCTestCase {
     private static let contractLines: [String] = {
@@ -90,6 +90,13 @@ final class EngineProtocolTests: XCTestCase {
         let text = try EngineLine.encode(
             .push(event: "model.done", params: .object(["usage": .object(["in": .number(42)])])))
         XCTAssertTrue(text.contains(#""in":42"#), text)
+    }
+
+    func testKernelDomainEventIsRecognisedWhileStreamEventIsNot() throws {
+        let pushed = try EngineLine.decode(Self.contractLines[15])
+        XCTAssertEqual(pushed.domainEvent, .slotEntered)
+        let streamDelta = try EngineLine.decode(Self.contractLines[11])
+        XCTAssertNil(streamDelta.domainEvent)
     }
 
     func testBlankLinesAreRejectedRatherThanDecodedIntoNull() {
