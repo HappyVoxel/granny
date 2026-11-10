@@ -75,6 +75,13 @@ public struct GrannyConfig: Codable, Sendable {
     /// The colours and names of the hours. The seven built-ins are the seed;
     /// a user may recolour, rename or add to them.
     public var tags: [SlotTag]
+    /// Hard daily ceiling on engine-initiated nudges (`notify.speak`). Owned by
+    /// the kernel so an eager engine cannot turn a strict coach into a nag.
+    public var nudgesPerDayMax: Int
+    /// Quiet-hours window in which `notify.speak` is refused; nil falls back to
+    /// `bedtimeHour` -> `wakeHour`.
+    public var quietStart: Int?
+    public var quietEnd: Int?
 
     public init(
         openRouterKey: String? = nil,
@@ -106,7 +113,10 @@ public struct GrannyConfig: Codable, Sendable {
         alwaysAllowedURLPrefixes: [String] = GrannyConfig.defaultAlwaysAllowedPrefixes,
         entertainmentApps: [String] = GrannyConfig.defaultEntertainmentApps,
         schedule: [ScheduleSlot] = [],
-        tags: [SlotTag] = SlotTag.defaults
+        tags: [SlotTag] = SlotTag.defaults,
+        nudgesPerDayMax: Int = 3,
+        quietStart: Int? = nil,
+        quietEnd: Int? = nil
     ) {
         self.openRouterKey = openRouterKey
         self.model = model
@@ -138,7 +148,13 @@ public struct GrannyConfig: Codable, Sendable {
         self.entertainmentApps = entertainmentApps
         self.schedule = schedule
         self.tags = tags
+        self.nudgesPerDayMax = max(0, nudgesPerDayMax)
+        self.quietStart = quietStart
+        self.quietEnd = quietEnd
     }
+
+    public var effectiveQuietStart: Int { quietStart ?? bedtimeHour }
+    public var effectiveQuietEnd: Int { quietEnd ?? wakeHour }
 
     public static let defaultBlockedDomains = [
         "facebook.com", "www.facebook.com", "m.facebook.com",
@@ -270,6 +286,9 @@ public struct GrannyConfig: Codable, Sendable {
         let palette: [Lossy<SlotTag>]? = (try? c.decodeIfPresent([Lossy<SlotTag>].self, forKey: .tags)) ?? nil
         schedule = slots?.compactMap(\.value) ?? d.schedule
         tags = palette?.compactMap(\.value) ?? d.tags
+        nudgesPerDayMax = max(0, value(.nudgesPerDayMax, d.nudgesPerDayMax))
+        quietStart = optional(.quietStart)
+        quietEnd = optional(.quietEnd)
     }
 
     public static func load(from url: URL = GrannyPaths.configURL) -> GrannyConfig {

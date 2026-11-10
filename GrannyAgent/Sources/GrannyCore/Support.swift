@@ -21,6 +21,10 @@ public enum GrannyPaths {
         stateDir.appendingPathComponent("state.json")
     }
 
+    public static var engineSocketURL: URL {
+        stateDir.appendingPathComponent("engine.sock")
+    }
+
     /// The live hosts file. The override lets the e2e suites point the agent
     /// (and the helper) at a sandbox copy.
     public static var hostsURL: URL {

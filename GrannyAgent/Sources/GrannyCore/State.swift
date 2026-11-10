@@ -56,7 +56,22 @@ public enum StreakEvent: Equatable, Sendable {
     case lost(Int)
 }
 
+/// One mutating engine request already applied today, kept so a restarted
+/// engine retrying the same idempotency key receives `duplicate` plus the
+/// original result instead of repeating the effect.
+public struct AppliedEngineKey: Codable, Equatable, Sendable {
+    public var key: String
+    public var result: EngineJSON
+
+    public init(key: String, result: EngineJSON) {
+        self.key = key
+        self.result = result
+    }
+}
+
 public struct DayState: Codable, Sendable {
+    public static let idempotencyWindow = 500
+
     public var date: String
     public var dayOff: Bool
     public var greeted: Bool
@@ -69,6 +84,10 @@ public struct DayState: Codable, Sendable {
     /// Task ids granny already scolded for finishing off-slot today, so the
     /// line lands once and does not repeat on a re-tick.
     public var nudgedOffSlot: [String]
+    /// How many times the engine has spoken today via `notify.speak`.
+    public var nudgesSent: Int
+    /// Last `idempotencyWindow` engine idempotency keys applied today.
+    public var appliedKeys: [AppliedEngineKey]
 
     public init(
         date: String,
@@ -80,7 +99,9 @@ public struct DayState: Codable, Sendable {
         streak: Int = 0,
         streakDay: String? = nil,
         firstRoundAt: String? = nil,
-        nudgedOffSlot: [String] = []
+        nudgedOffSlot: [String] = [],
+        nudgesSent: Int = 0,
+        appliedKeys: [AppliedEngineKey] = []
     ) {
         self.date = date
         self.dayOff = dayOff
@@ -92,6 +113,8 @@ public struct DayState: Codable, Sendable {
         self.streakDay = streakDay
         self.firstRoundAt = firstRoundAt
         self.nudgedOffSlot = nudgedOffSlot
+        self.nudgesSent = nudgesSent
+        self.appliedKeys = appliedKeys
     }
 
     public static func fresh(date: String) -> DayState {
@@ -153,6 +176,21 @@ public struct DayState: Codable, Sendable {
         return true
     }
 
+    public func appliedResult(for key: String) -> EngineJSON? {
+        appliedKeys.first(where: { $0.key == key })?.result
+    }
+
+    public mutating func recordAppliedKey(
+        _ key: String?, result: EngineJSON, window: Int = DayState.idempotencyWindow
+    ) {
+        guard let key, !key.isEmpty else { return }
+        appliedKeys.removeAll(where: { $0.key == key })
+        appliedKeys.append(AppliedEngineKey(key: key, result: result))
+        if appliedKeys.count > max(1, window) {
+            appliedKeys.removeFirst(appliedKeys.count - max(1, window))
+        }
+    }
+
     // Old state files have no `carried` or streak keys; default them instead
     // of resetting.
     public init(from decoder: Decoder) throws {
@@ -167,6 +205,8 @@ public struct DayState: Codable, Sendable {
         streakDay = try c.decodeIfPresent(String.self, forKey: .streakDay)
         firstRoundAt = try c.decodeIfPresent(String.self, forKey: .firstRoundAt)
         nudgedOffSlot = try c.decodeIfPresent([String].self, forKey: .nudgedOffSlot) ?? []
+        nudgesSent = try c.decodeIfPresent(Int.self, forKey: .nudgesSent) ?? 0
+        appliedKeys = try c.decodeIfPresent([AppliedEngineKey].self, forKey: .appliedKeys) ?? []
     }
 }
 

@@ -31,6 +31,7 @@ final class GrannyContext {
     private(set) var rhythmReport: RhythmReport?
 
     private var server: DecisionServer?
+    private(set) var engineServer: EngineServer?
     private var killer: AppKiller?
     private var janitor: BrowserJanitor?
     private var updateTimer: Timer?
@@ -85,6 +86,7 @@ final class GrannyContext {
         scheduler.onDayRollover = { [weak self] in self?.startPomodoroDay() }
         scheduler.start()
         startDecisionServer()
+        startEngineServer()
         startAppKiller()
         startBrowserJanitor()
         startUpdateCheck()
@@ -786,6 +788,23 @@ final class GrannyContext {
         } catch {
             postNotification(body: GrannyLines.decisionServerFailed(port: config.decidePort))
         }
+    }
+
+    private func startEngineServer() {
+        let server = EngineServer(
+            configProvider: { [unowned self] in self.config },
+            stateStore: store,
+            enforcementProvider: { [unowned self] in self.blocksEnforced() },
+            onSpeak: { [weak self] line in self?.announce(line) },
+            onMutated: { [weak self] in
+                guard let self else { return }
+                self.viewModel.refresh(from: self)
+                self.syncPomodoro()
+                self.scheduler.tick()
+                Task { await self.engine.clearCache() }
+            })
+        try? server.start()
+        self.engineServer = server
     }
 
     private func startBrowserJanitor() {

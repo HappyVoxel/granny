@@ -16,7 +16,13 @@ public enum EngineProtocol {
     /// Methods the kernel currently serves. Growth is per slice, so an engine
     /// asking for something designed-but-unbuilt is refused with `unavailable`
     /// instead of hanging or half-applying.
-    public static let available: Set<EngineCapability> = [.stateRead, .modelStream]
+    public static let available: Set<EngineCapability> = [
+        .stateRead,
+        .stateTaskAdd,
+        .stateTaskTick,
+        .notifySpeak,
+        .modelStream,
+    ]
 }
 
 /// A minimal JSON tree. The envelope has to carry payloads it does not

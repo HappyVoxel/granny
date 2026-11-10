@@ -133,7 +133,13 @@ if arguments.contains("--serve") {
             port: config.decidePortNumber,
             stateProvider: { onMain { (store.state, computePhase(config: config, state: store.state)) } },
             enforcementProvider: { onMain { pomodoro.enforced } })
+        let engineServer = EngineServer(
+            configProvider: { GrannyConfig.load() },
+            stateStore: store,
+            enforcementProvider: { onMain { pomodoro.enforced } })
         try server.start()
+        try engineServer.start()
+        _ = engineServer
         print("granny-agent serving on 127.0.0.1:\(config.decidePortNumber)")
         // A redirected stdout is block-buffered: a script waiting for the
         // server would read an empty file and call it a crash.
