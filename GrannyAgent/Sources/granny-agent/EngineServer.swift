@@ -34,9 +34,14 @@ final class EngineServer {
     private var stopped = false
 
     private var childProcess: Process?
+    private let supervisedEnginePath: String?
     private var restartAttempt = 0
 
     private(set) var status: Status = .absent
+
+    var currentStatus: Status {
+        ioQueue.sync { status }
+    }
 
     init(
         socketURL: URL = GrannyPaths.engineSocketURL,
@@ -52,6 +57,8 @@ final class EngineServer {
         self.enforcementProvider = enforcementProvider
         self.onSpeak = onSpeak
         self.onMutated = onMutated
+        let rawPath = ProcessInfo.processInfo.environment[GrannyEnv.enginePath] ?? ""
+        self.supervisedEnginePath = rawPath.isEmpty ? nil : rawPath
     }
 
     deinit {
@@ -246,9 +253,7 @@ final class EngineServer {
     // MARK: - Child supervision
 
     private func spawnEngineIfConfigured() {
-        guard let enginePath = ProcessInfo.processInfo.environment[GrannyEnv.enginePath],
-              !enginePath.isEmpty
-        else { return }
+        guard let enginePath = supervisedEnginePath else { return }
         ioQueue.async { [weak self] in
             self?.launchEngineProcess(at: enginePath)
         }
@@ -410,8 +415,9 @@ final class EngineServer {
                 if !handshaked {
                     if envelope.method == "hello" {
                         let slotRefusal: String? = ioQueue.sync {
-                            if let child = self.childProcess, child.isRunning {
-                                guard let peerPID = Self.peerPID(of: fd),
+                            if self.supervisedEnginePath != nil {
+                                guard let child = self.childProcess, child.isRunning,
+                                      let peerPID = Self.peerPID(of: fd),
                                       peerPID == child.processIdentifier
                                 else {
                                     self.status = .degraded(

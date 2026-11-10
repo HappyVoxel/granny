@@ -87,9 +87,9 @@ final class GrannyContext {
         // like, and why the clock is reset here instead of by comparing
         // stages.
         scheduler.onDayRollover = { [weak self] in self?.startPomodoroDay() }
+        startEngineServer()
         scheduler.start()
         startDecisionServer()
-        startEngineServer()
         startAppKiller()
         startBrowserJanitor()
         startUpdateCheck()
@@ -106,9 +106,10 @@ final class GrannyContext {
 
     func pushDayWoke() {
         let today = store.state.date
-        guard lastDayWokeDate != today else { return }
+        guard lastDayWokeDate != today, let engineServer else { return }
+        guard case .ready = engineServer.currentStatus else { return }
         lastDayWokeDate = today
-        engineServer?.push(
+        engineServer.push(
             domainEvent: .dayWoke,
             params: .object([
                 "date": .string(today),

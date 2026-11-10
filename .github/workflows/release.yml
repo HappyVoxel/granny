@@ -81,6 +81,8 @@ jobs:
             GrannyAgent/Sources/GrannyCore/TraceClient.swift
           sed -i '' -E "s/(defaultVersion = \")[0-9][0-9.]*/\1$VERSION/" \
             GrannyAgent/Sources/GrannyCore/EngineKernel.swift
+          sed -i '' -E "s/(\"impl\":\"granny\/)[0-9][0-9.]*/\1$VERSION/" \
+            tests/engine/contract.jsonl
           sed -i '' -E "s/^  version \".*\"$/  version \"$VERSION\"/" \
             packaging/homebrew/Casks/granny.rb
 

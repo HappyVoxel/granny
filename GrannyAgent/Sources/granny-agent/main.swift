@@ -144,12 +144,24 @@ if arguments.contains("--serve") {
             FileHandle.standardError.write(
                 Data("engine socket failed: \(error.localizedDescription)\n".utf8))
         }
-        _ = engineServer
+        signal(SIGTERM, SIG_IGN)
+        signal(SIGINT, SIG_IGN)
+        let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        let intSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+        for source in [termSource, intSource] {
+            source.setEventHandler {
+                engineServer.stop()
+                exit(0)
+            }
+            source.resume()
+        }
         print("granny-agent serving on 127.0.0.1:\(config.decidePortNumber)")
         // A redirected stdout is block-buffered: a script waiting for the
         // server would read an empty file and call it a crash.
         fflush(stdout)
-        RunLoop.main.run()
+        withExtendedLifetime((server, engineServer, termSource, intSource)) {
+            RunLoop.main.run()
+        }
     } catch {
         FileHandle.standardError.write(Data("serve failed: \(error.localizedDescription)\n".utf8))
         exit(1)

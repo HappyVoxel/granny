@@ -88,6 +88,7 @@ versions = {
     "extension/chrome/manifest.json": version_of("extension/chrome/manifest.json", r'"version": "([^"]+)"'),
     "extension/safari/manifest.json": version_of("extension/safari/manifest.json", r'"version": "([^"]+)"'),
     "GrannyAgent/Sources/GrannyCore/EngineKernel.swift": version_of("GrannyAgent/Sources/GrannyCore/EngineKernel.swift", r'defaultVersion = "([^"]+)"'),
+    "tests/engine/contract.jsonl": version_of("tests/engine/contract.jsonl", r'"impl":"granny/([^"]+)"'),
 }
 distinct = set(v for v in versions.values() if v)
 if len(distinct) != 1:

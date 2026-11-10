@@ -45,7 +45,7 @@ final class EngineProtocolTests: XCTestCase {
     func testHandshakeAcceptsAKernelHello() throws {
         let envelope = try EngineLine.decode(Self.contractLines[1])
         let hello = try EngineHandshake.accept(envelope, expecting: .kernel).get()
-        XCTAssertTrue(hello.impl.hasPrefix("granny/"))
+        XCTAssertEqual(hello.impl, "granny/\(EngineKernel.defaultVersion)")
         XCTAssertEqual(hello.limits?.nudgesRemaining, 3)
         XCTAssertEqual(hello.limits?.quietStart, 22)
     }

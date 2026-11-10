@@ -265,8 +265,8 @@ public enum EngineKernel {
                 }
                 return slotID == currentSlotID
             }())
-            if hasCurrentSlotTask, config.nudgesPerDayMax > 1,
-               !isCurrentSlotNudge, state.nudgesSent >= config.nudgesPerDayMax - 1
+            if hasCurrentSlotTask, !isCurrentSlotNudge,
+               state.nudgesSent >= config.nudgesPerDayMax - 1
             {
                 return EngineOutcome(
                     reply: .failure(
