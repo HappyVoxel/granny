@@ -24,8 +24,11 @@ final class EngineServer {
     private let enforcementProvider: () -> Bool
     private let onSpeak: ((String) -> Void)?
     private let onMutated: (() -> Void)?
+    private let onReady: (() -> Void)?
 
     private let ioQueue = DispatchQueue(label: "io.github.happyvoxel.granny.engine-io")
+    private let statusLock = NSLock()
+    private var _status: Status = .absent
     private var listenFD: Int32 = -1
     private var boundInode: ino_t = 0
     private var acceptSource: DispatchSourceRead?
@@ -36,11 +39,18 @@ final class EngineServer {
     private var childProcess: Process?
     private let supervisedEnginePath: String?
     private var restartAttempt = 0
-
-    private(set) var status: Status = .absent
+    private var lastDayWokeDate: String?
 
     var currentStatus: Status {
-        ioQueue.sync { status }
+        statusLock.lock()
+        defer { statusLock.unlock() }
+        return _status
+    }
+
+    private func setStatus(_ newValue: Status) {
+        statusLock.lock()
+        _status = newValue
+        statusLock.unlock()
     }
 
     init(
@@ -49,7 +59,8 @@ final class EngineServer {
         stateStore: StateStore,
         enforcementProvider: @escaping () -> Bool,
         onSpeak: ((String) -> Void)? = nil,
-        onMutated: (() -> Void)? = nil
+        onMutated: (() -> Void)? = nil,
+        onReady: (() -> Void)? = nil
     ) {
         self.socketURL = socketURL
         self.configProvider = configProvider
@@ -57,6 +68,7 @@ final class EngineServer {
         self.enforcementProvider = enforcementProvider
         self.onSpeak = onSpeak
         self.onMutated = onMutated
+        self.onReady = onReady
         let rawPath = ProcessInfo.processInfo.environment[GrannyEnv.enginePath] ?? ""
         self.supervisedEnginePath = rawPath.isEmpty ? nil : rawPath
     }
@@ -210,8 +222,30 @@ final class EngineServer {
         let envelope = EngineEnvelope.push(domainEvent: domainEvent, params: params)
         ioQueue.async { [weak self] in
             guard let self, self.engineFD >= 0 else { return }
-            self.writeLine(envelope, to: self.engineFD)
+            if !self.writeLine(envelope, to: self.engineFD) {
+                _ = Darwin.shutdown(self.engineFD, SHUT_RDWR)
+                self.engineFD = -1
+                self.setStatus(.degraded(reason: "engine write timed out"))
+            }
         }
+    }
+
+    /// Emits `day.woke` at most once per calendar date, and only once an engine
+    /// has completed its `hello` handshake.
+    func pushDayWokeIfNeeded() {
+        let state = stateStore.state
+        let config = configProvider()
+        guard computePhase(config: config, state: state, calendar: stateStore.calendar) == .awaitingTasks,
+              lastDayWokeDate != state.date,
+              case .ready = currentStatus
+        else { return }
+        lastDayWokeDate = state.date
+        push(
+            domainEvent: .dayWoke,
+            params: .object([
+                "date": .string(state.date),
+                "frogs": .number(Double(state.carried.count)),
+            ]))
     }
 
     /// Sends `chat.prompt` to the connected engine and streams deltas back.
@@ -283,7 +317,7 @@ final class EngineServer {
             try process.run()
             self.childProcess = process
         } catch {
-            self.status = .degraded(reason: "failed to launch engine: \(error.localizedDescription)")
+            self.setStatus(.degraded(reason: "failed to launch engine: \(error.localizedDescription)"))
             scheduleRestart(at: path)
         }
     }
@@ -320,6 +354,13 @@ final class EngineServer {
                 SO_NOSIGPIPE,
                 &noSigPipe,
                 socklen_t(MemoryLayout<Int32>.size))
+            var sndTimeout = timeval(tv_sec: 2, tv_usec: 0)
+            _ = setsockopt(
+                clientFD,
+                SOL_SOCKET,
+                SO_SNDTIMEO,
+                &sndTimeout,
+                socklen_t(MemoryLayout<timeval>.size))
             Thread.detachNewThread { [weak self] in
                 self?.serveConnection(fd: clientFD)
             }
@@ -349,9 +390,7 @@ final class EngineServer {
 
     func recordStartupFailure(_ error: Error) {
         let reason = error.localizedDescription
-        ioQueue.sync {
-            self.status = .degraded(reason: reason)
-        }
+        setStatus(.degraded(reason: reason))
         let logURL = socketURL.deletingLastPathComponent().appendingPathComponent("engine.log")
         let line = "\(ISO8601DateFormatter().string(from: Date())) engine socket failed: \(reason)\n"
         if let data = line.data(using: .utf8) {
@@ -375,7 +414,7 @@ final class EngineServer {
             ioQueue.sync {
                 if isRegisteredEngine, self.engineFD == fd {
                     self.engineFD = -1
-                    self.status = .degraded(reason: "engine disconnected")
+                    self.setStatus(.degraded(reason: "engine disconnected"))
                     let waiters = self.activePromptWaiters
                     self.activePromptWaiters.removeAll()
                     for (id, callback) in waiters {
@@ -420,8 +459,8 @@ final class EngineServer {
                                       let peerPID = Self.peerPID(of: fd),
                                       peerPID == child.processIdentifier
                                 else {
-                                    self.status = .degraded(
-                                        reason: "engine slot is owned by the spawned child")
+                                    self.setStatus(
+                                        .degraded(reason: "engine slot is owned by the spawned child"))
                                     return "engine slot is owned by the spawned child"
                                 }
                             }
@@ -448,10 +487,8 @@ final class EngineServer {
                         }
                         _ = ioQueue.sync { self.writeLine(reply, to: fd) }
                         guard let peer else {
-                            ioQueue.sync {
-                                self.status = .degraded(
-                                    reason: reply.error?.reason ?? "engine handshake refused")
-                            }
+                            self.setStatus(
+                                .degraded(reason: reply.error?.reason ?? "engine handshake refused"))
                             return
                         }
                         handshaked = true
@@ -462,7 +499,11 @@ final class EngineServer {
                             }
                             self.engineFD = fd
                             self.restartAttempt = 0
-                            self.status = .ready(impl: peer.impl)
+                            self.setStatus(.ready(impl: peer.impl))
+                        }
+                        DispatchQueue.main.async { [weak self] in
+                            self?.pushDayWokeIfNeeded()
+                            self?.onReady?()
                         }
                         continue
                     } else if envelope.method == "chat.prompt" {
@@ -535,8 +576,8 @@ final class EngineServer {
             return
         }
         // Unkeyed `chat.delta` / `chat.done` events when only one prompt is in flight.
-        if let event = envelope.event, event.hasPrefix("chat."), activePromptWaiters.count == 1,
-           let (id, waiter) = activePromptWaiters.first
+        if envelope.id == nil, let event = envelope.event, event.hasPrefix("chat."),
+           activePromptWaiters.count == 1, let (id, waiter) = activePromptWaiters.first
         {
             if event == "chat.done" || event == "chat.error" {
                 activePromptWaiters.removeValue(forKey: id)

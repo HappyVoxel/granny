@@ -46,7 +46,6 @@ final class GrannyContext {
     private var pomodoroRemaining: TimeInterval = 0
     private var pomodoroRunning = false
     private var pomodoroTimer: Timer?
-    private var lastDayWokeDate: String?
     private var lastRolloverDate: String?
 
     init() {
@@ -105,16 +104,7 @@ final class GrannyContext {
     }
 
     func pushDayWoke() {
-        let today = store.state.date
-        guard lastDayWokeDate != today, let engineServer else { return }
-        guard case .ready = engineServer.currentStatus else { return }
-        lastDayWokeDate = today
-        engineServer.push(
-            domainEvent: .dayWoke,
-            params: .object([
-                "date": .string(today),
-                "frogs": .number(Double(store.state.carried.count)),
-            ]))
+        engineServer?.pushDayWokeIfNeeded()
     }
 
     func snapshot() -> (DayState, Phase) {

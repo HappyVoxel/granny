@@ -114,7 +114,7 @@ out="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO" "$ADD" "$ADD_DUP" "$READ")"
 contains "$out" "\"impl\":\"granny/$CASK_VER\"" "handshake reply"
 contains "$out" '"code":"duplicate"' "second add with same key is duplicate"
 
-task_id="$(printf '%s\n' "$out" | sed -n '2p' | node -e 'const fs=require("fs");console.log(JSON.parse(fs.readFileSync(0,"utf8")).result.taskID)')"
+task_id="$(printf '%s\n' "$out" | node -e 'const fs=require("fs");for(const l of fs.readFileSync(0,"utf8").trim().split("\n")){const m=JSON.parse(l);if(m.id==="e-2"&&m.result){console.log(m.result.taskID);}}')"
 [ -n "$task_id" ] || fail "missing taskID from first add"
 CHECKS=$((CHECKS + 1))
 
@@ -207,11 +207,15 @@ task_count_after="$(node -e 'const fs=require("fs");console.log(JSON.parse(fs.re
 [ "$task_count_after" = "1" ] || fail "day state changed after engine crash: $task_count_after tasks"
 CHECKS=$((CHECKS + 1))
 
-# 7. GRANNY_ENGINE_PATH child supervision and automatic restart after kill -9.
+# 7. GRANNY_ENGINE_PATH child supervision, day.woke push latch, and automatic restart after kill -9.
 kill "$SERVER_PID" 2>/dev/null || true
 wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
 rm -f "$SOCK"
+
+cat >"$SANDBOX/state/state.json" <<JSON
+{"date":"$(date +%Y-%m-%d)","dayOff":false,"greeted":false,"tasks":[],"carried":[{"id":"f-1","title":"Eat the frog","carriedOver":true,"done":false}],"pomodoro":{"stage":"deepWork","finished":0}}
+JSON
 
 cat >"$SANDBOX/spawned-engine" <<'SH'
 #!/usr/bin/env node
@@ -219,6 +223,7 @@ import fs from "node:fs";
 import net from "node:net";
 const sock = process.env.GRANNY_ENGINE_SOCKET;
 const pidFile = process.env.GRANNY_TEST_ENGINE_PID;
+const eventsFile = process.env.GRANNY_TEST_ENGINE_EVENTS;
 if (pidFile) fs.writeFileSync(pidFile, String(process.pid));
 const conn = net.createConnection(sock, () => {
   conn.write(JSON.stringify({
@@ -235,6 +240,9 @@ conn.on("data", (chunk) => {
     buf = buf.slice(nl + 1);
     if (!line) continue;
     const msg = JSON.parse(line);
+    if (msg.event && eventsFile) {
+      fs.appendFileSync(eventsFile, line + "\n");
+    }
     if (msg.method === "chat.prompt") {
       conn.write(JSON.stringify({ v: 1, id: msg.id, event: "chat.delta", params: { text: "spawned " } }) + "\n");
       conn.write(JSON.stringify({ v: 1, id: msg.id, event: "chat.done", params: { text: "spawned ok" } }) + "\n");
@@ -247,6 +255,7 @@ chmod +x "$SANDBOX/spawned-engine"
 GRANNY_CONFIG_FILE="$SANDBOX/config.json" GRANNY_STATE_DIR="$SANDBOX/state" \
   GRANNY_ENGINE_PATH="$SANDBOX/spawned-engine" \
   GRANNY_TEST_ENGINE_PID="$SANDBOX/engine.pid" \
+  GRANNY_TEST_ENGINE_EVENTS="$SANDBOX/events.jsonl" \
   "$AGENT" --serve >"$SANDBOX/serve2.log" 2>&1 &
 SERVER_PID=$!
 
@@ -260,6 +269,11 @@ sleep 0.2
 spawn_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-3","method":"chat.prompt","params":{"text":"hello","stream":true}}')"
 contains "$spawn_out" '"text":"spawned ok"' "spawned engine answers chat.prompt"
+
+# day.woke is pushed to the ready engine with carried frog count.
+events_log="$(cat "$SANDBOX/events.jsonl" 2>/dev/null || true)"
+contains "$events_log" '"event":"day.woke"' "day.woke pushed on handshake"
+contains "$events_log" '"frogs":1' "day.woke carries frog count"
 
 # A non-child process cannot claim the engine slot when GRANNY_ENGINE_PATH owns it.
 impostor_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO")"
@@ -279,5 +293,10 @@ sleep 0.2
 respawn_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-4","method":"chat.prompt","params":{"text":"hello again","stream":true}}')"
 contains "$respawn_out" '"text":"spawned ok"' "respawned engine answers chat.prompt"
+
+# day.woke latch prevents a second day.woke on the same day after respawn.
+woke_count="$(grep -c '"event":"day.woke"' "$SANDBOX/events.jsonl")"
+[ "$woke_count" = "1" ] || fail "expected exactly 1 day.woke push, got $woke_count"
+CHECKS=$((CHECKS + 1))
 
 echo "e2e-engine OK ($CHECKS checks)"

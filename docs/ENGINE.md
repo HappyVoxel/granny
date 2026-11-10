@@ -95,8 +95,8 @@ quiet hours, whether a model tier is configured). Rules:
 ## Engine -> kernel: capabilities
 
 Every request carries `id` (engine-local, for correlation) and `key`
-(idempotency, see below). Phase 1 is the first three; the rest are designed
-and not built.
+(idempotency, see below). `state.read`, `state.task.add`, `state.task.tick` and
+`notify.speak` are built; the rest are designed and not built yet.
 
 ```json
 {"v":1,"id":"e-12","key":"k-8842","method":"state.task.add",
@@ -107,7 +107,7 @@ and not built.
 | method | params | returns / refuses |
 | --- | --- | --- |
 | `state.read` | `{}` | the day: `phase`, `date`, `dayOff`, `tasks` (`id`, `title`, `done`, `slotID`, `detail`), `slots`, `rounds`, `streak`, `blocksEnforced`, `nudgesRemaining`. Read-only. |
-| `state.task.add` | `title`, `detail?`, `slotID?` | `{taskID}`. Refuses: empty title, a day that is rewarded and would be unlocked by it (the kernel relocks), a slotID that does not exist. |
+| `state.task.add` | `title`, `detail?`, `slotID?` | `{taskID}`. Refuses: empty title, a day off, a `slotID` that does not exist. Adding an open task to a `rewarded` day relocks the day automatically (`allDone` becomes false). |
 | `round.start` | `{}` | `{stage, endsAt}`. Refuses: a round already running, a break in progress. |
 | `state.task.tick` | `taskID`, `done` | the new phase. Refuses the unpaid last tick, as the UI does. |
 | `slot.move` | `taskID`, `slotID?` | the proposals list. Refuses an unknown slot. |
@@ -327,35 +327,34 @@ can ship alone.
 
 ```mermaid
 flowchart LR
-    S0["0 · contract as fixtures<br/>types + jsonl cases"] --> S1["1 · kernel server on a socket<br/>hello · state.read · refusals<br/>driven by a 40-line Node stub"]
+    S0["0 · contract as fixtures<br/>types + jsonl cases (done)"] --> S1["1 · kernel socket + rule table<br/>hello · read · task.add/tick · speak<br/>child supervisor (done)"]
     S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state"]
-    S2 --> S3["3 · mutating capabilities<br/>task.add · round.start<br/>kill -9 mid-call"]
+    S2 --> S3["3 · remaining capabilities<br/>round.start · slot.move · model.stream"]
     S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH"]
-    S4 --> S5["5 · proactive events · budget · reflection<br/>the coach gets a clock"]
+    S4 --> S5["5 · proactive events · reflection<br/>slot.entered · round.idle · warn.continued"]
     S5 --> S6["6 · portability corpus<br/>a phone port can prove itself"]
 ```
 
-0. Contract as data: `EngineProtocol.swift` types and
+0. Contract as data (done): `EngineProtocol.swift` types and
    `tests/engine/*.jsonl` cases (hello, read, add, refusal, duplicate,
-   proactive events) that encode and decode both ways. No process, no socket -
-   just the shape, and a target for the engine.
-1. Kernel server over an `AF_UNIX` socket (`EngineServer.swift`): handshake,
-   `state.read`, every refusal path, the idempotency window persisted in the
-   day state. `tests/e2e-engine.sh` drives it with a 40-line Node stub using
-   nothing but `node:net` - if the contract needs a Swift-shaped client, it
-   is the wrong contract.
+   proactive events) that encode and decode both ways.
+1. Kernel server over an `AF_UNIX` socket (done, `EngineKernel.swift` +
+   `EngineServer.swift`): handshake, `state.read`, `state.task.add`,
+   `state.task.tick`, `notify.speak` (quiet hours, daily ceiling, current-slot
+   priority), the idempotency window persisted in the day state, child
+   supervision behind `GRANNY_ENGINE_PATH`, and `day.woke` / `round.finished` /
+   `day.rollover` pushes. Driven by `tests/e2e-engine.sh` using a `node:net`
+   stub.
 2. Chat tab on the stub: streaming deltas, abort, and the degraded state when
    no socket answers. Visible, reviewable, zero model spend.
-3. Mutating capabilities (`state.task.add`, `round.start`) and the crash test
-   that gives them meaning: `kill -9` the stub between the effect and the
-   reply, restart it, and the day holds one task.
+3. Remaining kernel capabilities: `round.start`, `slot.move`, `trace.emit` and
+   `model.stream` wired to `OpenRouterClient`.
 4. Engine #1: Pi Durable (`@earendil-works/pi-durable`, pinned), three lanes
    (`interactive`, `proactive`, `reflection`), model calls routed through
    `model.stream`, started by the app behind `GRANNY_ENGINE_PATH`. Crash and
    sleep-resume tests first, features second.
-5. Kernel domain events (`day.woke`, `slot.entered`, `round.idle`,
-   `warn.continued`, `day.rollover`), budget, quiet hours and durable scheduled
-   intents; rituals ride on them. Reflection writes `lessons.jsonl`; accepting
-   a lesson is a repo diff.
+5. Remaining proactive domain events (`slot.entered`, `round.idle`,
+   `warn.continued`) and durable scheduled intents; rituals ride on them.
+   Reflection writes `lessons.jsonl`; accepting a lesson is a repo diff.
 6. `tests/portability/*.json` generated from the Swift rules, so a phone port
    has something to prove itself against.

@@ -22,7 +22,7 @@ public struct EngineOutcome: Equatable, Sendable {
 /// table, the quiet-hours clock, the daily nudge ceiling and the idempotency
 /// window without opening a socket.
 public enum EngineKernel {
-    public static let defaultVersion = "0.1.2"
+    public static var defaultVersion: String { TraceClient.version }
 
     public static var implVersion: String {
         if let bundleID = Bundle.main.bundleIdentifier,
@@ -196,8 +196,7 @@ public enum EngineKernel {
                 allowedSurfaces: surfaces,
                 slotID: slotID,
                 detail: detail)
-            state.tasks.append(contentsOf: state.carried)
-            state.carried = []
+            state.takeCarriedFrogs()
             state.tasks.append(task)
             state.greeted = true
             let result: EngineJSON = .object(["taskID": .string(task.id)])
@@ -211,17 +210,18 @@ public enum EngineKernel {
                 return EngineOutcome(
                     reply: .failure(id: id, error: .invalid("state.task.tick requires taskID and done")))
             }
-            guard let index = state.tasks.firstIndex(where: { $0.id == taskID }) else {
+            var candidate = state
+            candidate.takeCarriedFrogs()
+            guard let index = candidate.tasks.firstIndex(where: { $0.id == taskID }) else {
                 return EngineOutcome(
                     reply: .failure(id: id, error: .refused("unknown task \(taskID)")))
             }
-            var candidate = state
             candidate.tasks[index].done = done
             if candidate.allDone, !candidate.paid {
                 return EngineOutcome(
                     reply: .failure(id: id, error: .refused("finish one deep-work round first")))
             }
-            state.tasks[index].done = done
+            state = candidate
             let phase = computePhase(now: now, config: config, state: state, calendar: calendar)
             let result: EngineJSON = .object(["phase": .string(phase.rawValue)])
             state.recordAppliedKey(envelope.key, result: result)
