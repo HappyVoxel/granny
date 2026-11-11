@@ -74,11 +74,8 @@ final class EngineProtocolTests: XCTestCase {
         XCTAssertEqual(invented.method, "state.task.giveup")
     }
 
-    func testDesignedButUnbuiltMethodsAreNotAvailableYet() {
-        XCTAssertTrue(EngineProtocol.available.contains(.stateRead))
-        XCTAssertTrue(EngineProtocol.available.contains(.stateTaskAdd))
-        XCTAssertFalse(EngineProtocol.available.contains(.modelStream))
-        XCTAssertFalse(EngineProtocol.available.contains(.roundStart))
+    func testAllContractCapabilitiesAreAvailable() {
+        XCTAssertEqual(EngineProtocol.available, Set(EngineCapability.allCases))
     }
 
     func testDuplicateCarriesTheFirstResultSoAResumedRunCanContinue() throws {

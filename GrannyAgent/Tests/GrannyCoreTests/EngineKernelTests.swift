@@ -280,4 +280,224 @@ final class EngineKernelTests: XCTestCase {
         XCTAssertEqual(state.appliedResult(for: "k-3"), .number(3))
         XCTAssertEqual(state.appliedResult(for: "k-5"), .number(5))
     }
+
+    func testDeviceContextReturnsSnapshotEvenOnDayOff() throws {
+        let config = GrannyConfig()
+        var state = DayState(date: "2026-11-10", dayOff: true)
+        let snapshot = EngineDeviceContext(
+            frontmostApp: .init(name: "Xcode", bundleID: "com.apple.dt.Xcode"),
+            openTabs: [.init(browser: "Safari", url: "https://swift.org", title: "Swift.org")],
+            calendarEvents: [
+                .init(
+                    title: "Design review",
+                    startAt: "2026-11-10T10:00:00Z",
+                    endAt: "2026-11-10T10:30:00Z")
+            ])
+
+        let outcome = EngineKernel.handle(
+            .request(id: "dc-1", method: EngineCapability.deviceContext.rawValue),
+            config: config, state: &state, blocksEnforced: false,
+            deviceContext: snapshot, now: date(hour: 10), calendar: calendar)
+        XCTAssertNil(outcome.reply.error)
+        let decoded = try outcome.reply.result?.decoded(as: EngineDeviceContext.self)
+        XCTAssertEqual(decoded, snapshot)
+    }
+
+    func testSlotMovePinsClearsProposesAndRefusesUnknownSlot() {
+        let schedule = [
+            ScheduleSlot(id: "morning", time: "09:00", label: "Deep work", tag: "deepWork"),
+            ScheduleSlot(id: "afternoon", time: "15:00", label: "Admin", tag: "admin"),
+        ]
+        let config = GrannyConfig(wakeHour: 7, bedtimeHour: 23, schedule: schedule)
+        let task = TaskItem(title: "Apply 5 jobs")
+        var state = DayState(date: "2026-11-10", greeted: true, tasks: [task])
+
+        let bogus = EngineKernel.handle(
+            .request(
+                id: "sm-1",
+                method: EngineCapability.slotMove.rawValue,
+                params: .object(["taskID": .string(task.id), "slotID": .string("midnight")]),
+                key: "k-sm-bogus"),
+            config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(bogus.reply.error?.code, .refused)
+        XCTAssertEqual(bogus.reply.error?.reason, "unknown slot midnight")
+
+        let pinned = EngineKernel.handle(
+            .request(
+                id: "sm-2",
+                method: EngineCapability.slotMove.rawValue,
+                params: .object(["taskID": .string(task.id), "slotID": .string("morning")]),
+                key: "k-sm-pin"),
+            config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertTrue(pinned.mutated)
+        XCTAssertEqual(state.tasks[0].slotID, "morning")
+        XCTAssertEqual(
+            pinned.reply.result,
+            .object([
+                "proposals": .array([
+                    .object(["taskID": .string(task.id), "slotID": .string("morning")])
+                ])
+            ]))
+
+        let cleared = EngineKernel.handle(
+            .request(
+                id: "sm-3",
+                method: EngineCapability.slotMove.rawValue,
+                params: .object(["taskID": .string(task.id), "slotID": .null]),
+                key: "k-sm-clear"),
+            config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertNil(state.tasks[0].slotID)
+        XCTAssertEqual(
+            cleared.reply.result,
+            .object([
+                "proposals": .array([
+                    .object(["taskID": .string(task.id), "slotID": .null])
+                ])
+            ]))
+
+        // Omitting slotID re-runs the keyword slot proposal ("Apply 5 jobs" -> admin -> afternoon).
+        let proposed = EngineKernel.handle(
+            .request(
+                id: "sm-4",
+                method: EngineCapability.slotMove.rawValue,
+                params: .object(["taskID": .string(task.id)]),
+                key: "k-sm-prop"),
+            config: config, state: &state, blocksEnforced: true,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertNil(proposed.reply.error)
+        XCTAssertEqual(state.tasks[0].slotID, "afternoon")
+    }
+
+    func testRoundStartEnforcesRunningAndBreakGuardsWithIdempotency() {
+        let config = GrannyConfig(
+            wakeHour: 7, bedtimeHour: 23, pomodoro: PomodoroConfig(workMinutes: 25))
+        var state = DayState(date: "2026-11-10", greeted: true)
+        let req = EngineEnvelope.request(
+            id: "rs-1", method: EngineCapability.roundStart.rawValue, key: "k-rs-1")
+
+        let started = EngineKernel.handle(
+            req, config: config, state: &state, blocksEnforced: true,
+            pomodoroRunning: false, now: date(hour: 10), calendar: calendar)
+        XCTAssertTrue(started.startedRound)
+        XCTAssertTrue(started.mutated)
+        XCTAssertEqual(
+            started.reply.result,
+            .object([
+                "stage": .string("deepWork"),
+                "endsAt": .string("2026-11-10T10:25:00Z"),
+            ]))
+
+        // Retrying the same key while the round is running returns duplicate + original result.
+        let retrySameKey = EngineKernel.handle(
+            req, config: config, state: &state, blocksEnforced: true,
+            pomodoroRunning: true, now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(retrySameKey.reply.error?.code, .duplicate)
+        XCTAssertEqual(retrySameKey.reply.error?.result, started.reply.result)
+
+        // A fresh request while the round is running is refused.
+        let whileRunning = EngineKernel.handle(
+            .request(id: "rs-2", method: EngineCapability.roundStart.rawValue, key: "k-rs-2"),
+            config: config, state: &state, blocksEnforced: true,
+            pomodoroRunning: true, now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(whileRunning.reply.error?.code, .refused)
+        XCTAssertEqual(whileRunning.reply.error?.reason, "round already running")
+
+        // A request during a break is refused even if paused.
+        state.pomodoro = PomodoroRun(stage: .shortBreak, finished: 1)
+        let onBreak = EngineKernel.handle(
+            .request(id: "rs-3", method: EngineCapability.roundStart.rawValue, key: "k-rs-3"),
+            config: config, state: &state, blocksEnforced: false,
+            pomodoroRunning: false, now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(onBreak.reply.error?.code, .refused)
+        XCTAssertEqual(onBreak.reply.error?.reason, "break in progress")
+    }
+
+    func testTraceEmitBuildsSpanAndWorksOnDayOff() {
+        let config = GrannyConfig()
+        var state = DayState(date: "2026-11-10", dayOff: true)
+        let outcome = EngineKernel.handle(
+            .request(
+                id: "tr-1",
+                method: EngineCapability.traceEmit.rawValue,
+                params: .object([
+                    "span": .object([
+                        "name": .string("proactive.check"),
+                        "traceName": .string("granny.proactive"),
+                        "model": .string("deepseek/deepseek-v4.1-flash"),
+                        "input": .object(["slot": .string("morning"), "rounds": .number(0)]),
+                        "output": .object(["action": .string("nudge")]),
+                    ])
+                ])),
+            config: config, state: &state, blocksEnforced: false,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(outcome.reply.result, .object([:]))
+        XCTAssertEqual(outcome.emittedSpan?.name, "proactive.check")
+        XCTAssertEqual(outcome.emittedSpan?.traceName, "granny.proactive")
+        XCTAssertEqual(outcome.emittedSpan?.model, "deepseek/deepseek-v4.1-flash")
+        XCTAssertEqual(outcome.emittedSpan?.input["rounds"], "0")
+    }
+
+    func testModelStreamValidatesKeyMessagesAndResolvesTiers() {
+        var state = DayState(date: "2026-11-10", dayOff: true)
+        let messages: [EngineJSON] = [
+            .object(["role": .string("user"), "content": .string("Help me split this task")])
+        ]
+
+        // Missing OpenRouter key -> unavailable.
+        let noKey = EngineKernel.handle(
+            .request(
+                id: "ms-1",
+                method: EngineCapability.modelStream.rawValue,
+                params: .object(["messages": .array(messages)])),
+            config: GrannyConfig(openRouterKey: nil),
+            state: &state, blocksEnforced: false, now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(noKey.reply.error?.code, .unavailable)
+
+        // Empty messages -> invalid.
+        let emptyMessages = EngineKernel.handle(
+            .request(
+                id: "ms-2",
+                method: EngineCapability.modelStream.rawValue,
+                params: .object(["messages": .array([])])),
+            config: GrannyConfig(openRouterKey: "sk-test"),
+            state: &state, blocksEnforced: false, now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(emptyMessages.reply.error?.code, .invalid)
+
+        // Tier resolution: default, fast (jevModel), free (streakModel).
+        let config = GrannyConfig(
+            openRouterKey: "sk-test",
+            model: "deepseek/deepseek-v4.1-flash",
+            streakModel: "openrouter/free-custom",
+            jevModel: "typesafe/jev-router")
+
+        let defaultTier = EngineKernel.handle(
+            .request(
+                id: "ms-3",
+                method: EngineCapability.modelStream.rawValue,
+                params: .object(["messages": .array(messages)])),
+            config: config, state: &state, blocksEnforced: false,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(defaultTier.modelStream?.model, "deepseek/deepseek-v4.1-flash")
+
+        let fastTier = EngineKernel.handle(
+            .request(
+                id: "ms-4",
+                method: EngineCapability.modelStream.rawValue,
+                params: .object(["messages": .array(messages), "tier": .string("fast")])),
+            config: config, state: &state, blocksEnforced: false,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(fastTier.modelStream?.model, "typesafe/jev-router")
+
+        let freeTier = EngineKernel.handle(
+            .request(
+                id: "ms-5",
+                method: EngineCapability.modelStream.rawValue,
+                params: .object(["messages": .array(messages), "tier": .string("free")])),
+            config: config, state: &state, blocksEnforced: false,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(freeTier.modelStream?.model, "openrouter/free-custom")
+    }
 }

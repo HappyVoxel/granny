@@ -27,9 +27,21 @@ final class ServePomodoro {
         self.config = config
         self.store = store
         guard ProcessInfo.processInfo.environment[GrannyEnv.pomodoroAutostart] == "1" else { return }
+        startRound()
+    }
+
+    var state: (running: Bool, remaining: TimeInterval?) {
+        let remaining = running ? deadline.map { max(0, $0.timeIntervalSinceNow) } : nil
+        return (running, remaining)
+    }
+
+    func startRound() {
+        guard !running, store.state.pomodoro.stage == .deepWork else { return }
+        let liveConfig = GrannyConfig.load()
         deadline = Date().addingTimeInterval(
-            TimeInterval(store.state.pomodoro.minutes(config.pomodoro) * 60))
+            TimeInterval(store.state.pomodoro.minutes(liveConfig.pomodoro) * 60))
         running = true
+        timer?.invalidate()
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -136,7 +148,11 @@ if arguments.contains("--serve") {
         let engineServer = EngineServer(
             configProvider: { GrannyConfig.load() },
             stateStore: store,
-            enforcementProvider: { onMain { pomodoro.enforced } })
+            enforcementProvider: { onMain { pomodoro.enforced } },
+            pomodoroProvider: { onMain { pomodoro.state } },
+            deviceContextProvider: { DeviceContextCollector.snapshot(calendar: store.calendar) },
+            traceProvider: { TraceClient(config: GrannyConfig.load().langfuse) },
+            onStartRound: { onMain { pomodoro.startRound() } })
         try server.start()
         do {
             try engineServer.start()

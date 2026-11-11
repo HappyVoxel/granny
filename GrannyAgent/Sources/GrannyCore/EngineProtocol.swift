@@ -18,9 +18,14 @@ public enum EngineProtocol {
     /// instead of hanging or half-applying.
     public static let available: Set<EngineCapability> = [
         .stateRead,
+        .deviceContext,
         .stateTaskAdd,
         .stateTaskTick,
+        .slotMove,
+        .roundStart,
         .notifySpeak,
+        .traceEmit,
+        .modelStream,
     ]
 }
 
@@ -105,7 +110,7 @@ public enum EngineDomainEvent: String, CaseIterable, Codable, Sendable {
     case dayRollover = "day.rollover"
 }
 
-public struct EngineError: Codable, Equatable, Sendable {
+public struct EngineError: Error, Codable, Equatable, Sendable {
     public enum Code: String, Codable, Sendable {
         case refused
         case invalid
@@ -340,5 +345,124 @@ public enum EngineLine {
                 .init(codingPath: [], debugDescription: "empty line"))
         }
         return try JSONDecoder().decode(EngineEnvelope.self, from: Data(trimmed.utf8))
+    }
+}
+
+/// Native macOS read-only snapshot returned by `device.context`.
+public struct EngineDeviceContext: Codable, Equatable, Sendable {
+    public struct FrontmostApp: Codable, Equatable, Sendable {
+        public var name: String
+        public var bundleID: String
+
+        public init(name: String, bundleID: String) {
+            self.name = name
+            self.bundleID = bundleID
+        }
+    }
+
+    public struct OpenTab: Codable, Equatable, Sendable {
+        public var browser: String
+        public var url: String
+        public var title: String
+
+        public init(browser: String, url: String, title: String) {
+            self.browser = browser
+            self.url = url
+            self.title = title
+        }
+    }
+
+    public struct CalendarEvent: Codable, Equatable, Sendable {
+        public var title: String
+        public var startAt: String
+        public var endAt: String
+        public var allDay: Bool
+
+        public init(title: String, startAt: String, endAt: String, allDay: Bool = false) {
+            self.title = title
+            self.startAt = startAt
+            self.endAt = endAt
+            self.allDay = allDay
+        }
+    }
+
+    public static let empty = EngineDeviceContext()
+
+    public var frontmostApp: FrontmostApp?
+    public var openTabs: [OpenTab]
+    public var calendarEvents: [CalendarEvent]
+
+    public init(
+        frontmostApp: FrontmostApp? = nil,
+        openTabs: [OpenTab] = [],
+        calendarEvents: [CalendarEvent] = []
+    ) {
+        self.frontmostApp = frontmostApp
+        self.openTabs = openTabs
+        self.calendarEvents = calendarEvents
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case frontmostApp, openTabs, calendarEvents
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        frontmostApp = try c.decodeIfPresent(FrontmostApp.self, forKey: .frontmostApp)
+        openTabs = try c.decodeIfPresent([OpenTab].self, forKey: .openTabs) ?? []
+        calendarEvents = try c.decodeIfPresent([CalendarEvent].self, forKey: .calendarEvents) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        if let frontmostApp {
+            try c.encode(frontmostApp, forKey: .frontmostApp)
+        } else {
+            try c.encodeNil(forKey: .frontmostApp)
+        }
+        try c.encode(openTabs, forKey: .openTabs)
+        try c.encode(calendarEvents, forKey: .calendarEvents)
+    }
+}
+
+/// One tool call assembled at the end of a `model.stream` turn.
+public struct ModelToolCall: Codable, Equatable, Sendable {
+    public var id: String
+    public var name: String
+    public var arguments: String
+
+    public init(id: String, name: String, arguments: String) {
+        self.id = id
+        self.name = name
+        self.arguments = arguments
+    }
+}
+
+/// Token counts reported in `model.done`.
+public struct ModelUsage: Codable, Equatable, Sendable {
+    public var inTokens: Int
+    public var outTokens: Int
+
+    public init(inTokens: Int = 0, outTokens: Int = 0) {
+        self.inTokens = inTokens
+        self.outTokens = outTokens
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case inTokens = "in"
+        case outTokens = "out"
+    }
+}
+
+/// Terminal payload of `model.stream` (`model.done`).
+public struct ModelStreamDone: Codable, Equatable, Sendable {
+    public var text: String
+    public var toolCalls: [ModelToolCall]
+    public var usage: ModelUsage
+
+    public init(text: String, toolCalls: [ModelToolCall] = [], usage: ModelUsage = ModelUsage()) {
+        self.text = text
+        self.toolCalls = toolCalls
+        self.usage = usage
     }
 }

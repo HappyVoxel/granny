@@ -12,9 +12,11 @@ AGENT="$REPO/GrannyAgent/.build/debug/granny-agent"
 SANDBOX="$(mktemp -d)"
 SERVER_PID=""
 ENGINE_PID=""
+MOCK_HTTP_PID=""
 cleanup() {
   if [ -n "$ENGINE_PID" ]; then kill -9 "$ENGINE_PID" 2>/dev/null || true; wait "$ENGINE_PID" 2>/dev/null || true; fi
   if [ -n "$SERVER_PID" ]; then kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; fi
+  if [ -n "$MOCK_HTTP_PID" ]; then kill "$MOCK_HTTP_PID" 2>/dev/null || true; wait "$MOCK_HTTP_PID" 2>/dev/null || true; fi
   rm -rf "$SANDBOX"
 }
 trap cleanup EXIT
@@ -63,7 +65,7 @@ client.on("data", (chunk) => {
     if (!line) continue;
     console.log(line);
     const msg = JSON.parse(line);
-    if (!msg.event || msg.event === "chat.done" || msg.event === "chat.error") sendNext();
+    if (!msg.event || msg.event === "chat.done" || msg.event === "chat.error" || msg.event === "model.done") sendNext();
   }
 });
 JS
@@ -335,5 +337,109 @@ contains "$respawn_out" '"text":"spawned ok"' "respawned engine answers chat.pro
 woke_count="$(grep -c '"event":"day.woke"' "$SANDBOX/events.jsonl")"
 [ "$woke_count" = "1" ] || fail "expected exactly 1 day.woke push, got $woke_count"
 CHECKS=$((CHECKS + 1))
+
+# 8. Slice 3 capabilities: device.context, slot.move, round.start, trace.emit, and model.stream.
+kill "$SERVER_PID" 2>/dev/null || true
+wait "$SERVER_PID" 2>/dev/null || true
+SERVER_PID=""
+rm -f "$SOCK"
+
+MOCK_PORT=$((47100 + RANDOM % 800))
+cat >"$SANDBOX/mock-http.mjs" <<'JS'
+import fs from "node:fs";
+import http from "node:http";
+const [port, traceLog] = process.argv.slice(2);
+const server = http.createServer((req, res) => {
+  let body = "";
+  req.on("data", (c) => { body += c.toString("utf8"); });
+  req.on("end", () => {
+    if (req.url === "/api/public/otel/v1/traces") {
+      fs.appendFileSync(traceLog, body + "\n");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("{}");
+      return;
+    }
+    if (req.url === "/chat/completions") {
+      res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+      res.write(": OPENROUTER PROCESSING\n\n");
+      res.write('data: {"choices":[{"delta":{"content":"First "}}]}\n\n');
+      setTimeout(() => {
+        res.write('data: {"choices":[{"delta":{"content":"step.","tool_calls":[{"index":0,"id":"call_e2e","type":"function","function":{"name":"round_start","arguments":"{}"}}]}}],"usage":{"prompt_tokens":18,"completion_tokens":4}}\n\n');
+        res.write("data: [DONE]\n\n");
+        res.end();
+      }, 25);
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+});
+server.listen(Number(port), "127.0.0.1");
+JS
+
+node "$SANDBOX/mock-http.mjs" "$MOCK_PORT" "$SANDBOX/traces.log" &
+MOCK_HTTP_PID=$!
+sleep 0.2
+
+cat >"$SANDBOX/device.json" <<'JSON'
+{"frontmostApp":{"name":"Xcode","bundleID":"com.apple.dt.Xcode"},"openTabs":[{"browser":"Safari","url":"https://swift.org","title":"Swift"}],"calendarEvents":[{"title":"1:1","startAt":"2026-11-10T10:00:00Z","endAt":"2026-11-10T10:30:00Z","allDay":false}]}
+JSON
+
+cat >"$SANDBOX/state/state.json" <<JSON
+{"date":"$(date +%Y-%m-%d)","dayOff":false,"greeted":true,"tasks":[{"id":"t-s3","title":"Ship Slice 3","done":false}],"pomodoro":{"stage":"deepWork","finished":0}}
+JSON
+
+# First start without an OpenRouter key: model.stream answers unavailable, device.context answers snapshot.
+write_config 0 0 3
+GRANNY_CONFIG_FILE="$SANDBOX/config.json" GRANNY_STATE_DIR="$SANDBOX/state" \
+  GRANNY_OPENROUTER_URL="http://127.0.0.1:$MOCK_PORT/chat/completions" \
+  GRANNY_DEVICE_CONTEXT="$SANDBOX/device.json" \
+  "$AGENT" --serve >"$SANDBOX/serve3.log" 2>&1 &
+SERVER_PID=$!
+
+for _ in $(seq 1 40); do
+  [ -S "$SOCK" ] && break
+  sleep 0.1
+done
+[ -S "$SOCK" ] || { cat "$SANDBOX/serve3.log" >&2; fail "engine.sock did not appear in Slice 3 run"; }
+
+DEV_REQ='{"v":1,"id":"dc-1","method":"device.context","params":{}}'
+MS_NOKEY='{"v":1,"id":"ms-0","method":"model.stream","params":{"messages":[{"role":"user","content":"hi"}]}}'
+s3_pre="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO" "$DEV_REQ" "$MS_NOKEY")"
+contains "$s3_pre" '"bundleID":"com.apple.dt.Xcode"' "device.context returns frontmostApp"
+contains "$s3_pre" '"url":"https://swift.org"' "device.context returns openTabs"
+contains "$s3_pre" '"title":"1:1"' "device.context returns calendarEvents"
+contains "$s3_pre" '"code":"unavailable"' "model.stream without key is unavailable"
+
+# Configure OpenRouter key, timetable slot, and local Langfuse collector.
+cat >"$SANDBOX/config.json" <<JSON
+{"token":"$TOKEN","decidePort":$PORT,"openRouterKey":"sk-e2e","wakeHour":0,"bedtimeHour":24,"quietStart":0,"quietEnd":0,"nudgesPerDayMax":3,"schedule":[{"id":"morning","time":"09:00","label":"Deep work","tag":"deepWork"}],"langfuse":{"baseURL":"http://127.0.0.1:$MOCK_PORT","publicKey":"pk","secretKey":"sk"}}
+JSON
+
+SLOT_BAD='{"v":1,"id":"sm-bad","key":"k-sm-bad","method":"slot.move","params":{"taskID":"t-s3","slotID":"nope"}}'
+SLOT_OK='{"v":1,"id":"sm-ok","key":"k-sm-ok","method":"slot.move","params":{"taskID":"t-s3","slotID":"morning"}}'
+ROUND_1='{"v":1,"id":"rs-1","key":"k-rs-1","method":"round.start","params":{}}'
+ROUND_DUP='{"v":1,"id":"rs-dup","key":"k-rs-1","method":"round.start","params":{}}'
+ROUND_2='{"v":1,"id":"rs-2","key":"k-rs-2","method":"round.start","params":{}}'
+TRACE_1='{"v":1,"id":"tr-1","method":"trace.emit","params":{"span":{"name":"e2e.span","traceName":"granny.e2e","input":{"step":"1"},"output":{"ok":"true"}}}}'
+MODEL_1='{"v":1,"id":"ms-1","method":"model.stream","params":{"messages":[{"role":"user","content":"start round"}],"tools":[{"name":"round_start","description":"Start tomato"}]}}'
+
+s3_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" "$HELLO" "$SLOT_BAD" "$SLOT_OK" "$ROUND_1" "$ROUND_DUP" "$ROUND_2" "$TRACE_1" "$MODEL_1")"
+contains "$s3_out" '"reason":"unknown slot nope"' "slot.move refuses unknown slot"
+contains "$s3_out" '"proposals":[{"slotID":"morning","taskID":"t-s3"}]' "slot.move updates task slot"
+contains "$s3_out" '"stage":"deepWork"' "round.start starts deepWork"
+contains "$s3_out" '"code":"duplicate"' "round.start duplicate key returns original result"
+contains "$s3_out" '"reason":"round already running"' "round.start refuses second running round"
+contains "$s3_out" '"id":"tr-1","result":{}' "trace.emit replies ok"
+contains "$s3_out" '"event":"model.delta"' "model.stream emits model.delta"
+contains "$s3_out" '"event":"model.done"' "model.stream emits model.done"
+contains "$s3_out" '"text":"First step."' "model.done carries assembled text"
+contains "$s3_out" '"name":"round_start"' "model.done carries assembled toolCalls"
+contains "$s3_out" '"usage":{"in":18,"out":4}' "model.done carries token usage"
+
+sleep 0.2
+traces_captured="$(cat "$SANDBOX/traces.log" 2>/dev/null || true)"
+contains "$traces_captured" "e2e.span" "trace.emit delivered OTLP span"
+contains "$traces_captured" "model.stream" "model.stream delivered generation OTLP span"
 
 echo "e2e-engine OK ($CHECKS checks)"

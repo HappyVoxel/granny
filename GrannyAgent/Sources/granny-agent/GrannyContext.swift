@@ -896,6 +896,17 @@ final class GrannyContext {
             configProvider: { [unowned self] in self.config },
             stateStore: store,
             enforcementProvider: { [unowned self] in self.blocksEnforced() },
+            pomodoroProvider: { [unowned self] in (self.pomodoroRunning, self.pomodoroRemaining) },
+            deviceContextProvider: { [unowned self] in
+                DeviceContextCollector.snapshot(calendar: self.store.calendar)
+            },
+            traceProvider: { [weak self] in self?.trace },
+            onStartRound: { [weak self] in
+                guard let self else { return }
+                self.chime.silence()
+                self.startPomodoro()
+                self.viewModel.refresh(from: self)
+            },
             onSpeak: { [weak self] line in self?.announce(line) },
             onMutated: { [weak self] in
                 guard let self else { return }

@@ -55,6 +55,7 @@ cat >"$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Granny reads today's calendar events so her coaching respects your meetings.</string>
 </dict>
 </plist>
 PLIST

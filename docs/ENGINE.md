@@ -1,14 +1,16 @@
 # Engine contract
 
-Status: wire types (`EngineProtocol.swift`), the kernel rule table
-(`EngineKernel.swift`: `hello`, `state.read`, `state.task.add`,
-`state.task.tick`, `notify.speak`), the local socket + child supervisor
-(`EngineServer.swift`, `GRANNY_ENGINE_PATH`, `day.woke`/`round.finished`/`day.rollover`
-pushes, `tests/e2e-engine.sh`), and the native chat tab (`ChatView.swift`:
-streaming deltas, `chat.abort`, degraded state) are implemented. `round.start`,
-`slot.move`, `model.stream` tier wiring, and the Pi Durable runtime remain.
-`docs/ARCHITECTURE.md` carries the decision ("The engine, and other platforms"
-plus the last two decision-log entries).
+Status: wire types (`EngineProtocol.swift`), the full kernel capability table
+(`EngineKernel.swift`: `hello`, `state.read`, `device.context`,
+`state.task.add`, `state.task.tick`, `slot.move`, `round.start`,
+`notify.speak`, `trace.emit`, and `model.stream` wired to `OpenRouterClient`),
+the local socket + child supervisor (`EngineServer.swift`,
+`GRANNY_ENGINE_PATH`, `day.woke`/`round.finished`/`day.rollover` pushes,
+`tests/e2e-engine.sh`), and the native chat tab (`ChatView.swift`: streaming
+deltas, `chat.abort`, degraded state) are implemented. The Pi Durable runtime
+and remaining proactive events remain. `docs/ARCHITECTURE.md` carries the
+decision ("The engine, and other platforms" plus the last two decision-log
+entries).
 
 Why a contract and not a framework choice: the harness is the only part of
 granny that can be wrong, experimental, or dead, and it must never be able to
@@ -96,8 +98,8 @@ quiet hours, whether a model tier is configured). Rules:
 ## Engine -> kernel: capabilities
 
 Every request carries `id` (engine-local, for correlation) and `key`
-(idempotency, see below). `state.read`, `state.task.add`, `state.task.tick` and
-`notify.speak` are built; the rest are designed and not built yet.
+(idempotency, see below). All nine capabilities in the table are built and
+served on `<state dir>/engine.sock`.
 
 ```json
 {"v":1,"id":"e-12","key":"k-8842","method":"state.task.add",
@@ -359,7 +361,7 @@ can ship alone.
 flowchart LR
     S0["0 · contract as fixtures<br/>types + jsonl cases (done)"] --> S1["1 · kernel socket + rule table<br/>hello · read · task.add/tick · speak<br/>child supervisor (done)"]
     S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state (done)"]
-    S2 --> S3["3 · remaining capabilities<br/>round.start · slot.move · model.stream"]
+    S2 --> S3["3 · remaining capabilities<br/>round.start · slot.move · device.context · model.stream (done)"]
     S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH"]
     S4 --> S5["5 · proactive events · reflection<br/>slot.entered · round.idle · warn.continued"]
     S5 --> S6["6 · portability corpus<br/>a phone port can prove itself"]
@@ -378,8 +380,11 @@ flowchart LR
 2. Chat tab on the stub (done, `ChatView.swift` + `RootView.swift`): streaming
    deltas, `chat.abort`, and the degraded state when no socket answers.
    Visible, reviewable, zero model spend.
-3. Remaining kernel capabilities: `round.start`, `slot.move`, `trace.emit` and
-   `model.stream` wired to `OpenRouterClient`.
+3. Remaining kernel capabilities (done, `EngineKernel.swift` +
+   `OpenRouterClient.swift` + `DeviceContextCollector.swift`): `round.start`,
+   `slot.move`, `device.context`, `trace.emit` and `model.stream` (SSE
+   streaming, tool-call assembly, tier resolution, retry before first delta,
+   and Langfuse generation spans).
 4. Engine #1: Pi Durable (`@earendil-works/pi-durable`, pinned), three lanes
    (`interactive`, `proactive`, `reflection`), model calls routed through
    `model.stream`, started by the app behind `GRANNY_ENGINE_PATH`. Crash and

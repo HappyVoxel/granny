@@ -6,7 +6,7 @@ import Foundation
 public final class TraceClient: @unchecked Sendable {
     public static let version = "0.1.2"
 
-    public struct Span: Sendable {
+    public struct Span: Equatable, Sendable {
         public var name: String
         public var traceName: String
         public var input: [String: String]

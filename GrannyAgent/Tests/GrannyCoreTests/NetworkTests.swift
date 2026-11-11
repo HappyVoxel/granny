@@ -702,4 +702,85 @@ final class NetworkTests: XCTestCase {
         let intake = await engine.parseIntake(text: "a")
         XCTAssertNil(intake)
     }
+
+    func testOpenRouterStreamChatSSEAndToolCallsAndUsage() async throws {
+        MockURLProtocol.handler = { request in
+            let sse = """
+            : OPENROUTER PROCESSING
+
+            data: {"choices":[{"delta":{"content":"Let's "}}]}
+
+            data: {"choices":[{"delta":{"content":"add it.","tool_calls":[{"index":0,"id":"call_9","type":"function","function":{"name":"state_task_add","arguments":"{\\"title\\":"}}]}}]}
+
+            data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"Apply job\\"}"}}]}}],"usage":{"prompt_tokens":42,"completion_tokens":9}}
+
+            data: [DONE]
+
+            """
+            let resp = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "text/event-stream"])!
+            return (resp, Data(sse.utf8))
+        }
+
+        let client = OpenRouterClient(
+            settings: .init(apiKey: "sk-test", model: "deepseek/deepseek-v4.1-flash"),
+            session: mockSession())
+        nonisolated(unsafe) var deltas: [String] = []
+        let result = await client.streamChat(
+            messages: [.object(["role": .string("user"), "content": .string("Add apply job")])],
+            tools: [.object(["name": .string("state_task_add"), "description": .string("Add task")])],
+            onDelta: { deltas.append($0) })
+
+        let done = try result.get()
+        XCTAssertEqual(deltas, ["Let's ", "add it."])
+        XCTAssertEqual(done.text, "Let's add it.")
+        XCTAssertEqual(done.usage, ModelUsage(inTokens: 42, outTokens: 9))
+        XCTAssertEqual(
+            done.toolCalls,
+            [ModelToolCall(id: "call_9", name: "state_task_add", arguments: #"{"title":"Apply job"}"#)])
+    }
+
+    func testOpenRouterStreamChatRetriesOnceBeforeFirstDelta() async throws {
+        nonisolated(unsafe) var call = 0
+        MockURLProtocol.handler = { [self] request in
+            call += 1
+            if call == 1 {
+                return response(request.url!, status: 503, json: ["error": "upstream busy"])
+            }
+            let sse = """
+            data: {"choices":[{"delta":{"content":"Recovered"}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}
+
+            data: [DONE]
+            """
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (resp, Data(sse.utf8))
+        }
+        let client = OpenRouterClient(
+            settings: .init(apiKey: "sk-test", model: "m"),
+            session: mockSession())
+        let done = try await client.streamChat(
+            messages: [.object(["role": .string("user"), "content": .string("hi")])],
+            onDelta: { _ in }).get()
+        XCTAssertEqual(call, 2)
+        XCTAssertEqual(done.text, "Recovered")
+    }
+
+    func testOpenRouterStreamChatDoesNotRetryAuthFailure() async {
+        MockURLProtocol.handler = { [self] request in
+            response(request.url!, status: 401, json: ["error": "bad key"])
+        }
+        let client = OpenRouterClient(
+            settings: .init(apiKey: "bad", model: "m"),
+            session: mockSession())
+        let result = await client.streamChat(
+            messages: [.object(["role": .string("user"), "content": .string("hi")])],
+            onDelta: { _ in })
+        if case .success = result {
+            XCTFail("expected auth failure")
+        }
+        XCTAssertEqual(MockURLProtocol.requestCount, 1)
+    }
 }

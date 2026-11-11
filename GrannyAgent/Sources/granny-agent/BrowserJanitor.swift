@@ -157,9 +157,81 @@ final class BrowserJanitor {
     }
 
     private func isScriptable(_ bundle: Bundle) -> Bool {
+        Self.isScriptableBundle(bundle)
+    }
+
+    private static func isScriptableBundle(_ bundle: Bundle) -> Bool {
         guard let resources = bundle.resourceURL?.path else { return false }
         let entries = (try? FileManager.default.contentsOfDirectory(atPath: resources)) ?? []
         return entries.contains { $0.hasSuffix(Self.scriptableBundleExtension) }
+    }
+
+    /// Stateless read of open http/https tabs across running scriptable
+    /// browsers for `device.context`. Never closes tabs or posts alerts.
+    static func snapshotOpenTabs() -> [EngineDeviceContext.OpenTab] {
+        let runningScriptable: [Browser] = onMain {
+            let probe = URL(string: "https://example.com")!
+            var seen = Set<String>()
+            var out: [Browser] = []
+            for appURL in NSWorkspace.shared.urlsForApplications(toOpen: probe) {
+                guard let bundle = Bundle(url: appURL),
+                      let id = bundle.bundleIdentifier,
+                      seen.insert(id).inserted,
+                      isScriptableBundle(bundle),
+                      !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty
+                else { continue }
+                out.append(Browser(name: appURL.deletingPathExtension().lastPathComponent, bundleID: id))
+            }
+            return out
+        }
+        guard !runningScriptable.isEmpty else { return [] }
+
+        let script = """
+        function run(argv) {
+          var B = Application(argv[0]);
+          if (!B.running()) return '[]';
+          var tabs = [];
+          B.windows().forEach(function (w) {
+            w.tabs().forEach(function (t) {
+              try {
+                var u = t.url();
+                if (u) tabs.push({ url: u, title: t.name() || '' });
+              } catch (e) {}
+            });
+          });
+          return JSON.stringify(tabs);
+        }
+        """
+        let tool = ProcessInfo.processInfo.environment[GrannyEnv.osaCmd] ?? "/usr/bin/osascript"
+        var collected: [EngineDeviceContext.OpenTab] = []
+        for browser in runningScriptable {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: tool)
+            process.arguments = ["-l", "JavaScript", "-e", script, browser.name]
+            let stdout = Pipe()
+            let stderr = Pipe()
+            process.standardOutput = stdout
+            process.standardError = stderr
+            guard (try? process.run()) != nil else { continue }
+            let outData = stdout.fileHandleForReading.readDataToEndOfFile()
+            _ = stderr.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0,
+                  let raw = JSON.decode([[String: String]].self, from: outData)
+            else { continue }
+            for entry in raw {
+                guard let url = entry["url"],
+                      let scheme = URL(string: url)?.scheme?.lowercased(),
+                      scheme == "http" || scheme == "https"
+                else { continue }
+                collected.append(
+                    EngineDeviceContext.OpenTab(
+                        browser: browser.name,
+                        url: url,
+                        title: entry["title"] ?? ""))
+            }
+        }
+        return collected
     }
 
     // MARK: - AppleScript (JavaScript for Automation)

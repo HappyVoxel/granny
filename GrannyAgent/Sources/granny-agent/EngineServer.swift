@@ -8,7 +8,7 @@ import GrannyCore
 ///
 /// The kernel never blocks on the engine: if no process is connected, or the
 /// child crashes mid-stream, the day, the blocks and `/decide` keep running.
-final class EngineServer {
+final class EngineServer: @unchecked Sendable {
     enum Status: Equatable {
         case absent
         case ready(impl: String)
@@ -22,6 +22,10 @@ final class EngineServer {
     private let configProvider: () -> GrannyConfig
     private let stateStore: StateStore
     private let enforcementProvider: () -> Bool
+    private let pomodoroProvider: () -> (running: Bool, remaining: TimeInterval?)
+    private let deviceContextProvider: () -> EngineDeviceContext
+    private let traceProvider: () -> TraceClient?
+    private let onStartRound: (() -> Void)?
     private let onSpeak: ((String) -> Void)?
     private let onMutated: (() -> Void)?
     private let onStatusChange: (() -> Void)?
@@ -34,6 +38,7 @@ final class EngineServer {
     private var acceptSource: DispatchSourceRead?
     private var engineFD: Int32 = -1
     private var activePromptWaiters: [String: (EngineEnvelope) -> Void] = [:]
+    private var activeModelStreams: [String: Task<Void, Never>] = [:]
     private var stopped = false
 
     private var childProcess: Process?
@@ -62,6 +67,10 @@ final class EngineServer {
         configProvider: @escaping () -> GrannyConfig,
         stateStore: StateStore,
         enforcementProvider: @escaping () -> Bool,
+        pomodoroProvider: @escaping () -> (running: Bool, remaining: TimeInterval?) = { (false, nil) },
+        deviceContextProvider: @escaping () -> EngineDeviceContext = { DeviceContextCollector.snapshot() },
+        traceProvider: @escaping () -> TraceClient? = { nil },
+        onStartRound: (() -> Void)? = nil,
         onSpeak: ((String) -> Void)? = nil,
         onMutated: (() -> Void)? = nil,
         onStatusChange: (() -> Void)? = nil
@@ -70,6 +79,10 @@ final class EngineServer {
         self.configProvider = configProvider
         self.stateStore = stateStore
         self.enforcementProvider = enforcementProvider
+        self.pomodoroProvider = pomodoroProvider
+        self.deviceContextProvider = deviceContextProvider
+        self.traceProvider = traceProvider
+        self.onStartRound = onStartRound
         self.onSpeak = onSpeak
         self.onMutated = onMutated
         self.onStatusChange = onStatusChange
@@ -182,6 +195,8 @@ final class EngineServer {
     func stop() {
         ioQueue.sync {
             stopped = true
+            for task in activeModelStreams.values { task.cancel() }
+            activeModelStreams.removeAll()
             if engineFD >= 0 {
                 _ = Darwin.shutdown(engineFD, SHUT_RDWR)
                 engineFD = -1
@@ -442,6 +457,8 @@ final class EngineServer {
                 if isRegisteredEngine, self.engineFD == fd {
                     self.engineFD = -1
                     self.setStatus(.degraded(reason: "engine disconnected"))
+                    for task in self.activeModelStreams.values { task.cancel() }
+                    self.activeModelStreams.removeAll()
                     let waiters = self.activePromptWaiters
                     self.activePromptWaiters.removeAll()
                     for (id, callback) in waiters {
@@ -580,10 +597,17 @@ final class EngineServer {
                 // Registered engine connection: may send capability requests or
                 // stream events (`chat.delta`, `chat.done`, `chat.error`).
                 if envelope.isRequest {
+                    let snapshot: EngineDeviceContext = envelope.capability == .deviceContext
+                        ? deviceContextProvider()
+                        : .empty
                     let outcome = onMain {
-                        self.evaluateKernelRequest(envelope)
+                        self.evaluateKernelRequest(envelope, deviceContext: snapshot)
                     }
-                    _ = ioQueue.sync { self.writeLine(outcome.reply, to: fd) }
+                    if let streamReq = outcome.modelStream {
+                        startModelStream(streamReq, to: fd)
+                    } else {
+                        _ = ioQueue.sync { self.writeLine(outcome.reply, to: fd) }
+                    }
                 } else {
                     ioQueue.sync {
                         self.routeEnginePushOrReply(envelope)
@@ -593,24 +617,105 @@ final class EngineServer {
         }
     }
 
-    private func evaluateKernelRequest(_ envelope: EngineEnvelope) -> EngineOutcome {
+    private func evaluateKernelRequest(
+        _ envelope: EngineEnvelope,
+        deviceContext: EngineDeviceContext = .empty
+    ) -> EngineOutcome {
         let config = configProvider()
         let enforced = enforcementProvider()
+        let pomodoro = pomodoroProvider()
         var draft = stateStore.state
         let outcome = EngineKernel.handle(
             envelope,
             config: config,
             state: &draft,
             blocksEnforced: enforced,
+            pomodoroRunning: pomodoro.running,
+            pomodoroRemaining: pomodoro.remaining,
+            deviceContext: deviceContext,
             calendar: stateStore.calendar)
         if outcome.mutated {
             stateStore.update { $0 = draft }
+        }
+        if outcome.startedRound {
+            onStartRound?()
+        }
+        if outcome.mutated {
             onMutated?()
         }
         if let spoken = outcome.spokenText {
             onSpeak?(spoken)
         }
+        if let span = outcome.emittedSpan {
+            traceProvider()?.record(span)
+        }
         return outcome
+    }
+
+    private func startModelStream(_ req: ValidatedModelStream, to fd: Int32) {
+        let streamKey = "\(fd):\(req.id)"
+        let task = Task { [weak self] in
+            let startedAt = Date()
+            let client = OpenRouterClient(
+                settings: .init(apiKey: req.apiKey, model: req.model, language: req.language))
+            let result = await client.streamChat(messages: req.messages, tools: req.tools) { [weak self] chunk in
+                guard let self else { return }
+                self.ioQueue.sync {
+                    guard !self.stopped, self.engineFD == fd else { return }
+                    _ = self.writeLine(
+                        EngineEnvelope(
+                            id: req.id,
+                            params: .object(["text": .string(chunk)]),
+                            event: "model.delta"),
+                        to: fd)
+                }
+            }
+            guard let self else { return }
+            let endedAt = Date()
+            self.ioQueue.sync {
+                self.activeModelStreams.removeValue(forKey: streamKey)
+                guard !Task.isCancelled, !self.stopped, self.engineFD == fd else { return }
+                switch result {
+                case .success(let done):
+                    let params = (try? EngineJSON.encoded(done)) ?? .object([
+                        "text": .string(done.text),
+                        "toolCalls": .array([]),
+                        "usage": .object([
+                            "in": .number(Double(done.usage.inTokens)),
+                            "out": .number(Double(done.usage.outTokens)),
+                        ]),
+                    ])
+                    _ = self.writeLine(
+                        EngineEnvelope(id: req.id, params: params, event: "model.done"),
+                        to: fd)
+                case .failure(let err):
+                    _ = self.writeLine(.failure(id: req.id, error: err), to: fd)
+                }
+            }
+            if case .success(let done) = result {
+                let tracer = onMain { self.traceProvider() }
+                tracer?.record(.init(
+                    name: "model.stream",
+                    traceName: "granny.engine",
+                    input: [
+                        "tier": req.tier,
+                        "messages": "\(req.messages.count)",
+                    ],
+                    output: [
+                        "text": String(done.text.prefix(500)),
+                        "toolCalls": "\(done.toolCalls.count)",
+                        "in": "\(done.usage.inTokens)",
+                        "out": "\(done.usage.outTokens)",
+                    ],
+                    model: req.model,
+                    startedAt: startedAt,
+                    endedAt: endedAt))
+            }
+        }
+        ioQueue.sync {
+            activeModelStreams[streamKey]?.cancel()
+            activeModelStreams[streamKey] = task
+        }
     }
 
     private func routeEnginePushOrReply(_ envelope: EngineEnvelope) {

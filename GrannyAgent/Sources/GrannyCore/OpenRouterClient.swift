@@ -21,12 +21,360 @@ public struct OpenRouterClient: Sendable {
     /// Verdict label: "model" for the DeepSeek fallback, the model slug for
     /// Jev-via-OpenRouter.
     let source: String
-    private static let endpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+    private static let defaultEndpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+    private static var endpoint: URL {
+        if let raw = ProcessInfo.processInfo.environment[GrannyEnv.openRouterURL],
+           !raw.isEmpty,
+           let url = URL(string: raw)
+        {
+            return url
+        }
+        return defaultEndpoint
+    }
+    static let streamTimeout: TimeInterval = 60
 
     public init(settings: LLMSettings, source: String = "model", session: URLSession = .shared) {
         self.settings = settings
         self.source = source
         self.session = session
+    }
+
+    /// Picks the configured model slug for a `model.stream` tier request.
+    public static func resolveModel(tier: String?, config: GrannyConfig) -> String {
+        switch tier?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "fast", "jev":
+            let jev = config.jevModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            return jev.isEmpty ? config.model : jev
+        case "free", "streak":
+            let streak = config.streakModel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return streak.isEmpty ? defaultStreakModel : streak
+        default:
+            return config.model
+        }
+    }
+
+    /// Streams one chat-completions turn for `model.stream`, emitting text
+    /// deltas as they arrive and returning assembled tool calls + token usage.
+    /// Retries once on transient transport/429/5xx errors before any delta is
+    /// emitted; never retries after a delta has already gone over the wire.
+    public func streamChat(
+        messages: [EngineJSON],
+        tools: [EngineJSON]? = nil,
+        onDelta: @Sendable (String) -> Void
+    ) async -> Result<ModelStreamDone, EngineError> {
+        guard let body = Self.modelStreamRequestBody(
+            model: settings.model, messages: messages, tools: tools)
+        else {
+            return .failure(.invalid("invalid model.stream messages or tools"))
+        }
+        let timeout = max(settings.timeout, Self.streamTimeout)
+        let first = await performStreamOnce(body: body, timeout: timeout, onDelta: onDelta)
+        switch first {
+        case .success(let done):
+            return .success(done)
+        case .failure(let failure):
+            guard failure.canRetry, !Task.isCancelled else {
+                return .failure(failure.error)
+            }
+            let second = await performStreamOnce(body: body, timeout: timeout, onDelta: onDelta)
+            switch second {
+            case .success(let done):
+                return .success(done)
+            case .failure(let retryFailure):
+                return .failure(retryFailure.error)
+            }
+        }
+    }
+
+    private struct StreamAttemptFailure: Error {
+        let error: EngineError
+        let canRetry: Bool
+    }
+
+    private struct PartialToolCall {
+        var id: String = ""
+        var name: String = ""
+        var arguments: String = ""
+    }
+
+    private func performStreamOnce(
+        body: Data,
+        timeout: TimeInterval,
+        onDelta: @Sendable (String) -> Void
+    ) async -> Result<ModelStreamDone, StreamAttemptFailure> {
+        var request = URLRequest(url: Self.endpoint)
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.timeoutInterval = timeout
+        request.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var emittedAnyDelta = false
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return .failure(.init(
+                    error: EngineError(code: .internal, reason: "non-HTTP model response"),
+                    canRetry: true))
+            }
+            guard http.statusCode == 200 else {
+                var errLines: [String] = []
+                for try await line in bytes.lines {
+                    errLines.append(line)
+                    if errLines.count >= 8 { break }
+                }
+                let detail = errLines.joined(separator: " ").prefix(200)
+                let transient = http.statusCode == 429 || (500...599).contains(http.statusCode)
+                return .failure(.init(
+                    error: EngineError(
+                        code: .internal,
+                        reason: detail.isEmpty
+                            ? "model HTTP \(http.statusCode)"
+                            : "model HTTP \(http.statusCode): \(detail)"),
+                    canRetry: transient))
+            }
+
+            var fullText = ""
+            var usageIn = 0
+            var usageOut = 0
+            var toolCallsByIndex: [Int: PartialToolCall] = [:]
+            var sawSSE = false
+            var plainLines: [String] = []
+
+            for try await rawLine in bytes.lines {
+                try Task.checkCancellation()
+                let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty || trimmed.hasPrefix(":") { continue }
+                guard trimmed.hasPrefix("data:") else {
+                    if !sawSSE { plainLines.append(trimmed) }
+                    continue
+                }
+                sawSSE = true
+                let payload = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                if payload == "[DONE]" { break }
+                guard let chunkData = payload.data(using: .utf8),
+                      let dict = JSON.dict(from: chunkData)
+                else { continue }
+
+                if let errObj = dict["error"] as? [String: Any],
+                   let message = errObj["message"] as? String
+                {
+                    return .failure(.init(
+                        error: EngineError(code: .internal, reason: message),
+                        canRetry: !emittedAnyDelta))
+                }
+                Self.consumeChunk(
+                    dict,
+                    fullText: &fullText,
+                    toolCallsByIndex: &toolCallsByIndex,
+                    usageIn: &usageIn,
+                    usageOut: &usageOut,
+                    onDelta: { piece in
+                        emittedAnyDelta = true
+                        onDelta(piece)
+                    })
+            }
+
+            // Fallback when an upstream ignores `stream: true` and returns one JSON body.
+            if !sawSSE, !plainLines.isEmpty,
+               let data = plainLines.joined(separator: "\n").data(using: .utf8),
+               let dict = JSON.dict(from: data)
+            {
+                Self.consumeChunk(
+                    dict,
+                    fullText: &fullText,
+                    toolCallsByIndex: &toolCallsByIndex,
+                    usageIn: &usageIn,
+                    usageOut: &usageOut,
+                    onDelta: { piece in
+                        emittedAnyDelta = true
+                        onDelta(piece)
+                    })
+            }
+
+            let orderedCalls = toolCallsByIndex.keys.sorted().compactMap { index -> ModelToolCall? in
+                guard let item = toolCallsByIndex[index], !item.name.isEmpty else { return nil }
+                let callID = item.id.isEmpty ? "call_\(index)" : item.id
+                return ModelToolCall(id: callID, name: item.name, arguments: item.arguments)
+            }
+            return .success(ModelStreamDone(
+                text: fullText,
+                toolCalls: orderedCalls,
+                usage: ModelUsage(inTokens: usageIn, outTokens: usageOut)))
+        } catch is CancellationError {
+            return .failure(.init(
+                error: EngineError(code: .internal, reason: "model.stream cancelled"),
+                canRetry: false))
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            return .failure(.init(
+                error: EngineError(code: .internal, reason: "model.stream cancelled"),
+                canRetry: false))
+        } catch {
+            return .failure(.init(
+                error: EngineError(
+                    code: .internal,
+                    reason: "model transport failed: \(error.localizedDescription)"),
+                canRetry: !emittedAnyDelta))
+        }
+    }
+
+    private static func consumeChunk(
+        _ dict: [String: Any],
+        fullText: inout String,
+        toolCallsByIndex: inout [Int: PartialToolCall],
+        usageIn: inout Int,
+        usageOut: inout Int,
+        onDelta: (String) -> Void
+    ) {
+        if let usage = dict["usage"] as? [String: Any] {
+            if let prompt = usage["prompt_tokens"] as? Int { usageIn = prompt }
+            if let completion = usage["completion_tokens"] as? Int { usageOut = completion }
+        }
+        guard let choices = dict["choices"] as? [[String: Any]],
+              let first = choices.first
+        else { return }
+        let carrier = (first["delta"] as? [String: Any]) ?? (first["message"] as? [String: Any])
+        guard let carrier else { return }
+
+        if let content = carrier["content"] as? String, !content.isEmpty {
+            fullText += content
+            onDelta(content)
+        }
+        if let rawCalls = carrier["tool_calls"] as? [[String: Any]] {
+            for (offset, call) in rawCalls.enumerated() {
+                let index = (call["index"] as? Int) ?? offset
+                var entry = toolCallsByIndex[index] ?? PartialToolCall()
+                if let id = call["id"] as? String, !id.isEmpty {
+                    entry.id = id
+                }
+                if let fn = call["function"] as? [String: Any] {
+                    if let name = fn["name"] as? String, !name.isEmpty {
+                        entry.name += name
+                    }
+                    if let args = fn["arguments"] as? String {
+                        entry.arguments += args
+                    }
+                }
+                toolCallsByIndex[index] = entry
+            }
+        }
+    }
+
+    public static func modelStreamRequestBody(
+        model: String,
+        messages: [EngineJSON],
+        tools: [EngineJSON]? = nil
+    ) -> Data? {
+        guard !messages.isEmpty else { return nil }
+        var wireMessages: [[String: Any]] = []
+        for entry in messages {
+            guard case .object(let fields) = entry,
+                  case .string(let rawRole) = fields["role"]
+            else { return nil }
+            let role = rawRole.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !role.isEmpty else { return nil }
+
+            var message: [String: Any] = ["role": role]
+            let rawCalls = fields["tool_calls"] ?? fields["toolCalls"]
+            if let content = fields["content"] {
+                message["content"] = anyJSONValue(content)
+            } else if rawCalls != nil, role == "assistant" {
+                message["content"] = NSNull()
+            } else {
+                return nil
+            }
+            if case .string(let name) = fields["name"], !name.isEmpty {
+                message["name"] = name
+            }
+            if case .string(let callID) = fields["tool_call_id"] ?? fields["toolCallID"], !callID.isEmpty {
+                message["tool_call_id"] = callID
+            }
+            if case .array(let calls) = rawCalls {
+                var normalizedCalls: [[String: Any]] = []
+                for item in calls {
+                    guard case .object(let callFields) = item else { return nil }
+                    if case .object = callFields["function"],
+                       let converted = anyJSONValue(item) as? [String: Any]
+                    {
+                        normalizedCalls.append(converted)
+                    } else if case .string(let fnName) = callFields["name"], !fnName.isEmpty {
+                        let callID: String
+                        if case .string(let id) = callFields["id"], !id.isEmpty {
+                            callID = id
+                        } else {
+                            callID = "call_0"
+                        }
+                        let args: String
+                        if case .string(let rawArgs) = callFields["arguments"] {
+                            args = rawArgs
+                        } else if let argVal = callFields["arguments"],
+                                  let encoded = try? JSONEncoder.engine.encode(argVal),
+                                  let text = String(data: encoded, encoding: .utf8)
+                        {
+                            args = text
+                        } else {
+                            args = "{}"
+                        }
+                        normalizedCalls.append([
+                            "id": callID,
+                            "type": "function",
+                            "function": ["name": fnName, "arguments": args],
+                        ])
+                    } else {
+                        return nil
+                    }
+                }
+                message["tool_calls"] = normalizedCalls
+            }
+            wireMessages.append(message)
+        }
+
+        var body: [String: Any] = [
+            "model": model,
+            "stream": true,
+            "stream_options": ["include_usage": true],
+            "messages": wireMessages,
+        ]
+        if let tools, !tools.isEmpty {
+            var wireTools: [[String: Any]] = []
+            for tool in tools {
+                guard case .object(let fields) = tool else { return nil }
+                if fields["type"] == .string("function"),
+                   case .object = fields["function"],
+                   let converted = anyJSONValue(tool) as? [String: Any]
+                {
+                    wireTools.append(converted)
+                } else if case .string(let name) = fields["name"], !name.isEmpty {
+                    var fn: [String: Any] = ["name": name]
+                    if case .string(let desc) = fields["description"] {
+                        fn["description"] = desc
+                    }
+                    if let params = fields["parameters"] {
+                        fn["parameters"] = anyJSONValue(params)
+                    } else {
+                        fn["parameters"] = ["type": "object", "properties": [String: Any]()]
+                    }
+                    wireTools.append(["type": "function", "function": fn])
+                } else {
+                    return nil
+                }
+            }
+            body["tools"] = wireTools
+        }
+        return JSON.data(from: body)
+    }
+
+    private static func anyJSONValue(_ value: EngineJSON) -> Any {
+        switch value {
+        case .null: return NSNull()
+        case .bool(let b): return b
+        case .number(let n):
+            if n.rounded() == n, abs(n) < 1e15 { return Int(n) }
+            return n
+        case .string(let s): return s
+        case .array(let items): return items.map(anyJSONValue)
+        case .object(let map): return map.mapValues(anyJSONValue)
+        }
     }
 
     /// Ambiguous-URL verdict. nil on any failure; the engine falls through.
