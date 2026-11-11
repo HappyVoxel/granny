@@ -60,6 +60,12 @@ extension/
   chrome/ | safari/           manifests per browser
   safari/app/                 generated Xcode project (converter output)
   package.json | tsconfig     TypeScript toolchain (typescript 7, @types/chrome)
+engine/
+  src/                        Pi Durable sidecar (wire, socket provider, 3 lanes,
+                              durable intents, zero-LLM wait probes, cli)
+  test/                       crash-recovery, sleep-resume, and probe tests
+  bin/granny-engine           PID-preserving launcher (`exec` for LOCAL_PEERPID)
+  build/                      bundled ESM output (gitignored; scripts/build-engine.sh)
 scripts/                      install entrypoint, build/icon/app/helper/extension
                               installers, package-chrome, make-safari,
                               build-release, sync-env, proto.sh (legacy)

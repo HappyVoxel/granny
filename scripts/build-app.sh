@@ -37,6 +37,13 @@ cp extension/shared/options.html "$EXT_DIR/"
 cp extension/shared/icons/*.png "$EXT_DIR/icons/"
 cp extension/chrome/manifest.json "$EXT_DIR/manifest.json"
 
+# Ship the bundled Pi Durable sidecar (<1MB single-file ESM + launcher).
+bash scripts/build-engine.sh
+ENG_DIR="$APP/Contents/Resources/engine"
+mkdir -p "$ENG_DIR"
+cp engine/bin/granny-engine engine/build/granny-engine.mjs "$ENG_DIR/"
+chmod +x "$ENG_DIR/granny-engine"
+
 # Keep build output out of Spotlight/Launchpad.
 touch dist/.metadata_never_index
 

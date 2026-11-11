@@ -87,6 +87,8 @@ versions = {
     "packaging/homebrew/Casks/granny.rb": version_of("packaging/homebrew/Casks/granny.rb", r'version "([^"]+)"'),
     "extension/chrome/manifest.json": version_of("extension/chrome/manifest.json", r'"version": "([^"]+)"'),
     "extension/safari/manifest.json": version_of("extension/safari/manifest.json", r'"version": "([^"]+)"'),
+    "engine/package.json": version_of("engine/package.json", r'"version": "([^"]+)"'),
+    "engine/src/wire.ts": version_of("engine/src/wire.ts", r'ENGINE_VERSION = "([^"]+)"'),
     "GrannyAgent/Sources/GrannyCore/TraceClient.swift": version_of("GrannyAgent/Sources/GrannyCore/TraceClient.swift", r'public static let version = "([^"]+)"'),
     "tests/engine/contract.jsonl": version_of("tests/engine/contract.jsonl", r'"impl":"granny/([^"]+)"'),
 }

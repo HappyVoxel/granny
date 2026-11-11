@@ -86,8 +86,19 @@ final class EngineServer: @unchecked Sendable {
         self.onSpeak = onSpeak
         self.onMutated = onMutated
         self.onStatusChange = onStatusChange
-        let rawPath = ProcessInfo.processInfo.environment[GrannyEnv.enginePath] ?? ""
-        self.supervisedEnginePath = rawPath.isEmpty ? nil : rawPath
+        let hostEnv = ProcessInfo.processInfo.environment
+        if let explicit = hostEnv[GrannyEnv.enginePath] {
+            self.supervisedEnginePath = explicit.isEmpty ? nil : explicit
+        } else if !CommandLine.arguments.contains("--serve"),
+                  Bundle.main.bundleIdentifier == "io.github.happyvoxel.granny",
+                  let bundled = Bundle.main.resourceURL?
+                      .appendingPathComponent("engine/granny-engine").path,
+                  FileManager.default.isExecutableFile(atPath: bundled)
+        {
+            self.supervisedEnginePath = bundled
+        } else {
+            self.supervisedEnginePath = nil
+        }
     }
 
     deinit {
@@ -340,16 +351,28 @@ final class EngineServer: @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         let hostEnv = ProcessInfo.processInfo.environment
+        let basePath = hostEnv["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         var env: [String: String] = [
             GrannyEnv.engineSocket: socketURL.path,
+            "PATH": "\(basePath):/opt/homebrew/bin:/usr/local/bin",
         ]
-        for key in ["PATH", "HOME", "TMPDIR", "LANG"] {
+        for key in ["HOME", "TMPDIR", "LANG", "GRANNY_NODE", "GRANNY_ENGINE_STORAGE_DIR"] {
             if let value = hostEnv[key] { env[key] = value }
         }
         for (key, value) in hostEnv where key.hasPrefix("GRANNY_TEST_") {
             env[key] = value
         }
         process.environment = env
+        let logURL = socketURL.deletingLastPathComponent().appendingPathComponent("engine.log")
+        if !FileManager.default.fileExists(atPath: logURL.path) {
+            FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        }
+        let logHandle = try? FileHandle(forWritingTo: logURL)
+        defer { try? logHandle?.close() }
+        if let logHandle {
+            _ = try? logHandle.seekToEnd()
+            process.standardError = logHandle
+        }
         process.terminationHandler = { [weak self] _ in
             self?.ioQueue.async { [weak self] in
                 self?.scheduleRestart(at: path)

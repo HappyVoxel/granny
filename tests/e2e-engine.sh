@@ -450,4 +450,113 @@ traces_captured="$(cat "$SANDBOX/traces.log" 2>/dev/null || true)"
 contains "$traces_captured" "e2e.span" "trace.emit delivered OTLP span"
 contains "$traces_captured" "model.stream" "model.stream delivered generation OTLP span"
 
+# 9. Slice 4: Real Pi Durable sidecar (`engine/bin/granny-engine`) unit + live kernel E2E.
+bash "$REPO/scripts/build-engine.sh" >/dev/null
+(cd "$REPO/engine" && npm test >/dev/null)
+CHECKS=$((CHECKS + 1))
+
+kill "$SERVER_PID" 2>/dev/null || true
+wait "$SERVER_PID" 2>/dev/null || true
+SERVER_PID=""
+kill "$MOCK_HTTP_PID" 2>/dev/null || true
+wait "$MOCK_HTTP_PID" 2>/dev/null || true
+MOCK_HTTP_PID=""
+rm -f "$SOCK" "$SANDBOX/mock.port"
+
+cat >"$SANDBOX/mock-durable-llm.mjs" <<'JS'
+import fs from "node:fs";
+import http from "node:http";
+const [portFile] = process.argv.slice(2);
+const server = http.createServer((req, res) => {
+  let body = "";
+  req.on("data", (c) => { body += c.toString("utf8"); });
+  req.on("end", () => {
+    if (req.url !== "/chat/completions") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("{}");
+      return;
+    }
+    const parsed = JSON.parse(body || "{}");
+    const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+    const last = messages[messages.length - 1] || {};
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+
+    if (last.role === "user" && String(last.content || "").includes("Read chapter 3")) {
+      res.write('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_s4_add","type":"function","function":{"name":"state_task_add","arguments":"{\\"title\\":\\"Read chapter 3\\"}"}}]}}],"usage":{"prompt_tokens":22,"completion_tokens":7}}\n\n');
+      res.write("data: [DONE]\n\n");
+      res.end();
+      return;
+    }
+    res.write('data: {"choices":[{"delta":{"content":"Đã ghi "}}]}\n\n');
+    res.write('data: {"choices":[{"delta":{"content":"vào sổ rồi cháu!"}}],"usage":{"prompt_tokens":35,"completion_tokens":8}}\n\n');
+    res.write("data: [DONE]\n\n");
+    res.end();
+  });
+});
+server.listen(0, "127.0.0.1", () => {
+  fs.writeFileSync(portFile, String(server.address().port));
+});
+JS
+
+node "$SANDBOX/mock-durable-llm.mjs" "$SANDBOX/mock.port" &
+MOCK_HTTP_PID=$!
+for _ in $(seq 1 30); do
+  [ -f "$SANDBOX/mock.port" ] && break
+  sleep 0.1
+done
+[ -f "$SANDBOX/mock.port" ] || fail "durable mock LLM server failed to bind"
+kill -0 "$MOCK_HTTP_PID" 2>/dev/null || fail "durable mock LLM server died"
+MOCK_PORT="$(cat "$SANDBOX/mock.port")"
+
+cat >"$SANDBOX/config.json" <<JSON
+{"token":"$TOKEN","decidePort":$PORT,"openRouterKey":"sk-e2e-durable","wakeHour":0,"bedtimeHour":24,"quietStart":0,"quietEnd":0,"nudgesPerDayMax":3}
+JSON
+
+cat >"$SANDBOX/state/state.json" <<JSON
+{"date":"$(date +%Y-%m-%d)","dayOff":false,"greeted":true,"tasks":[],"pomodoro":{"stage":"deepWork","finished":0}}
+JSON
+
+rm -f "$SANDBOX/durable.pid"
+GRANNY_CONFIG_FILE="$SANDBOX/config.json" GRANNY_STATE_DIR="$SANDBOX/state" \
+  GRANNY_ENGINE_PATH="$REPO/engine/bin/granny-engine" \
+  GRANNY_OPENROUTER_URL="http://127.0.0.1:$MOCK_PORT/chat/completions" \
+  GRANNY_DEVICE_CONTEXT="$SANDBOX/device.json" \
+  GRANNY_TEST_ENGINE_PID="$SANDBOX/durable.pid" \
+  "$AGENT" --serve >"$SANDBOX/serve4.log" 2>&1 &
+SERVER_PID=$!
+
+for _ in $(seq 1 60); do
+  [ -f "$SANDBOX/durable.pid" ] && break
+  sleep 0.1
+done
+[ -f "$SANDBOX/durable.pid" ] || { cat "$SANDBOX/serve4.log" "$SANDBOX/state/engine.log" 2>/dev/null >&2; fail "Pi Durable granny-engine did not start"; }
+CHECKS=$((CHECKS + 1))
+
+[ -f "$SANDBOX/state/engine/durable.sqlite" ] || fail "durable.sqlite was not created"
+CHECKS=$((CHECKS + 1))
+
+durable_chat="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-durable-1","method":"chat.prompt","params":{"text":"Thêm việc Read chapter 3","stream":true}}')"
+contains "$durable_chat" '"event":"chat.delta"' "Pi Durable streams chat.delta"
+contains "$durable_chat" '"text":"Đã ghi vào sổ rồi cháu!"' "Pi Durable completes tool loop + chat.done"
+
+state_titles="$(node -e 'const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));console.log(s.tasks.map(t=>t.title).join(","))' "$SANDBOX/state/state.json")"
+contains "$state_titles" "Read chapter 3" "Pi Durable tool call persisted task via EngineKernel"
+
+# Kill -9 the Pi Durable process and verify automatic respawn on the same durable.sqlite.
+durable_first_pid="$(cat "$SANDBOX/durable.pid")"
+rm -f "$SANDBOX/durable.pid"
+kill -9 "$durable_first_pid" 2>/dev/null || true
+
+for _ in $(seq 1 60); do
+  [ -f "$SANDBOX/durable.pid" ] && break
+  sleep 0.1
+done
+[ -f "$SANDBOX/durable.pid" ] || fail "Pi Durable granny-engine was not respawned after kill -9"
+CHECKS=$((CHECKS + 1))
+
+durable_after_crash="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-durable-2","method":"chat.prompt","params":{"text":"Cảm ơn Ngoại","stream":true}}')"
+contains "$durable_after_crash" '"text":"Đã ghi vào sổ rồi cháu!"' "Respawned Pi Durable answers chat.prompt"
+
 echo "e2e-engine OK ($CHECKS checks)"
