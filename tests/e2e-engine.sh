@@ -147,8 +147,9 @@ contains "$quiet_out" '"reason":"after quiet hours"' "speak during quiet hours r
 
 # 5. chat.prompt streams deltas and ends with chat.done; killing the engine mid-stream leaves the day untouched.
 cat >"$SANDBOX/engine-stub.mjs" <<'JS'
+import fs from "node:fs";
 import net from "node:net";
-const [sock, mode] = process.argv.slice(2);
+const [sock, mode, abortLog] = process.argv.slice(2);
 const conn = net.createConnection(sock, () => {
   conn.write(JSON.stringify({
     v: 1, id: "h-1", method: "hello",
@@ -164,10 +165,17 @@ conn.on("data", (chunk) => {
     buf = buf.slice(nl + 1);
     if (!line) continue;
     const msg = JSON.parse(line);
+    if (msg.method === "chat.abort" && abortLog) {
+      fs.appendFileSync(abortLog, String(msg.params?.id ?? "") + "\n");
+      return;
+    }
     if (msg.method === "chat.prompt") {
       conn.write(JSON.stringify({ v: 1, id: msg.id, event: "chat.delta", params: { text: "which step " } }) + "\n");
       if (mode === "crash") {
         process.exit(1);
+      }
+      if (mode === "slow") {
+        return;
       }
       conn.write(JSON.stringify({ v: 1, id: msg.id, event: "chat.done", params: { text: "which step is stuck?" } }) + "\n");
     }
@@ -187,6 +195,35 @@ stream_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-1","method":"chat.prompt","params":{"text":"stuck on booking","stream":true}}')"
 contains "$stream_out" '"event":"chat.delta"' "chat.prompt streams delta"
 contains "$stream_out" '"event":"chat.done"' "chat.prompt ends with chat.done"
+kill "$ENGINE_PID" 2>/dev/null || true
+wait "$ENGINE_PID" 2>/dev/null || true
+ENGINE_PID=""
+
+# Start stub in slow mode: chat.abort cancels the in-flight prompt.
+node "$SANDBOX/engine-stub.mjs" "$SOCK" "slow" "$SANDBOX/abort.log" &
+ENGINE_PID=$!
+sleep 0.2
+
+node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-slow","method":"chat.prompt","params":{"text":"long answer","stream":true}}' >"$SANDBOX/slow.out" &
+SLOW_CLIENT_PID=$!
+sleep 0.2
+
+abort_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-abort","method":"chat.abort","params":{"id":"c-slow"}}')"
+contains "$abort_out" '"aborted":true' "chat.abort ack"
+wait "$SLOW_CLIENT_PID" 2>/dev/null || true
+slow_stream="$(cat "$SANDBOX/slow.out")"
+contains "$slow_stream" '"event":"chat.delta"' "slow prompt delivered delta before abort"
+contains "$slow_stream" '"aborted":true' "slow prompt released on abort"
+sleep 0.1
+abort_logged="$(cat "$SANDBOX/abort.log" 2>/dev/null || true)"
+contains "$abort_logged" "c-slow" "engine received forwarded chat.abort"
+
+# Aborting an unknown run id answers aborted:false.
+noop_abort="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"c-noop","method":"chat.abort","params":{"id":"c-missing"}}')"
+contains "$noop_abort" '"aborted":false' "chat.abort on unknown id returns false"
 kill "$ENGINE_PID" 2>/dev/null || true
 wait "$ENGINE_PID" 2>/dev/null || true
 ENGINE_PID=""

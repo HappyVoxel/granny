@@ -84,6 +84,7 @@ public enum EngineJSON: Codable, Equatable, Sendable {
 /// each one; this list is the vocabulary, not a permission.
 public enum EngineCapability: String, CaseIterable, Codable, Sendable {
     case stateRead = "state.read"
+    case deviceContext = "device.context"
     case stateTaskAdd = "state.task.add"
     case stateTaskTick = "state.task.tick"
     case slotMove = "slot.move"

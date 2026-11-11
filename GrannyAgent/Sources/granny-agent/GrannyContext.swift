@@ -107,6 +107,82 @@ final class GrannyContext {
         engineServer?.pushDayWokeIfNeeded()
     }
 
+    func sendChatPrompt(_ raw: String) {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, viewModel.activeChatRunID == nil else { return }
+        let userID = "u-\(UUID().uuidString.prefix(8))"
+        let runID = "c-\(UUID().uuidString.prefix(8))"
+        viewModel.chatTurns.append(
+            ChatTurn(id: userID, role: .you, text: text, streaming: false))
+        viewModel.chatTurns.append(
+            ChatTurn(id: runID, role: .granny, text: "", streaming: true))
+        viewModel.activeChatRunID = runID
+
+        guard let server = engineServer else {
+            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
+            return
+        }
+        server.prompt(id: runID, text: text) { [weak self] envelope in
+            DispatchQueue.main.async {
+                self?.handleChatEnvelope(envelope, runID: runID)
+            }
+        }
+    }
+
+    func abortChatPrompt() {
+        guard let runID = viewModel.activeChatRunID else { return }
+        engineServer?.abort(id: runID)
+        finishChatTurn(id: runID, error: nil)
+    }
+
+    private func handleChatEnvelope(_ envelope: EngineEnvelope, runID: String) {
+        guard viewModel.activeChatRunID == runID,
+              let index = viewModel.chatTurns.firstIndex(where: { $0.id == runID })
+        else { return }
+        if envelope.event == "chat.delta" {
+            if case .object(let fields) = envelope.params,
+               case .string(let chunk) = fields["text"]
+            {
+                viewModel.chatTurns[index].text += chunk
+            }
+            return
+        }
+        if envelope.event == "chat.done" {
+            if viewModel.chatTurns[index].text.isEmpty,
+               case .object(let fields) = envelope.params,
+               case .string(let full) = fields["text"]
+            {
+                viewModel.chatTurns[index].text = full
+            }
+            finishChatTurn(id: runID, error: nil)
+            return
+        }
+        if envelope.error != nil {
+            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
+            return
+        }
+        if envelope.event == "chat.error" {
+            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
+            return
+        }
+        if envelope.isReply {
+            finishChatTurn(id: runID, error: nil)
+        }
+    }
+
+    private func finishChatTurn(id: String, error: String?) {
+        if let index = viewModel.chatTurns.firstIndex(where: { $0.id == id }) {
+            viewModel.chatTurns[index].streaming = false
+            if let error {
+                viewModel.chatTurns[index].error = error
+            }
+        }
+        if viewModel.activeChatRunID == id {
+            viewModel.activeChatRunID = nil
+        }
+        viewModel.refresh(from: self)
+    }
+
     func snapshot() -> (DayState, Phase) {
         (store.state, phase())
     }
@@ -827,6 +903,10 @@ final class GrannyContext {
                 self.syncPomodoro()
                 self.scheduler.tick()
                 Task { await self.engine.clearCache() }
+            },
+            onStatusChange: { [weak self] in
+                guard let self else { return }
+                self.viewModel.refresh(from: self)
             })
         do {
             try server.start()

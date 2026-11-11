@@ -7,6 +7,7 @@ import GrannyCore
 /// notebook behind every time a key was pasted.
 enum GrannyTab: String, CaseIterable {
     case notebook
+    case chat
     case timetable
     case settings
 
@@ -15,6 +16,7 @@ enum GrannyTab: String, CaseIterable {
     var title: String? {
         switch self {
         case .notebook: return GrannyLines.tabTasks
+        case .chat: return GrannyLines.tabChat
         case .timetable: return GrannyLines.tabTimetable
         case .settings: return nil
         }
@@ -46,6 +48,11 @@ struct GrannyRootView: View {
                 notebookTab
                     .opacity(tabs.current == .notebook ? 1 : 0)
                     .allowsHitTesting(tabs.current == .notebook)
+                if visited.contains(.chat) {
+                    chatTab
+                        .opacity(tabs.current == .chat ? 1 : 0)
+                        .allowsHitTesting(tabs.current == .chat)
+                }
                 if visited.contains(.timetable) {
                     timetableTab
                         .opacity(tabs.current == .timetable ? 1 : 0)
@@ -142,6 +149,14 @@ struct GrannyRootView: View {
             onResumeWork: { [weak context] in context?.clearDayOff() },
             onTogglePomodoro: { [weak context] in context?.togglePomodoro() },
             onDraftChanged: { [weak context] holds in context?.hasDraft = holds })
+    }
+
+    @ViewBuilder
+    private var chatTab: some View {
+        ChatView(
+            viewModel: viewModel,
+            onSend: { [weak context] text in context?.sendChatPrompt(text) },
+            onAbort: { [weak context] in context?.abortChatPrompt() })
     }
 
     @ViewBuilder

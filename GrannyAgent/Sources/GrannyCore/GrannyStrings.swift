@@ -104,7 +104,17 @@ public protocol GrannyStrings: Sendable {
     var slotClear: String { get }
     var scheduleInvalid: String { get }
     var tabTasks: String { get }
+    var tabChat: String { get }
     var tabTimetable: String { get }
+    var chatTitle: String { get }
+    var chatSubtitle: String { get }
+    var chatPlaceholder: String { get }
+    var chatSendButton: String { get }
+    var chatAbortButton: String { get }
+    var chatEmpty: String { get }
+    var chatDegraded: String { get }
+    var chatSpeakerYou: String { get }
+    var chatSpeakerGranny: String { get }
     var tagsTitle: String { get }
     var tagAdd: String { get }
     var tagNamePlaceholder: String { get }
@@ -401,7 +411,17 @@ public struct EnglishStrings: GrannyStrings {
     public var slotClear: String { "Take it off the timetable" }
     public var scheduleInvalid: String { "Every slot needs a real hour (09:00) and a name." }
     public var tabTasks: String { "To-do list" }
+    public var tabChat: String { "Talk to Granny" }
     public var tabTimetable: String { "Timetable" }
+    public var chatTitle: String { "A word with Granny" }
+    public var chatSubtitle: String { "Ask when you are stuck, or make your case - the notebook still keeps the score." }
+    public var chatPlaceholder: String { "Tell Granny what you are stuck on…" }
+    public var chatSendButton: String { "Send" }
+    public var chatAbortButton: String { "Stop" }
+    public var chatEmpty: String { "No words yet today. Write below when a task has you cornered." }
+    public var chatDegraded: String { "Granny's engine is not answering right now - the day's blocks and your notebook are still on duty." }
+    public var chatSpeakerYou: String { "YOU" }
+    public var chatSpeakerGranny: String { "GRANNY" }
     public var tagsTitle: String { "TAGS" }
     public var tagAdd: String { "New tag" }
     public var tagNamePlaceholder: String { "Tag name" }
@@ -744,7 +764,17 @@ public struct VietnameseStrings: GrannyStrings {
     public var slotClear: String { "Bỏ khỏi mốc" }
     public var scheduleInvalid: String { "Mỗi mốc cần giờ hợp lệ (09:00) và một cái tên." }
     public var tabTasks: String { "Việc hôm nay" }
+    public var tabChat: String { "Đôi co với Ngoại" }
     public var tabTimetable: String { "Thời gian biểu" }
+    public var chatTitle: String { "Đôi co với Ngoại" }
+    public var chatSubtitle: String { "Bí bước nào thì hỏi, muốn xin xỏ thì trình bày - sổ việc vẫn giữ nguyên luật." }
+    public var chatPlaceholder: String { "Trình bày với Ngoại xem đang vướng chỗ nào…" }
+    public var chatSendButton: String { "Gửi" }
+    public var chatAbortButton: String { "Dừng" }
+    public var chatEmpty: String { "Hôm nay chưa đôi co câu nào. Bí việc nào thì gõ xuống dưới." }
+    public var chatDegraded: String { "Bộ não hội thoại của Ngoại đang nghỉ - sổ việc và lệnh chặn vẫn giữ nguyên." }
+    public var chatSpeakerYou: String { "CHÁU" }
+    public var chatSpeakerGranny: String { "NGOẠI" }
     public var tagsTitle: String { "THẺ" }
     public var tagAdd: String { "Thẻ mới" }
     public var tagNamePlaceholder: String { "Tên thẻ" }
@@ -1086,7 +1116,17 @@ public struct FinnishStrings: GrannyStrings {
     public var slotClear: String { "Irrota aikataulusta" }
     public var scheduleInvalid: String { "Jokainen kohta tarvitsee oikean tunnin (09:00) ja nimen." }
     public var tabTasks: String { "Tehtävälista" }
+    public var tabChat: String { "Juttele mummon kanssa" }
     public var tabTimetable: String { "Aikataulu" }
+    public var chatTitle: String { "Sana mummon kanssa" }
+    public var chatSubtitle: String { "Kysy kun olet jumissa tai perustele asiasi - vihko pitää silti kirjaa." }
+    public var chatPlaceholder: String { "Kerro mummolle missä olet jumissa…" }
+    public var chatSendButton: String { "Lähetä" }
+    public var chatAbortButton: String { "Seis" }
+    public var chatEmpty: String { "Ei vielä sanoja tänään. Kirjoita alle kun tehtävä jumittaa." }
+    public var chatDegraded: String { "Mummon moottori ei vastaa juuri nyt - päivän estot ja vihko ovat silti voimassa." }
+    public var chatSpeakerYou: String { "SINÄ" }
+    public var chatSpeakerGranny: String { "MUMMO" }
     public var tagsTitle: String { "TAGIT" }
     public var tagAdd: String { "Uusi tagi" }
     public var tagNamePlaceholder: String { "Tagin nimi" }

@@ -369,6 +369,19 @@ struct GrannySecondaryButtonStyle: ButtonStyle {
     }
 }
 
+struct ChatTurn: Identifiable, Equatable {
+    enum Role: Equatable {
+        case you
+        case granny
+    }
+
+    var id: String
+    var role: Role
+    var text: String
+    var streaming: Bool
+    var error: String?
+}
+
 final class GrannyViewModel: ObservableObject {
     @Published var tasks: [TaskItem] = []
     @Published var phase: Phase = .awaitingTasks
@@ -394,6 +407,9 @@ final class GrannyViewModel: ObservableObject {
     /// The timetable, for the hour chip on each task.
     @Published var slots: [ScheduleSlot] = []
     @Published var tags: [SlotTag] = []
+    @Published var chatTurns: [ChatTurn] = []
+    @Published var activeChatRunID: String?
+    @Published var engineReady = false
 
     func refresh(from context: GrannyContext) {
         tasks = context.store.state.tasks
@@ -405,6 +421,11 @@ final class GrannyViewModel: ObservableObject {
         rhythm = context.rhythmReport
         slots = context.schedule.sorted
         tags = context.tags
+        if let status = context.engineServer?.currentStatus, case .ready = status {
+            engineReady = true
+        } else {
+            engineReady = false
+        }
     }
 }
 
