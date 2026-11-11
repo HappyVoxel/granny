@@ -14,3 +14,11 @@
 {"v":1,"id":"e-7","method":"state.task.giveup","params":{}}
 {"v":1,"id":"e-7","error":{"code":"invalid","reason":"unknown method state.task.giveup","retryable":false}}
 {"v":1,"event":"slot.entered","params":{"rounds":0,"slotID":"morning-deep","taskIDs":["t-9"]}}
+{"v":1,"id":"e-8","method":"device.context","params":{}}
+{"v":1,"id":"e-8","result":{"calendarEvents":[{"allDay":false,"endAt":"2026-11-10T10:30:00Z","startAt":"2026-11-10T10:00:00Z","title":"Standup"}],"frontmostApp":{"bundleID":"com.apple.dt.Xcode","name":"Xcode"},"openTabs":[{"browser":"Safari","title":"Docs","url":"https://developer.apple.com"}]}}
+{"v":1,"id":"e-9","key":"k-slot","method":"slot.move","params":{"slotID":"morning-deep","taskID":"t-9"}}
+{"v":1,"id":"e-9","result":{"proposals":[{"slotID":"morning-deep","taskID":"t-9"}]}}
+{"v":1,"id":"e-10","key":"k-round","method":"round.start","params":{}}
+{"v":1,"id":"e-10","result":{"endsAt":"2026-11-10T10:25:00Z","stage":"deepWork"}}
+{"v":1,"id":"e-11","method":"trace.emit","params":{"span":{"input":{"prompt":"stuck"},"name":"chat.turn","output":{"reply":"break it down"},"traceName":"granny.engine"}}}
+{"v":1,"id":"e-11","result":{}}

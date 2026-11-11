@@ -100,6 +100,7 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   `GRANNY_KILLALL` (the Private Relay proxy killed when the block returns
   after a break - the e2e suites point it at a sentinel),
   `GRANNY_POMODORO_AUTOSTART`, `GRANNY_ENGINE_PATH`, `GRANNY_ENGINE_SOCKET`,
+  `GRANNY_OPENROUTER_URL`, `GRANNY_DEVICE_CONTEXT`,
   and the updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
   system calls must get an override or the e2e suites cannot reach them.
   `GRANNY_HOSTS_FILE` is the one that changes behaviour, not just a path: a run

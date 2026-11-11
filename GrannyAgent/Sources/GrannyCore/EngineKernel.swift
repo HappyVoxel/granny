@@ -1,5 +1,34 @@
 import Foundation
 
+/// Validated `model.stream` invocation ready for async streaming over the wire.
+public struct ValidatedModelStream: Equatable, Sendable {
+    public var id: String
+    public var apiKey: String
+    public var model: String
+    public var tier: String
+    public var language: String
+    public var messages: [EngineJSON]
+    public var tools: [EngineJSON]?
+
+    public init(
+        id: String,
+        apiKey: String,
+        model: String,
+        tier: String,
+        language: String,
+        messages: [EngineJSON],
+        tools: [EngineJSON]? = nil
+    ) {
+        self.id = id
+        self.apiKey = apiKey
+        self.model = model
+        self.tier = tier
+        self.language = language
+        self.messages = messages
+        self.tools = tools
+    }
+}
+
 /// What a single engine request produced against the kernel's day state.
 /// Pure data: the socket server writes `reply` to the wire, persists `state`
 /// when `mutated` is true, and hands `spokenText` to `Speaker` when non-nil.
@@ -7,11 +36,24 @@ public struct EngineOutcome: Equatable, Sendable {
     public var reply: EngineEnvelope
     public var spokenText: String?
     public var mutated: Bool
+    public var startedRound: Bool
+    public var emittedSpan: TraceClient.Span?
+    public var modelStream: ValidatedModelStream?
 
-    public init(reply: EngineEnvelope, spokenText: String? = nil, mutated: Bool = false) {
+    public init(
+        reply: EngineEnvelope,
+        spokenText: String? = nil,
+        mutated: Bool = false,
+        startedRound: Bool = false,
+        emittedSpan: TraceClient.Span? = nil,
+        modelStream: ValidatedModelStream? = nil
+    ) {
         self.reply = reply
         self.spokenText = spokenText
         self.mutated = mutated
+        self.startedRound = startedRound
+        self.emittedSpan = emittedSpan
+        self.modelStream = modelStream
     }
 }
 
@@ -84,6 +126,9 @@ public enum EngineKernel {
         config: GrannyConfig,
         state: inout DayState,
         blocksEnforced: Bool,
+        pomodoroRunning: Bool = false,
+        pomodoroRemaining: TimeInterval? = nil,
+        deviceContext: EngineDeviceContext = .empty,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> EngineOutcome {
@@ -156,6 +201,104 @@ public enum EngineKernel {
                 "nudgesRemaining": .number(Double(max(0, config.nudgesPerDayMax - state.nudgesSent))),
             ])
             return EngineOutcome(reply: .reply(id: id, result: result))
+        }
+
+        if capability == .deviceContext {
+            let result = (try? EngineJSON.encoded(deviceContext)) ?? .object([
+                "frontmostApp": .null,
+                "openTabs": .array([]),
+                "calendarEvents": .array([]),
+            ])
+            return EngineOutcome(reply: .reply(id: id, result: result))
+        }
+
+        if capability == .traceEmit {
+            guard case .object(let spanFields) = fields["span"] else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .invalid("trace.emit requires span object")))
+            }
+            guard case .string(let rawName) = spanFields["name"] else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .invalid("span requires name")))
+            }
+            let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .invalid("span requires name")))
+            }
+            let traceName: String
+            if case .string(let rawTrace) = spanFields["traceName"],
+               !rawTrace.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                traceName = rawTrace.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                traceName = "granny.engine"
+            }
+            let model: String?
+            if case .string(let rawModel) = spanFields["model"],
+               !rawModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                model = rawModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                model = nil
+            }
+            let startedAt = parseTimestamp(spanFields["startedAt"]) ?? now
+            let rawEnded = parseTimestamp(spanFields["endedAt"]) ?? now
+            let endedAt = max(startedAt, rawEnded)
+            let span = TraceClient.Span(
+                name: name,
+                traceName: traceName,
+                input: stringDictionary(from: spanFields["input"]),
+                output: stringDictionary(from: spanFields["output"]),
+                model: model,
+                startedAt: startedAt,
+                endedAt: endedAt)
+            return EngineOutcome(reply: .reply(id: id, result: .object([:])), emittedSpan: span)
+        }
+
+        if capability == .modelStream {
+            guard case .array(let messages) = fields["messages"], !messages.isEmpty else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .invalid("model.stream requires non-empty messages")))
+            }
+            var tools: [EngineJSON]?
+            if let rawTools = fields["tools"], rawTools != .null {
+                guard case .array(let parsedTools) = rawTools else {
+                    return EngineOutcome(
+                        reply: .failure(id: id, error: .invalid("tools must be an array")))
+                }
+                tools = parsedTools
+            }
+            guard OpenRouterClient.modelStreamRequestBody(
+                model: config.model, messages: messages, tools: tools) != nil
+            else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .invalid("invalid model.stream messages or tools")))
+            }
+            guard let rawKey = config.openRouterKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !rawKey.isEmpty
+            else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .unavailable("OpenRouter key is not configured")))
+            }
+            let tier: String
+            if case .string(let rawTier) = fields["tier"],
+               !rawTier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                tier = rawTier.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                tier = "default"
+            }
+            let resolvedModel = OpenRouterClient.resolveModel(tier: tier, config: config)
+            let stream = ValidatedModelStream(
+                id: id,
+                apiKey: rawKey,
+                model: resolvedModel,
+                tier: tier,
+                language: config.language,
+                messages: messages,
+                tools: tools)
+            return EngineOutcome(reply: .reply(id: id, result: .object([:])), modelStream: stream)
         }
 
         // Idempotency comes before mutations and budget checks so a retried
@@ -281,9 +424,143 @@ public enum EngineKernel {
                 spokenText: text,
                 mutated: true)
 
+        case .slotMove:
+            guard case .string(let taskID) = fields["taskID"], !taskID.isEmpty else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .invalid("slot.move requires taskID")))
+            }
+            enum SlotTarget {
+                case propose
+                case clear
+                case pin(String)
+            }
+            let target: SlotTarget
+            if let rawSlot = fields["slotID"] {
+                switch rawSlot {
+                case .null:
+                    target = .clear
+                case .string(let candidate):
+                    let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.isEmpty {
+                        target = .clear
+                    } else {
+                        guard config.schedule.contains(where: { $0.id == trimmed }) else {
+                            return EngineOutcome(
+                                reply: .failure(id: id, error: .refused("unknown slot \(trimmed)")))
+                        }
+                        target = .pin(trimmed)
+                    }
+                default:
+                    return EngineOutcome(
+                        reply: .failure(id: id, error: .invalid("slotID must be a string or null")))
+                }
+            } else {
+                target = .propose
+            }
+
+            var candidate = state
+            candidate.takeCarriedFrogs()
+            guard let index = candidate.tasks.firstIndex(where: { $0.id == taskID }) else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .refused("unknown task \(taskID)")))
+            }
+            let schedule = Schedule(slots: config.schedule)
+            switch target {
+            case .pin(let slotID):
+                candidate.tasks[index].slotID = slotID
+            case .clear:
+                candidate.tasks[index].slotID = nil
+            case .propose:
+                candidate.tasks[index].slotID = proposeSlots(
+                    for: [candidate.tasks[index]], in: schedule)[taskID]
+            }
+            state = candidate
+            let proposals: [EngineJSON] = state.tasks.map { item in
+                .object([
+                    "taskID": .string(item.id),
+                    "slotID": item.slotID.map(EngineJSON.string) ?? .null,
+                ])
+            }
+            let result: EngineJSON = .object(["proposals": .array(proposals)])
+            state.recordAppliedKey(envelope.key, result: result)
+            return EngineOutcome(reply: .reply(id: id, result: result), mutated: true)
+
+        case .roundStart:
+            guard state.pomodoro.stage == .deepWork else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .refused("break in progress")))
+            }
+            guard !pomodoroRunning else {
+                return EngineOutcome(
+                    reply: .failure(id: id, error: .refused("round already running")))
+            }
+            let duration: TimeInterval
+            if let remaining = pomodoroRemaining, remaining > 0 {
+                duration = remaining
+            } else {
+                duration = TimeInterval(state.pomodoro.minutes(config.pomodoro) * 60)
+            }
+            let endsAt = iso8601Timestamp(now.addingTimeInterval(duration))
+            let result: EngineJSON = .object([
+                "stage": .string(state.pomodoro.stage.rawValue),
+                "endsAt": .string(endsAt),
+            ])
+            let hasKey = !(envelope.key ?? "").isEmpty
+            state.recordAppliedKey(envelope.key, result: result)
+            return EngineOutcome(
+                reply: .reply(id: id, result: result),
+                mutated: hasKey,
+                startedRound: true)
+
         default:
             return EngineOutcome(
                 reply: .failure(id: id, error: .unavailable("\(capability.rawValue) is not available")))
         }
+    }
+
+    private static func iso8601Timestamp(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: date)
+    }
+
+    private static func parseTimestamp(_ raw: EngineJSON?) -> Date? {
+        guard let raw else { return nil }
+        switch raw {
+        case .string(let text):
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let parsed = fractional.date(from: text) { return parsed }
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+            return plain.date(from: text)
+        case .number(let val):
+            let seconds = val > 10_000_000_000 ? val / 1000.0 : val
+            return Date(timeIntervalSince1970: seconds)
+        default:
+            return nil
+        }
+    }
+
+    private static func stringDictionary(from raw: EngineJSON?) -> [String: String] {
+        guard case .object(let map) = raw else { return [:] }
+        var out: [String: String] = [:]
+        for (key, value) in map {
+            switch value {
+            case .string(let s): out[key] = s
+            case .bool(let b): out[key] = b ? "true" : "false"
+            case .number(let n):
+                out[key] = (n.rounded() == n && abs(n) < 1e15) ? String(Int(n)) : String(n)
+            case .null: out[key] = ""
+            case .array, .object:
+                if let data = try? JSONEncoder.engine.encode(value),
+                   let text = String(data: data, encoding: .utf8)
+                {
+                    out[key] = text
+                }
+            }
+        }
+        return out
     }
 }

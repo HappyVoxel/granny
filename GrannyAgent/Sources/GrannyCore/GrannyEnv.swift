@@ -32,4 +32,10 @@ public enum GrannyEnv {
     public static let enginePath = "GRANNY_ENGINE_PATH"
     /// Path to `<state dir>/engine.sock` passed to the spawned engine child.
     public static let engineSocket = "GRANNY_ENGINE_SOCKET"
+    /// Endpoint override for OpenRouter chat completions so the e2e engine
+    /// suite can stream against a local SSE stub without hitting the network.
+    public static let openRouterURL = "GRANNY_OPENROUTER_URL"
+    /// Path to a JSON file supplying a canned `device.context` snapshot for
+    /// e2e tests so no suite touches the developer's browsers or Calendar.
+    public static let deviceContext = "GRANNY_DEVICE_CONTEXT"
 }

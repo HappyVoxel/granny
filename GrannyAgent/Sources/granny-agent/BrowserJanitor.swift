@@ -47,11 +47,17 @@ final class BrowserJanitor {
     private static let scriptableBundleExtension = ".sdef"
     /// osascript's "not authorized to send Apple events" exit code.
     private static let notAuthorizedError = "-1743"
+    /// Bounded wait so a browser blocked on an Automation prompt or modal
+    /// dialog cannot hang the sweep or `device.context` socket request.
+    private static let osaReadTimeoutSeconds: TimeInterval = 3
+    private static let osaCloseTimeoutSeconds: TimeInterval = 5
     /// Grace period for the in-tab purge before the close.
     private static let purgeDelaySeconds: Double = 1.2
+    private static let osaLock = NSLock()
+    private static var sharedWarnedBrowsers: Set<String> = []
+    private static var sharedFailedSnapshotBrowsers: Set<String> = []
 
     private var timer: Timer?
-    private var warnedBrowsers: Set<String> = []
     private var notifiedUnscriptable: Set<String> = []
     private var failedBrowsers: Set<String> = []
     private var lastDiscovery = ""
@@ -157,31 +163,109 @@ final class BrowserJanitor {
     }
 
     private func isScriptable(_ bundle: Bundle) -> Bool {
+        Self.isScriptableBundle(bundle)
+    }
+
+    private static func isScriptableBundle(_ bundle: Bundle) -> Bool {
         guard let resources = bundle.resourceURL?.path else { return false }
         let entries = (try? FileManager.default.contentsOfDirectory(atPath: resources)) ?? []
         return entries.contains { $0.hasSuffix(Self.scriptableBundleExtension) }
     }
 
+    /// Stateless read of open http/https tabs across running scriptable
+    /// browsers for `device.context`. Bounded by `osaReadTimeoutSeconds` so a
+    /// consent prompt or modal never hangs the engine socket; logs failures to
+    /// `janitor.log` and reports denied Automation once per browser.
+    static func snapshotOpenTabs() -> [EngineDeviceContext.OpenTab] {
+        let warned: Set<String> = {
+            osaLock.lock()
+            defer { osaLock.unlock() }
+            return sharedWarnedBrowsers
+        }()
+        let runningScriptable: [Browser] = onMain {
+            let probe = URL(string: "https://example.com")!
+            var seen = Set<String>()
+            var out: [Browser] = []
+            for appURL in NSWorkspace.shared.urlsForApplications(toOpen: probe) {
+                guard let bundle = Bundle(url: appURL),
+                      let id = bundle.bundleIdentifier,
+                      seen.insert(id).inserted,
+                      isScriptableBundle(bundle),
+                      !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty
+                else { continue }
+                let name = appURL.deletingPathExtension().lastPathComponent
+                guard !warned.contains(name) else { continue }
+                out.append(Browser(name: name, bundleID: id))
+            }
+            return out
+        }
+        guard !runningScriptable.isEmpty else { return [] }
+
+        var collected: [EngineDeviceContext.OpenTab] = []
+        for browser in runningScriptable {
+            let result = executeOsascript(
+                Self.openTabsJXA,
+                arguments: [browser.name],
+                browserName: browser.name,
+                timeout: osaReadTimeoutSeconds)
+            guard let output = result.output,
+                  let outData = output.data(using: .utf8),
+                  let raw = JSON.decode([[String: String]].self, from: outData)
+            else {
+                let firstFailure: Bool = {
+                    osaLock.lock()
+                    defer { osaLock.unlock() }
+                    return sharedFailedSnapshotBrowsers.insert(browser.bundleID).inserted
+                }()
+                if firstFailure {
+                    appendLog(
+                        "snapshotOpenTabs \(browser.name): failed\(result.stderr.isEmpty ? "" : " - \(result.stderr)")")
+                }
+                continue
+            }
+            osaLock.lock()
+            sharedFailedSnapshotBrowsers.remove(browser.bundleID)
+            osaLock.unlock()
+            for entry in raw {
+                guard let url = entry["url"],
+                      let scheme = URL(string: url)?.scheme?.lowercased(),
+                      scheme == "http" || scheme == "https"
+                else { continue }
+                collected.append(
+                    EngineDeviceContext.OpenTab(
+                        browser: browser.name,
+                        url: url,
+                        title: entry["title"] ?? ""))
+            }
+        }
+        return collected
+    }
+
     // MARK: - AppleScript (JavaScript for Automation)
 
+    private static let openTabsJXA = """
+    function run(argv) {
+      var B = Application(argv[0]);
+      if (!B.running()) return '[]';
+      var tabs = [];
+      B.windows().forEach(function (w) {
+        w.tabs().forEach(function (t) {
+          try {
+            var u = t.url();
+            if (u) tabs.push({ url: u, title: t.name() || '' });
+          } catch (e) {}
+        });
+      });
+      return JSON.stringify(tabs);
+    }
+    """
+
     private func openTabs(_ browser: Browser) -> [(url: String, title: String)] {
-        let script = """
-        function run(argv) {
-          var B = Application(argv[0]);
-          if (!B.running()) return '[]';
-          var tabs = [];
-          B.windows().forEach(function (w) {
-            w.tabs().forEach(function (t) {
-              try {
-                var u = t.url();
-                if (u) tabs.push({ url: u, title: t.name() || '' });
-              } catch (e) {}
-            });
-          });
-          return JSON.stringify(tabs);
-        }
-        """
-        guard let output = runOsascript(script, arguments: [browser.name], browserName: browser.name),
+        guard let output = runOsascript(
+            Self.openTabsJXA,
+            arguments: [browser.name],
+            browserName: browser.name,
+            timeout: Self.osaReadTimeoutSeconds),
               let data = output.data(using: .utf8),
               let raw = JSON.decode([[String: String]].self, from: data) else {
             // Log the first failure per browser, not one line every 5 s.
@@ -233,7 +317,12 @@ final class BrowserJanitor {
         }
         """
         let arguments = [browser.name, url, purge, browser.chromium ? "1" : "0"]
-        guard let output = runOsascript(script, arguments: arguments, browserName: browser.name) else {
+        guard let output = runOsascript(
+            script,
+            arguments: arguments,
+            browserName: browser.name,
+            timeout: Self.osaCloseTimeoutSeconds)
+        else {
             log("close \(browser.name) \(url): failed\(lastStderr.isEmpty ? "" : " - \(lastStderr)")")
             return false
         }
@@ -245,8 +334,26 @@ final class BrowserJanitor {
     private func runOsascript(
         _ script: String,
         arguments: [String] = [],
-        browserName: String
+        browserName: String,
+        timeout: TimeInterval
     ) -> String? {
+        let result = Self.executeOsascript(
+            script,
+            arguments: arguments,
+            browserName: browserName,
+            timeout: timeout,
+            onDenied: onError)
+        lastStderr = result.stderr
+        return result.output
+    }
+
+    private static func executeOsascript(
+        _ script: String,
+        arguments: [String] = [],
+        browserName: String,
+        timeout: TimeInterval,
+        onDenied: ((String) -> Void)? = nil
+    ) -> (output: String?, stderr: String) {
         let process = Process()
         // `GRANNY_OSA_CMD` replaces osascript, the way it does for the bell: a
         // sandboxed run can make the janitor inert instead of driving the
@@ -261,30 +368,68 @@ final class BrowserJanitor {
         do {
             try process.run()
         } catch {
-            return nil
+            return (nil, error.localizedDescription)
         }
+        // A browser sitting on the Automation consent prompt or a modal dialog
+        // blocks osascript forever; terminate after `timeout` so neither the
+        // janitor nor `device.context` can wedge.
+        let timeoutLock = NSLock()
+        var timedOut = false
+        let watchdog = DispatchWorkItem {
+            if process.isRunning {
+                timeoutLock.lock()
+                timedOut = true
+                timeoutLock.unlock()
+                process.terminate()
+            }
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
+        defer { watchdog.cancel() }
+
         // Drain both pipes before waiting: a full pipe would block osascript
         // forever and the janitor with it.
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let errData = stderr.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        let output = String(data: outData, encoding: .utf8)
-        if process.terminationStatus != 0 {
-            let message = String(data: errData, encoding: .utf8) ?? ""
-            lastStderr = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !warnedBrowsers.contains(browserName),
-               message.contains(Self.notAuthorizedError) || message.lowercased().contains("not allowed") {
-                warnedBrowsers.insert(browserName)
-                onError?(GrannyLines.browserControlDenied(browser: browserName))
+        timeoutLock.lock()
+        let didTimeout = timedOut
+        timeoutLock.unlock()
+
+        if didTimeout || process.terminationStatus != 0 {
+            let rawErr = (String(data: errData, encoding: .utf8) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = didTimeout
+                ? (rawErr.isEmpty ? "timed out after \(Int(timeout))s" : "\(rawErr) (timed out)")
+                : rawErr
+            if message.contains(notAuthorizedError) || message.lowercased().contains("not allowed") {
+                let shouldWarn: Bool = {
+                    osaLock.lock()
+                    defer { osaLock.unlock() }
+                    return sharedWarnedBrowsers.insert(browserName).inserted
+                }()
+                if shouldWarn {
+                    let line = GrannyLines.browserControlDenied(browser: browserName)
+                    if let onDenied {
+                        onDenied(line)
+                    } else {
+                        DispatchQueue.main.async { postNotification(body: line) }
+                    }
+                }
             }
-            return nil
+            return (nil, message)
         }
-        return output
+        return (String(data: outData, encoding: .utf8), "")
     }
 
     /// Append-only trail in the state directory: this runs inside a login
     /// agent with no console, so failures have to land somewhere.
     private func log(_ message: String) {
+        Self.appendLog(message)
+    }
+
+    private static func appendLog(_ message: String) {
+        osaLock.lock()
+        defer { osaLock.unlock() }
         let stamp = ISO8601DateFormatter().string(from: Date())
         let line = "\(stamp) \(message)\n"
         let url = GrannyPaths.stateDir.appendingPathComponent("janitor.log")
