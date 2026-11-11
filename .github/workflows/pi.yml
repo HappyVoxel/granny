@@ -1,4 +1,4 @@
-name: Pi
+name: Huggy
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -19,10 +19,10 @@ jobs:
       contents: read
       pull-requests: write
     concurrency:
-      group: pi-review-${{ github.event.pull_request.number }}
+      group: huggy-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     steps:
-      - uses: tripplen23/pi-pr-agent@v1
+      - uses: tripplen23/huggy-pr-agent@v1
         with:
           mode: review
           api_key: ${{ secrets.OPENCODE_GO_KEY }}
@@ -33,8 +33,16 @@ jobs:
     if: >-
       (github.event_name == 'pull_request_review_comment' ||
        (github.event_name == 'issue_comment' && github.event.issue.pull_request)) &&
-      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
-      github.event.comment.user.type != 'Bot'
+      github.event.comment.user.type != 'Bot' &&
+      (contains(github.event.comment.body, '@huggy') ||
+       contains(github.event.comment.body, '/huggy') ||
+       contains(github.event.comment.body, '@pi') ||
+       contains(github.event.comment.body, '/pi') ||
+       contains(github.event.comment.body, '/fix') ||
+       contains(github.event.comment.body, '/review') ||
+       contains(github.event.comment.body, '/describe') ||
+       contains(github.event.comment.body, '/improve') ||
+       contains(github.event.comment.body, '/ask'))
     runs-on: macos-15
     timeout-minutes: 90
     permissions:
@@ -42,12 +50,12 @@ jobs:
       pull-requests: write
       issues: write
     concurrency:
-      group: pi-cmd-${{ github.event.issue.number || github.event.pull_request.number }}
+      group: huggy-cmd-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     steps:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
-      - uses: tripplen23/pi-pr-agent@v1
+      - uses: tripplen23/huggy-pr-agent@v1
         with:
           mode: comment
           api_key: ${{ secrets.OPENCODE_GO_KEY }}
