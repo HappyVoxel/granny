@@ -24,7 +24,7 @@ final class EngineServer {
     private let enforcementProvider: () -> Bool
     private let onSpeak: ((String) -> Void)?
     private let onMutated: (() -> Void)?
-    private let onReady: (() -> Void)?
+    private let onStatusChange: (() -> Void)?
 
     private let ioQueue = DispatchQueue(label: "io.github.happyvoxel.granny.engine-io")
     private let statusLock = NSLock()
@@ -49,8 +49,12 @@ final class EngineServer {
 
     private func setStatus(_ newValue: Status) {
         statusLock.lock()
+        let changed = _status != newValue
         _status = newValue
         statusLock.unlock()
+        if changed, let onStatusChange {
+            DispatchQueue.main.async(execute: onStatusChange)
+        }
     }
 
     init(
@@ -60,7 +64,7 @@ final class EngineServer {
         enforcementProvider: @escaping () -> Bool,
         onSpeak: ((String) -> Void)? = nil,
         onMutated: (() -> Void)? = nil,
-        onReady: (() -> Void)? = nil
+        onStatusChange: (() -> Void)? = nil
     ) {
         self.socketURL = socketURL
         self.configProvider = configProvider
@@ -68,7 +72,7 @@ final class EngineServer {
         self.enforcementProvider = enforcementProvider
         self.onSpeak = onSpeak
         self.onMutated = onMutated
-        self.onReady = onReady
+        self.onStatusChange = onStatusChange
         let rawPath = ProcessInfo.processInfo.environment[GrannyEnv.enginePath] ?? ""
         self.supervisedEnginePath = rawPath.isEmpty ? nil : rawPath
     }
@@ -285,18 +289,25 @@ final class EngineServer {
     }
 
     /// Cancels an in-flight `chat.prompt` run on the connected engine.
-    func abort(id: String) {
+    func abort(id: String, completion: ((Bool) -> Void)? = nil) {
         ioQueue.async { [weak self] in
-            guard let self else { return }
-            let waiter = self.activePromptWaiters.removeValue(forKey: id)
-            if self.engineFD >= 0 {
-                let request = EngineEnvelope.request(
-                    id: id,
-                    method: "chat.abort",
-                    params: .object(["id": .string(id)]))
-                _ = self.writeLine(request, to: self.engineFD)
+            guard let self else {
+                completion?(false)
+                return
             }
-            waiter?(.reply(id: id, result: .object(["aborted": .bool(true)])))
+            guard let waiter = self.activePromptWaiters.removeValue(forKey: id),
+                  self.engineFD >= 0
+            else {
+                completion?(false)
+                return
+            }
+            let request = EngineEnvelope.request(
+                id: id,
+                method: "chat.abort",
+                params: .object(["id": .string(id)]))
+            let sent = self.writeLine(request, to: self.engineFD)
+            waiter(.reply(id: id, result: .object(["aborted": .bool(sent)])))
+            completion?(sent)
         }
     }
 
@@ -519,7 +530,6 @@ final class EngineServer {
                         }
                         DispatchQueue.main.async { [weak self] in
                             self?.pushDayWokeIfNeeded()
-                            self?.onReady?()
                         }
                         continue
                     } else if envelope.method == "chat.prompt" {
@@ -534,10 +544,16 @@ final class EngineServer {
                         {
                             targetID = runID
                         }
-                        abort(id: targetID)
+                        let done = DispatchSemaphore(value: 0)
+                        var aborted = false
+                        abort(id: targetID) { ok in
+                            aborted = ok
+                            done.signal()
+                        }
+                        _ = done.wait(timeout: .now() + 2)
                         _ = ioQueue.sync {
                             self.writeLine(
-                                .reply(id: envelope.id ?? targetID, result: .object(["aborted": .bool(true)])),
+                                .reply(id: envelope.id ?? targetID, result: .object(["aborted": .bool(aborted)])),
                                 to: fd)
                         }
                         return

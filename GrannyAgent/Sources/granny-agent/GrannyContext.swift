@@ -136,7 +136,9 @@ final class GrannyContext {
     }
 
     private func handleChatEnvelope(_ envelope: EngineEnvelope, runID: String) {
-        guard let index = viewModel.chatTurns.firstIndex(where: { $0.id == runID }) else { return }
+        guard viewModel.activeChatRunID == runID,
+              let index = viewModel.chatTurns.firstIndex(where: { $0.id == runID })
+        else { return }
         if envelope.event == "chat.delta" {
             if case .object(let fields) = envelope.params,
                case .string(let chunk) = fields["text"]
@@ -155,18 +157,16 @@ final class GrannyContext {
             finishChatTurn(id: runID, error: nil)
             return
         }
-        if let error = envelope.error {
-            finishChatTurn(id: runID, error: error.reason)
+        if envelope.error != nil {
+            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
             return
         }
         if envelope.event == "chat.error" {
-            var reason = GrannyLines.chatDegraded
-            if case .object(let fields) = envelope.params,
-               case .string(let text) = fields["reason"], !text.isEmpty
-            {
-                reason = text
-            }
-            finishChatTurn(id: runID, error: reason)
+            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
+            return
+        }
+        if envelope.isReply {
+            finishChatTurn(id: runID, error: nil)
         }
     }
 
@@ -904,7 +904,7 @@ final class GrannyContext {
                 self.scheduler.tick()
                 Task { await self.engine.clearCache() }
             },
-            onReady: { [weak self] in
+            onStatusChange: { [weak self] in
                 guard let self else { return }
                 self.viewModel.refresh(from: self)
             })

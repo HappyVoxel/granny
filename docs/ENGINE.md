@@ -108,6 +108,7 @@ Every request carries `id` (engine-local, for correlation) and `key`
 | method | params | returns / refuses |
 | --- | --- | --- |
 | `state.read` | `{}` | the day: `phase`, `date`, `dayOff`, `tasks` (`id`, `title`, `done`, `slotID`, `detail`), `slots`, `rounds`, `streak`, `blocksEnforced`, `nudgesRemaining`. Read-only. |
+| `device.context` | `{}` | `{frontmostApp, openTabs, calendarEvents}`. Read-only (`replay: "safe"`): native macOS context from `NSWorkspace`, `BrowserJanitor` and `EventKit` without screenshots or a computer-use driver. |
 | `state.task.add` | `title`, `detail?`, `slotID?` | `{taskID}`. Refuses: empty title, a day off, a `slotID` that does not exist. Adding an open task to a `rewarded` day relocks the day automatically (`allDone` becomes false). |
 | `round.start` | `{}` | `{stage, endsAt}`. Refuses: a round already running, a break in progress. |
 | `state.task.tick` | `taskID`, `done` | the new phase. Refuses the unpaid last tick, as the UI does. |
@@ -154,7 +155,7 @@ sequenceDiagram
 | method | params | notes |
 | --- | --- | --- |
 | `chat.prompt` | `text`, `stream` | Streams `chat.delta` events, ends with `chat.done {text, toolCalls}`. |
-| `chat.abort` | `id` of the run | Stops the run; the kernel is unaffected. |
+| `chat.abort` | `id` of the run | Forwards `chat.abort` to the engine, releases the waiting prompt stream, and answers `{"aborted": true\|false}` (`true` only when an in-flight run was cancelled). |
 | `intent.schedule` | `kind`, `fireAt`, `payload` | Persisted by the engine; the kernel still owns whether it may *speak*. |
 | `reflection.run` | `windowDays` | Writes `lessons.jsonl`; never edits the prompt. |
 | `lesson.list` / `lesson.accept` | - / `lessonID` | Accepting is what may change a harness file, and it happens as a repo diff, not at runtime. |
@@ -182,11 +183,16 @@ things wake a background turn in `granny-engine`:
 | `warn.continued` | `url`, `title`, `taskIDs` | The user clicked "Continue" on a negotiable `warn` interstitial. |
 | `day.rollover` | `date`, `done`, `open`, `rounds` | Midnight rollover wrote the day's line to `state.json.log`. |
 
-2. **Durable timers (`intent.schedule`)** persisted in Pi Durable's own SQLite
-   journal. During intake or a negotiation ("cho cháu 20 phút đọc tài liệu
-   này"), the engine schedules a follow-up intent at `fireAt`. Because the
-   timer lives in Pi Durable's journal, it survives Mac sleep, app relaunches
-   and engine restarts; when the clock catches up, the intent fires once.
+2. **Durable timers (`intent.schedule`) and zero-LLM wait probes** persisted in
+   Pi Durable's own SQLite journal. During intake or a negotiation ("cho cháu
+   20 phút đọc tài liệu này"), the engine schedules a follow-up intent at
+   `fireAt` or a lightweight probe (`wait.probe`: check whether `device.context`
+   still shows the same tab, whether a git commit landed, or whether `rounds`
+   moved). Probes are evaluated deterministically with zero model spend; only
+   when the condition fires does the `proactive` lane wake a model turn. Each
+   proactive run also carries a one-line `continuitySummary` of what it last
+   observed and said, so an unchanged state exits silently instead of repeating
+   the same scolding.
 
 **Three lanes in Pi Durable** keep proactive work from stepping on a live
 conversation:
@@ -274,8 +280,10 @@ strict coach into a nag; the ceiling is not configurable by the engine.
 3. `state.task.tick` for the last task with `rounds == 0` is refused.
 4. `notify.speak` outside quiet hours is refused with a reason; inside budget
    it is delivered.
-5. `chat.prompt` streams deltas and ends with `chat.done`; killing the engine
-   mid-stream leaves the kernel's day untouched.
+5. `chat.prompt` streams deltas and ends with `chat.done`; `chat.abort`
+   forwards to the engine, releases the stream and answers `{"aborted":true}`
+   (`false` when no run is in flight); killing the engine mid-stream leaves the
+   kernel's day untouched.
 6. `state.read` works with the engine absent (the app's own status path).
 
 Unit tests in `GrannyCoreTests`: the budget, the quiet-hours predicate, the
@@ -320,6 +328,27 @@ Why this flips the decision:
    `state.task.add`, `slot.move`) passes through the kernel's idempotency
    window, `nudgesPerDayMax` budget and `quietHours` gate. Even a runaway
    proactive loop in the engine cannot spam the user or lift a block.
+4. **Why not OpenMausBot (`milind-soni/OpenMausBot`) as the runtime, and what we
+   take from it.** OpenMausBot is a full Electron + React + DuckDB multi-bot
+   desktop application that wraps external CLI agents (including `pi --mode rpc`
+   in its own `server/drivers/pi.ts`) and drives the machine through
+   screenshot-based computer use (`@trycua/cua-driver`). Embedding a second
+   desktop app beside `Granny.app` would duplicate the UI, the browser janitor
+   and OS enforcement. Instead, we keep Pi Durable as the sidecar engine and
+   adopt three mechanisms from OpenMausBot's design:
+   - **Zero-LLM wait probes (`waits.ts`)**: cheap deterministic checks
+     (`device.context`, git/file stamps, open tab URLs) gate the `proactive`
+     lane so background watches spend zero tokens until a condition fires.
+   - **Continuity carry (`routine-execution.ts`)**: each proactive run stores a
+     one-line `continuitySummary` so the next check stays silent when nothing
+     changed.
+   - **Two-tier device & connected apps**: Tier 1 is native macOS read access
+     in `GrannyCore` (`device.context`: frontmost app via `NSWorkspace`, open
+     tabs via `BrowserJanitor`, today's calendar/reminders via `EventKit` -
+     fast, local, zero screenshots); Tier 2 mounts external work apps (GitHub,
+     Google Calendar, Linear, Gmail, Notion) into the Pi Durable engine via
+     MCP / Composio so granny can verify deliverables (e.g. a sent application
+     or opened PR) and cross-check today's schedule at `day.woke`.
 
 ## Steps
 
