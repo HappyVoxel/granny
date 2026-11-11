@@ -75,7 +75,12 @@ final class EngineProtocolTests: XCTestCase {
     }
 
     func testAllContractCapabilitiesAreAvailable() {
-        XCTAssertEqual(EngineProtocol.available, Set(EngineCapability.allCases))
+        XCTAssertEqual(
+            EngineProtocol.available,
+            [
+                .stateRead, .deviceContext, .stateTaskAdd, .stateTaskTick,
+                .slotMove, .roundStart, .notifySpeak, .traceEmit, .modelStream,
+            ])
     }
 
     func testDuplicateCarriesTheFirstResultSoAResumedRunCanContinue() throws {

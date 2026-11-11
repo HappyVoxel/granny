@@ -38,7 +38,7 @@ final class EngineServer: @unchecked Sendable {
     private var acceptSource: DispatchSourceRead?
     private var engineFD: Int32 = -1
     private var activePromptWaiters: [String: (EngineEnvelope) -> Void] = [:]
-    private var activeModelStreams: [String: Task<Void, Never>] = [:]
+    private var activeModelStreams: [String: (token: UUID, task: Task<Void, Never>)] = [:]
     private var stopped = false
 
     private var childProcess: Process?
@@ -195,7 +195,7 @@ final class EngineServer: @unchecked Sendable {
     func stop() {
         ioQueue.sync {
             stopped = true
-            for task in activeModelStreams.values { task.cancel() }
+            for entry in activeModelStreams.values { entry.task.cancel() }
             activeModelStreams.removeAll()
             if engineFD >= 0 {
                 _ = Darwin.shutdown(engineFD, SHUT_RDWR)
@@ -457,7 +457,7 @@ final class EngineServer: @unchecked Sendable {
                 if isRegisteredEngine, self.engineFD == fd {
                     self.engineFD = -1
                     self.setStatus(.degraded(reason: "engine disconnected"))
-                    for task in self.activeModelStreams.values { task.cancel() }
+                    for entry in self.activeModelStreams.values { entry.task.cancel() }
                     self.activeModelStreams.removeAll()
                     let waiters = self.activePromptWaiters
                     self.activePromptWaiters.removeAll()
@@ -654,14 +654,19 @@ final class EngineServer: @unchecked Sendable {
 
     private func startModelStream(_ req: ValidatedModelStream, to fd: Int32) {
         let streamKey = "\(fd):\(req.id)"
+        let streamToken = UUID()
         let task = Task { [weak self] in
             let startedAt = Date()
             let client = OpenRouterClient(
                 settings: .init(apiKey: req.apiKey, model: req.model, language: req.language))
             let result = await client.streamChat(messages: req.messages, tools: req.tools) { [weak self] chunk in
-                guard let self else { return }
+                let deltaCancelled = Task.isCancelled
+                guard !deltaCancelled, let self else { return }
                 self.ioQueue.sync {
-                    guard !self.stopped, self.engineFD == fd else { return }
+                    guard !self.stopped,
+                          self.engineFD == fd,
+                          self.activeModelStreams[streamKey]?.token == streamToken
+                    else { return }
                     _ = self.writeLine(
                         EngineEnvelope(
                             id: req.id,
@@ -670,11 +675,16 @@ final class EngineServer: @unchecked Sendable {
                         to: fd)
                 }
             }
+            let cancelled = Task.isCancelled
             guard let self else { return }
             let endedAt = Date()
+            var emittedDone = false
             self.ioQueue.sync {
-                self.activeModelStreams.removeValue(forKey: streamKey)
-                guard !Task.isCancelled, !self.stopped, self.engineFD == fd else { return }
+                let isCurrent = self.activeModelStreams[streamKey]?.token == streamToken
+                if isCurrent {
+                    self.activeModelStreams.removeValue(forKey: streamKey)
+                }
+                guard !cancelled, isCurrent, !self.stopped, self.engineFD == fd else { return }
                 switch result {
                 case .success(let done):
                     let params = (try? EngineJSON.encoded(done)) ?? .object([
@@ -685,14 +695,14 @@ final class EngineServer: @unchecked Sendable {
                             "out": .number(Double(done.usage.outTokens)),
                         ]),
                     ])
-                    _ = self.writeLine(
+                    emittedDone = self.writeLine(
                         EngineEnvelope(id: req.id, params: params, event: "model.done"),
                         to: fd)
                 case .failure(let err):
                     _ = self.writeLine(.failure(id: req.id, error: err), to: fd)
                 }
             }
-            if case .success(let done) = result {
+            if emittedDone, case .success(let done) = result {
                 let tracer = onMain { self.traceProvider() }
                 tracer?.record(.init(
                     name: "model.stream",
@@ -713,8 +723,8 @@ final class EngineServer: @unchecked Sendable {
             }
         }
         ioQueue.sync {
-            activeModelStreams[streamKey]?.cancel()
-            activeModelStreams[streamKey] = task
+            activeModelStreams[streamKey]?.task.cancel()
+            activeModelStreams[streamKey] = (streamToken, task)
         }
     }
 

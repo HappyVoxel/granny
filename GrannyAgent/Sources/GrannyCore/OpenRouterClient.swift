@@ -197,6 +197,11 @@ public struct OpenRouterClient: Sendable {
                 let callID = item.id.isEmpty ? "call_\(index)" : item.id
                 return ModelToolCall(id: callID, name: item.name, arguments: item.arguments)
             }
+            if fullText.isEmpty, orderedCalls.isEmpty {
+                return .failure(.init(
+                    error: EngineError(code: .internal, reason: "model stream produced no content"),
+                    canRetry: !emittedAnyDelta))
+            }
             return .success(ModelStreamDone(
                 text: fullText,
                 toolCalls: orderedCalls,
@@ -248,8 +253,8 @@ public struct OpenRouterClient: Sendable {
                     entry.id = id
                 }
                 if let fn = call["function"] as? [String: Any] {
-                    if let name = fn["name"] as? String, !name.isEmpty {
-                        entry.name += name
+                    if let name = fn["name"] as? String, !name.isEmpty, entry.name.isEmpty {
+                        entry.name = name
                     }
                     if let args = fn["arguments"] as? String {
                         entry.arguments += args
@@ -291,38 +296,39 @@ public struct OpenRouterClient: Sendable {
             }
             if case .array(let calls) = rawCalls {
                 var normalizedCalls: [[String: Any]] = []
-                for item in calls {
+                for (offset, item) in calls.enumerated() {
                     guard case .object(let callFields) = item else { return nil }
-                    if case .object = callFields["function"],
-                       let converted = anyJSONValue(item) as? [String: Any]
-                    {
-                        normalizedCalls.append(converted)
-                    } else if case .string(let fnName) = callFields["name"], !fnName.isEmpty {
-                        let callID: String
-                        if case .string(let id) = callFields["id"], !id.isEmpty {
-                            callID = id
-                        } else {
-                            callID = "call_0"
-                        }
-                        let args: String
-                        if case .string(let rawArgs) = callFields["arguments"] {
-                            args = rawArgs
-                        } else if let argVal = callFields["arguments"],
-                                  let encoded = try? JSONEncoder.engine.encode(argVal),
-                                  let text = String(data: encoded, encoding: .utf8)
-                        {
-                            args = text
-                        } else {
-                            args = "{}"
-                        }
-                        normalizedCalls.append([
-                            "id": callID,
-                            "type": "function",
-                            "function": ["name": fnName, "arguments": args],
-                        ])
+                    let fnSource: [String: EngineJSON]
+                    if case .object(let nestedFn) = callFields["function"] {
+                        fnSource = nestedFn
                     } else {
+                        fnSource = callFields
+                    }
+                    guard case .string(let fnName) = fnSource["name"], !fnName.isEmpty else {
                         return nil
                     }
+                    let callID: String
+                    if case .string(let id) = callFields["id"], !id.isEmpty {
+                        callID = id
+                    } else {
+                        callID = "call_\(offset)"
+                    }
+                    let args: String
+                    if case .string(let rawArgs) = fnSource["arguments"] {
+                        args = rawArgs
+                    } else if let argVal = fnSource["arguments"], argVal != .null,
+                              let encoded = try? JSONEncoder.engine.encode(argVal),
+                              let text = String(data: encoded, encoding: .utf8)
+                    {
+                        args = text
+                    } else {
+                        args = "{}"
+                    }
+                    normalizedCalls.append([
+                        "id": callID,
+                        "type": "function",
+                        "function": ["name": fnName, "arguments": args],
+                    ])
                 }
                 message["tool_calls"] = normalizedCalls
             }

@@ -344,11 +344,10 @@ wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
 rm -f "$SOCK"
 
-MOCK_PORT=$((47100 + RANDOM % 800))
 cat >"$SANDBOX/mock-http.mjs" <<'JS'
 import fs from "node:fs";
 import http from "node:http";
-const [port, traceLog] = process.argv.slice(2);
+const [portFile, traceLog] = process.argv.slice(2);
 const server = http.createServer((req, res) => {
   let body = "";
   req.on("data", (c) => { body += c.toString("utf8"); });
@@ -374,12 +373,21 @@ const server = http.createServer((req, res) => {
     res.end();
   });
 });
-server.listen(Number(port), "127.0.0.1");
+server.listen(0, "127.0.0.1", () => {
+  fs.writeFileSync(portFile, String(server.address().port));
+});
 JS
 
-node "$SANDBOX/mock-http.mjs" "$MOCK_PORT" "$SANDBOX/traces.log" &
+node "$SANDBOX/mock-http.mjs" "$SANDBOX/mock.port" "$SANDBOX/traces.log" &
 MOCK_HTTP_PID=$!
-sleep 0.2
+for _ in $(seq 1 30); do
+  [ -f "$SANDBOX/mock.port" ] && break
+  sleep 0.1
+done
+[ -f "$SANDBOX/mock.port" ] || fail "mock HTTP server failed to bind"
+kill -0 "$MOCK_HTTP_PID" 2>/dev/null || fail "mock HTTP server died after startup"
+MOCK_PORT="$(cat "$SANDBOX/mock.port")"
+CHECKS=$((CHECKS + 1))
 
 cat >"$SANDBOX/device.json" <<'JSON'
 {"frontmostApp":{"name":"Xcode","bundleID":"com.apple.dt.Xcode"},"openTabs":[{"browser":"Safari","url":"https://swift.org","title":"Swift"}],"calendarEvents":[{"title":"1:1","startAt":"2026-11-10T10:00:00Z","endAt":"2026-11-10T10:30:00Z","allDay":false}]}

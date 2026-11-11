@@ -8,6 +8,12 @@ import GrannyCore
 /// and today's authorized Calendar events (`EventKit`), with a deterministic
 /// `GRANNY_DEVICE_CONTEXT` seam for the e2e suites.
 enum DeviceContextCollector {
+    /// Short TTL so proactive `wait.probe` polls do not turn into a continuous
+    /// `osascript` + `EKEventStore` loop.
+    private static let cacheTTL: TimeInterval = 5
+    private static let cacheLock = NSLock()
+    private static var cached: (value: EngineDeviceContext, at: Date)?
+
     static func snapshot(
         now: Date = Date(),
         calendar: Calendar = .current
@@ -26,6 +32,14 @@ enum DeviceContextCollector {
             return .empty
         }
 
+        cacheLock.lock()
+        if let hit = cached, abs(now.timeIntervalSince(hit.at)) < cacheTTL {
+            let value = hit.value
+            cacheLock.unlock()
+            return value
+        }
+        cacheLock.unlock()
+
         let frontmost: EngineDeviceContext.FrontmostApp? = onMain {
             guard let app = NSWorkspace.shared.frontmostApplication,
                   let bundleID = app.bundleIdentifier
@@ -35,10 +49,15 @@ enum DeviceContextCollector {
         }
         let tabs = BrowserJanitor.snapshotOpenTabs()
         let events = todayCalendarEvents(now: now, calendar: calendar)
-        return EngineDeviceContext(
+        let built = EngineDeviceContext(
             frontmostApp: frontmost,
             openTabs: tabs,
             calendarEvents: events)
+
+        cacheLock.lock()
+        cached = (built, now)
+        cacheLock.unlock()
+        return built
     }
 
     private static func todayCalendarEvents(

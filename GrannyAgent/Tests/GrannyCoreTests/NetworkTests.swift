@@ -703,8 +703,42 @@ final class NetworkTests: XCTestCase {
         XCTAssertNil(intake)
     }
 
+    private func requestBodyJSON(_ request: URLRequest) -> [String: Any]? {
+        if let body = request.httpBody {
+            return JSON.dict(from: body)
+        }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buf = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let n = stream.read(&buf, maxLength: buf.count)
+            if n <= 0 { break }
+            data.append(contentsOf: buf[0..<n])
+        }
+        return JSON.dict(from: data)
+    }
+
     func testOpenRouterStreamChatSSEAndToolCallsAndUsage() async throws {
-        MockURLProtocol.handler = { request in
+        MockURLProtocol.handler = { [self] request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sk-test")
+            let sent = requestBodyJSON(request)
+            XCTAssertEqual(sent?["stream"] as? Bool, true)
+            let streamOpts = sent?["stream_options"] as? [String: Any]
+            XCTAssertEqual(streamOpts?["include_usage"] as? Bool, true)
+            let sentTools = sent?["tools"] as? [[String: Any]]
+            XCTAssertEqual(sentTools?.first?["type"] as? String, "function")
+            let sentFn = sentTools?.first?["function"] as? [String: Any]
+            XCTAssertEqual(sentFn?["name"] as? String, "state_task_add")
+
+            // Verify already-shaped assistant tool_calls normalise object arguments to a JSON string.
+            let sentMessages = sent?["messages"] as? [[String: Any]]
+            let assistantCalls = sentMessages?[1]["tool_calls"] as? [[String: Any]]
+            let assistantFn = assistantCalls?.first?["function"] as? [String: Any]
+            XCTAssertEqual(assistantCalls?.first?["id"] as? String, "call_0")
+            XCTAssertEqual(assistantFn?["arguments"] as? String, #"{"title":"x"}"#)
+
             let sse = """
             : OPENROUTER PROCESSING
 
@@ -712,7 +746,7 @@ final class NetworkTests: XCTestCase {
 
             data: {"choices":[{"delta":{"content":"add it.","tool_calls":[{"index":0,"id":"call_9","type":"function","function":{"name":"state_task_add","arguments":"{\\"title\\":"}}]}}]}
 
-            data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"Apply job\\"}"}}]}}],"usage":{"prompt_tokens":42,"completion_tokens":9}}
+            data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"state_task_add","arguments":"\\"Apply job\\"}"}}]}}],"usage":{"prompt_tokens":42,"completion_tokens":9}}
 
             data: [DONE]
 
@@ -730,7 +764,22 @@ final class NetworkTests: XCTestCase {
             session: mockSession())
         nonisolated(unsafe) var deltas: [String] = []
         let result = await client.streamChat(
-            messages: [.object(["role": .string("user"), "content": .string("Add apply job")])],
+            messages: [
+                .object(["role": .string("user"), "content": .string("Add apply job")]),
+                .object([
+                    "role": .string("assistant"),
+                    "tool_calls": .array([
+                        .object([
+                            "type": .string("function"),
+                            "function": .object([
+                                "name": .string("state_task_add"),
+                                "arguments": .object(["title": .string("x")]),
+                            ]),
+                        ])
+                    ]),
+                ]),
+                .object(["role": .string("tool"), "toolCallID": .string("call_0"), "content": .string("ok")]),
+            ],
             tools: [.object(["name": .string("state_task_add"), "description": .string("Add task")])],
             onDelta: { deltas.append($0) })
 
@@ -782,5 +831,66 @@ final class NetworkTests: XCTestCase {
             XCTFail("expected auth failure")
         }
         XCTAssertEqual(MockURLProtocol.requestCount, 1)
+    }
+
+    func testOpenRouterStreamChatHandlesInStreamErrorPlainJSONAndEmpty200() async throws {
+        // 1. SSE error chunk before any delta retries once and accepts a plain JSON fallback.
+        nonisolated(unsafe) var step = 0
+        MockURLProtocol.handler = { [self] request in
+            step += 1
+            if step == 1 {
+                let errSSE = "data: {\"error\":{\"message\":\"provider overloaded\"}}\n\n"
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (resp, Data(errSSE.utf8))
+            }
+            return response(request.url!, status: 200, json: [
+                "choices": [["message": ["role": "assistant", "content": "Plain fallback"]]],
+                "usage": ["prompt_tokens": 6, "completion_tokens": 2],
+            ])
+        }
+        let client = OpenRouterClient(
+            settings: .init(apiKey: "sk-test", model: "m"),
+            session: mockSession())
+        let recovered = try await client.streamChat(
+            messages: [.object(["role": .string("user"), "content": .string("hi")])],
+            onDelta: { _ in }).get()
+        XCTAssertEqual(step, 2)
+        XCTAssertEqual(recovered.text, "Plain fallback")
+        XCTAssertEqual(recovered.usage, ModelUsage(inTokens: 6, outTokens: 2))
+
+        // 2. SSE error chunk after a delta was already emitted must NOT retry.
+        nonisolated(unsafe) var midStreamCalls = 0
+        MockURLProtocol.handler = { request in
+            midStreamCalls += 1
+            let midErr = """
+            data: {"choices":[{"delta":{"content":"Half "}}]}
+
+            data: {"error":{"message":"cut mid-sentence"}}
+
+            """
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (resp, Data(midErr.utf8))
+        }
+        let midResult = await client.streamChat(
+            messages: [.object(["role": .string("user"), "content": .string("hi")])],
+            onDelta: { _ in })
+        XCTAssertEqual(midStreamCalls, 1)
+        if case .success = midResult {
+            XCTFail("expected mid-stream error failure")
+        }
+
+        // 3. Empty 200 body fails loudly rather than claiming an empty generation succeeded.
+        MockURLProtocol.handler = { request in
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (resp, Data("<html>bad gateway</html>".utf8))
+        }
+        let emptyResult = await client.streamChat(
+            messages: [.object(["role": .string("user"), "content": .string("hi")])],
+            onDelta: { _ in })
+        if case .failure(let err) = emptyResult {
+            XCTAssertEqual(err.reason, "model stream produced no content")
+        } else {
+            XCTFail("expected empty 200 body to fail")
+        }
     }
 }
