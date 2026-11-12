@@ -17,6 +17,7 @@ final class EngineServer: @unchecked Sendable {
 
     private static let promptTimeout: TimeInterval = 30
     private static let maxRestartAttempts = 6
+    private static let maxEngineLogBytes: UInt64 = 5 * 1024 * 1024
 
     private let socketURL: URL
     private let configProvider: () -> GrannyConfig
@@ -64,6 +65,7 @@ final class EngineServer: @unchecked Sendable {
 
     init(
         socketURL: URL = GrannyPaths.engineSocketURL,
+        resourceURL: URL? = Bundle.main.resourceURL,
         configProvider: @escaping () -> GrannyConfig,
         stateStore: StateStore,
         enforcementProvider: @escaping () -> Bool,
@@ -86,19 +88,7 @@ final class EngineServer: @unchecked Sendable {
         self.onSpeak = onSpeak
         self.onMutated = onMutated
         self.onStatusChange = onStatusChange
-        let hostEnv = ProcessInfo.processInfo.environment
-        if let explicit = hostEnv[GrannyEnv.enginePath] {
-            self.supervisedEnginePath = explicit.isEmpty ? nil : explicit
-        } else if !CommandLine.arguments.contains("--serve"),
-                  Bundle.main.bundleIdentifier == "io.github.happyvoxel.granny",
-                  let bundled = Bundle.main.resourceURL?
-                      .appendingPathComponent("engine/granny-engine").path,
-                  FileManager.default.isExecutableFile(atPath: bundled)
-        {
-            self.supervisedEnginePath = bundled
-        } else {
-            self.supervisedEnginePath = nil
-        }
+        self.supervisedEnginePath = EngineKernel.resolveEnginePath(resourceURL: resourceURL)
     }
 
     deinit {
@@ -356,7 +346,7 @@ final class EngineServer: @unchecked Sendable {
             GrannyEnv.engineSocket: socketURL.path,
             "PATH": "\(basePath):/opt/homebrew/bin:/usr/local/bin",
         ]
-        for key in ["HOME", "TMPDIR", "LANG", "GRANNY_NODE", "GRANNY_ENGINE_STORAGE_DIR"] {
+        for key in ["HOME", "TMPDIR", "LANG", GrannyEnv.node, GrannyEnv.engineStorageDir] {
             if let value = hostEnv[key] { env[key] = value }
         }
         for (key, value) in hostEnv where key.hasPrefix("GRANNY_TEST_") {
@@ -370,7 +360,9 @@ final class EngineServer: @unchecked Sendable {
         let logHandle = try? FileHandle(forWritingTo: logURL)
         defer { try? logHandle?.close() }
         if let logHandle {
-            _ = try? logHandle.seekToEnd()
+            if ((try? logHandle.seekToEnd()) ?? 0) > Self.maxEngineLogBytes {
+                try? logHandle.truncate(atOffset: 0)
+            }
             process.standardError = logHandle
         }
         process.terminationHandler = { [weak self] _ in
@@ -461,7 +453,9 @@ final class EngineServer: @unchecked Sendable {
         if let data = line.data(using: .utf8) {
             if let handle = try? FileHandle(forWritingTo: logURL) {
                 defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
+                if ((try? handle.seekToEnd()) ?? 0) > Self.maxEngineLogBytes {
+                    try? handle.truncate(atOffset: 0)
+                }
                 try? handle.write(contentsOf: data)
             } else {
                 try? data.write(to: logURL, options: .atomic)

@@ -160,18 +160,18 @@ export function createGrannyModels(options: GrannyModelsOptions): Models {
         return;
       }
 
-      const wireMessages = convertTranscriptToWireMessages(context);
-      const activeTools = getCurrentTools(context.messages).map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters as unknown as JsonValue,
-      }));
-
-      out.push({ type: "start", partial: { ...partial } });
-      let textStarted = false;
-      let textContent = "";
-
       try {
+        const wireMessages = convertTranscriptToWireMessages(context);
+        const activeTools = getCurrentTools(context.messages).map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters as unknown as JsonValue,
+        }));
+
+        out.push({ type: "start", partial: { ...partial } });
+        let textStarted = false;
+        let textContent = "";
+
         const done = await options.transport.streamModel(
           {
             messages: wireMessages,

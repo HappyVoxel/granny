@@ -8,6 +8,7 @@ cask "granny" do
   homepage "https://github.com/HappyVoxel/granny"
 
   depends_on macos: :sonoma
+  depends_on formula: "node"
 
   app "granny.app"
 

@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { JsonObject } from "@earendil-works/pi-durable";
-import { GrannyDurableRuntime } from "../src/runtime.js";
+import { GrannyDurableRuntime, createWallClockTimer } from "../src/runtime.js";
 import {
   ENGINE_PROTOCOL_VERSION,
+  KernelRpcError,
   type EngineEnvelope,
   type KernelTransport,
   type ModelStreamDoneWire,
@@ -192,59 +195,108 @@ test("sleep-resume: durable intent fires immediately after a wall-clock Mac slee
   }
 });
 
-test("crash recovery: lane conversation IDs and sleeping intents survive SQLite restart", async () => {
+test("crash recovery: hard SIGKILL mid-turn preserves lane IDs and recovers sleeping SQLite WAL intent", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "granny-durable-crash-"));
   try {
-    let clock = Date.parse("2026-11-11T10:00:00Z");
-    const transport1 = new FakeKernelTransport();
-    const runtime1 = await GrannyDurableRuntime.open({
-      transport: transport1,
-      stateDir: dir,
-      now: () => clock,
-    });
+    const startClock = Date.parse("2026-11-11T10:00:00Z");
+    const readyFile = path.join(dir, "child-ready.json");
+    const runtimeModuleUrl = new URL("../src/runtime.js", import.meta.url).href;
+    const workerScript = path.join(dir, "crash-child.mjs");
 
-    const originalLaneIds = {
-      interactive: Number(runtime1.lanes.interactive.id),
-      proactive: Number(runtime1.lanes.proactive.id),
-      reflection: Number(runtime1.lanes.reflection.id),
+    fs.writeFileSync(
+      workerScript,
+      `
+import fs from "node:fs";
+import { GrannyDurableRuntime } from ${JSON.stringify(runtimeModuleUrl)};
+
+const [stateDir, readyPath, rawClock] = process.argv.slice(2);
+const clock = Number(rawClock);
+const transport = {
+  async callCapability(method) {
+    if (method === "state.read") return { phase: "working", dayOff: false, nudgesRemaining: 3, rounds: 0, tasks: [] };
+    return {};
+  },
+  streamModel(_params, onDelta) {
+    onDelta("Partial before SIGKILL...");
+    // Hang mid-stream so SIGKILL strikes with an active running task and open WAL.
+    return new Promise(() => {});
+  },
+  sendEnvelope() {},
+  onInbound(cb) {
+    this._cb = cb;
+    return () => {};
+  },
+  close() {},
+};
+
+const rt = await GrannyDurableRuntime.open({ transport, stateDir, now: () => clock });
+const scheduled = await rt.scheduleIntent({
+  kind: "slot.check",
+  fireAt: clock + 20 * 60_000,
+  note: "Check morning deep-work slot",
+});
+// Start an interactive turn that hangs mid-generation when SIGKILL lands.
+transport._cb({ v: 1, id: "c-midcrash", method: "chat.prompt", params: { text: "hello", stream: true } });
+setTimeout(() => {
+  fs.writeFileSync(readyPath, JSON.stringify({
+    lanes: {
+      interactive: Number(rt.lanes.interactive.id),
+      proactive: Number(rt.lanes.proactive.id),
+      reflection: Number(rt.lanes.reflection.id),
+    },
+    taskId: scheduled.taskId,
+  }));
+}, 60);
+setInterval(() => {}, 10_000);
+`,
+    );
+
+    const child = spawn(
+      process.execPath,
+      ["--no-warnings", workerScript, dir, readyFile, String(startClock)],
+      { stdio: "ignore" },
+    );
+
+    await waitUntil(() => fs.existsSync(readyFile));
+    const childMeta = JSON.parse(fs.readFileSync(readyFile, "utf8")) as {
+      lanes: { interactive: number; proactive: number; reflection: number };
+      taskId: number;
     };
-    assert.notEqual(originalLaneIds.interactive, originalLaneIds.proactive);
-    assert.notEqual(originalLaneIds.proactive, originalLaneIds.reflection);
 
-    const { taskId } = await runtime1.scheduleIntent({
-      kind: "slot.check",
-      fireAt: clock + 20 * 60_000,
-      note: "Check morning deep-work slot",
+    // Hard crash with SIGKILL (no close(), dirty WAL on disk).
+    const exited = new Promise<NodeJS.Signals | null>((resolve) => {
+      child.once("exit", (_code, signal) => resolve(signal));
     });
+    child.kill("SIGKILL");
+    assert.equal(await exited, "SIGKILL");
 
-    // Shut down process #1 before `fireAt` arrives.
-    await runtime1.close();
-    assert.equal(transport1.sentEnvelopes.length, 0);
-
-    // Process #2 starts 25 minutes later on the same SQLite database.
-    clock += 25 * 60_000;
+    // Reopen on the dirty SQLite database 25 minutes later with a live ticking clock.
+    const clockOffset = startClock + 25 * 60_000 - Date.now();
     const transport2 = new FakeKernelTransport();
     const runtime2 = await GrannyDurableRuntime.open({
       transport: transport2,
       stateDir: dir,
-      now: () => clock,
+      now: () => Date.now() + clockOffset,
     });
 
-    assert.equal(Number(runtime2.lanes.interactive.id), originalLaneIds.interactive);
-    assert.equal(Number(runtime2.lanes.proactive.id), originalLaneIds.proactive);
-    assert.equal(Number(runtime2.lanes.reflection.id), originalLaneIds.reflection);
+    try {
+      assert.equal(Number(runtime2.lanes.interactive.id), childMeta.lanes.interactive);
+      assert.equal(Number(runtime2.lanes.proactive.id), childMeta.lanes.proactive);
+      assert.equal(Number(runtime2.lanes.reflection.id), childMeta.lanes.reflection);
 
-    const outcome = await runtime2.waitForTask(taskId);
-    assert.deepEqual(outcome, {
-      status: "completed",
-      result: { fired: true },
-    });
-    assert.ok(
-      transport2.sentEnvelopes.some((e) => e.event === "intent.fired"),
-      "recovered sleeping intent fired after restart",
-    );
-    await runtime2.waitForIdle();
-    await runtime2.close();
+      const outcome = await runtime2.waitForTask(childMeta.taskId);
+      assert.deepEqual(outcome, {
+        status: "completed",
+        result: { fired: true },
+      });
+      assert.ok(
+        transport2.sentEnvelopes.some((e) => e.event === "intent.fired"),
+        "recovered sleeping intent fired after SIGKILL",
+      );
+      await runtime2.waitForIdle();
+    } finally {
+      await runtime2.close();
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -512,6 +564,135 @@ test("AF_UNIX socket transport: interactive tool loop recovers duplicate key & c
     transport.close();
   } finally {
     for (const c of serverConns) c.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("overlapping prompts stay isolated, wall-clock nudges do not duplicate chains, and socket timeouts/close reject cleanly", async () => {
+  void fileURLToPath;
+  // 1. Repeated `nudgeAll()` calls before `targetAt` fire the callback once, not N times.
+  let fakeNow = 1_000;
+  const wall = createWallClockTimer(() => fakeNow, 50);
+  let firedCount = 0;
+  wall.setTimer(() => {
+    firedCount += 1;
+  }, 500, { background: false });
+  wall.nudgeAll();
+  wall.nudgeAll();
+  wall.nudgeAll();
+  fakeNow = 2_000;
+  wall.nudgeAll();
+  await new Promise((r) => setTimeout(r, 70));
+  assert.equal(firedCount, 1);
+  wall.dispose();
+
+  // 2. Overlapping `chat.prompt` requests keep deltas and `chat.done` strictly attributed.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "granny-durable-overlap-"));
+  const sockPath = path.join(dir, "engine.sock");
+  const conns: net.Socket[] = [];
+
+  const server = net.createServer((conn) => {
+    conns.push(conn);
+    let buf = "";
+    conn.on("data", (chunk) => {
+      buf += chunk.toString("utf8");
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const msg = JSON.parse(line) as EngineEnvelope;
+        if (msg.method === "hello") {
+          conn.write(
+            JSON.stringify({
+              v: ENGINE_PROTOCOL_VERSION,
+              id: msg.id,
+              result: { role: "kernel", impl: "granny/0.1.2", capabilities: [] },
+            }) + "\n",
+          );
+        }
+        // Intentionally drop `state.read` / `hang` RPCs to exercise timeout & close().
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(sockPath, resolve));
+
+  try {
+    const transport = new FakeKernelTransport();
+    let callNum = 0;
+    transport.modelResponder = async (_params, onDelta) => {
+      callNum += 1;
+      const label = callNum === 1 ? "FIRST" : "SECOND";
+      await new Promise((r) => setTimeout(r, 30));
+      onDelta(`${label}-A `);
+      await new Promise((r) => setTimeout(r, 20));
+      onDelta(`${label}-B`);
+      return {
+        text: `${label}-A ${label}-B`,
+        toolCalls: [],
+        usage: { in: 10, out: 4 },
+      };
+    };
+
+    const runtime = await GrannyDurableRuntime.open({ transport, stateDir: dir });
+    try {
+      // Fire two prompts back-to-back before the first finishes streaming.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "p-1",
+        method: "chat.prompt",
+        params: { text: "first question", stream: true },
+      });
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "p-2",
+        method: "chat.prompt",
+        params: { text: "second question", stream: true },
+      });
+
+      await waitUntil(
+        () =>
+          transport.sentEnvelopes.some((e) => e.id === "p-1" && e.event === "chat.done") &&
+          transport.sentEnvelopes.some((e) => e.id === "p-2" && e.event === "chat.done"),
+      );
+
+      const p1Deltas = transport.sentEnvelopes
+        .filter((e) => e.id === "p-1" && e.event === "chat.delta")
+        .map((e) => (e.params as Record<string, unknown>).text);
+      const p2Deltas = transport.sentEnvelopes
+        .filter((e) => e.id === "p-2" && e.event === "chat.delta")
+        .map((e) => (e.params as Record<string, unknown>).text);
+      assert.deepEqual(p1Deltas, ["FIRST-A ", "FIRST-B"]);
+      assert.deepEqual(p2Deltas, ["SECOND-A ", "SECOND-B"]);
+
+      const p2Done = transport.sentEnvelopes.find(
+        (e) => e.id === "p-2" && e.event === "chat.done",
+      )!;
+      assert.equal((p2Done.params as Record<string, unknown>).text, "SECOND-A SECOND-B");
+    } finally {
+      await runtime.close();
+    }
+
+    // 3. SocketKernelTransport timeout & close() reject pending calls immediately.
+    const { transport: sockTransport } = await SocketKernelTransport.connect(sockPath);
+    await assert.rejects(
+      () => sockTransport.callCapability("state.read", {}, { timeoutMs: 40 }),
+      (err: unknown) => err instanceof KernelRpcError && err.retryable === true,
+    );
+
+    const pendingOnClose = sockTransport.callCapability("state.read", {}, { timeoutMs: 10_000 });
+    sockTransport.close();
+    await assert.rejects(() => pendingOnClose, /kernel socket closed/);
+
+    let disconnectedImmediately = false;
+    sockTransport.onDisconnect(() => {
+      disconnectedImmediately = true;
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(disconnectedImmediately, true);
+  } finally {
+    for (const c of conns) c.destroy();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     fs.rmSync(dir, { recursive: true, force: true });
   }

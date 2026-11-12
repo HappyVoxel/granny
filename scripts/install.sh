@@ -6,7 +6,8 @@
 #   ./scripts/install.sh --no-helper    # skip the sudo helper step
 #   ./scripts/install.sh --no-extension # skip browser extensions
 #
-# Requirements: macOS 14+, full Xcode (SwiftUI macros need its toolchain).
+# Requirements: macOS 14+, full Xcode (SwiftUI macros need its toolchain), and
+# Node.js >= 22.19 (`brew install node`, for the bundled Pi Durable sidecar).
 #
 # The only steps a human must do afterwards are consent toggles Apple and
 # Google require and no script can press:
@@ -42,6 +43,14 @@ if [ ! -x "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild" ]; the
   say "Xcode is required (the app target needs its SwiftUI macro toolchain)."
   say "Install Xcode from the App Store, open it once, then rerun."
   exit 1
+fi
+
+if [ "$DRY_RUN" = "0" ]; then
+  if ! command -v node >/dev/null 2>&1 || ! node -e 'const [M,m]=process.versions.node.split(".").map(Number);process.exit(M>22||(M===22&&m>=19)?0:1)'; then
+    say "Node.js >= 22.19 is required for the Pi Durable coaching engine (node:sqlite)."
+    say "Install with: brew install node"
+    exit 1
+  fi
 fi
 
 say "== 1/4 build the app"

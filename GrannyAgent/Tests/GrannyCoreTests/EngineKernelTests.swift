@@ -500,4 +500,56 @@ final class EngineKernelTests: XCTestCase {
             now: date(hour: 10), calendar: calendar)
         XCTAssertEqual(freeTier.modelStream?.model, "openrouter/free-custom")
     }
+
+    func testResolveEnginePathHonoursOverridesBundleAndServeGuard() {
+        let bundleResources = URL(fileURLWithPath: "/Applications/granny.app/Contents/Resources")
+        let bundledPath = "/Applications/granny.app/Contents/Resources/engine/granny-engine"
+
+        // Packaged app discovers bundled engine when executable.
+        XCTAssertEqual(
+            EngineKernel.resolveEnginePath(
+                environment: [:],
+                arguments: ["/Applications/granny.app/Contents/MacOS/granny-agent"],
+                bundleIdentifier: "io.github.happyvoxel.granny",
+                resourceURL: bundleResources,
+                isExecutable: { $0 == bundledPath }),
+            bundledPath)
+
+        // Non-executable bundle entry falls back to nil.
+        XCTAssertNil(
+            EngineKernel.resolveEnginePath(
+                environment: [:],
+                arguments: ["/Applications/granny.app/Contents/MacOS/granny-agent"],
+                bundleIdentifier: "io.github.happyvoxel.granny",
+                resourceURL: bundleResources,
+                isExecutable: { _ in false }))
+
+        // CLI `--serve` stays stub-only unless an env override is set.
+        XCTAssertNil(
+            EngineKernel.resolveEnginePath(
+                environment: [:],
+                arguments: ["granny-agent", "--serve"],
+                bundleIdentifier: "io.github.happyvoxel.granny",
+                resourceURL: bundleResources,
+                isExecutable: { _ in true }))
+
+        // `GRANNY_ENGINE_RESOURCES_DIR` exercises bundle discovery even under `--serve`.
+        XCTAssertEqual(
+            EngineKernel.resolveEnginePath(
+                environment: [GrannyEnv.engineResourcesDir: "/tmp/fake-resources"],
+                arguments: ["granny-agent", "--serve"],
+                bundleIdentifier: nil,
+                resourceURL: nil,
+                isExecutable: { $0 == "/tmp/fake-resources/engine/granny-engine" }),
+            "/tmp/fake-resources/engine/granny-engine")
+
+        // Explicit empty `GRANNY_ENGINE_PATH=""` disables bundled engine supervision.
+        XCTAssertNil(
+            EngineKernel.resolveEnginePath(
+                environment: [GrannyEnv.enginePath: ""],
+                arguments: ["/Applications/granny.app/Contents/MacOS/granny-agent"],
+                bundleIdentifier: "io.github.happyvoxel.granny",
+                resourceURL: bundleResources,
+                isExecutable: { _ in true }))
+    }
 }

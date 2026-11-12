@@ -117,7 +117,11 @@ export function createWallClockTimer(
     };
 
     const checkOrRearm = () => {
-      if (cancelled) return;
+      if (cancelled || disposed) return;
+      if (handle !== undefined) {
+        clearTimeout(handle);
+        handle = undefined;
+      }
       const remaining = targetAt - now();
       if (remaining <= 0) {
         activeChecks.delete(checkOrRearm);
@@ -200,6 +204,7 @@ export class GrannyDurableRuntime {
   private readonly intentTaskDef: ScheduledIntentTaskType;
   private readonly nudgeTimers?: () => void;
   private readonly disposeTimers?: () => void;
+  private interactiveQueue: Promise<void> = Promise.resolve();
   private activeInteractiveRunId: string | null = null;
   private activeInteractiveEmittedText = "";
   private readonly abortedRunIds = new Set<string>();
@@ -716,7 +721,11 @@ export class GrannyDurableRuntime {
       const runId = envelope.id ?? `c-${this.nowFn()}`;
       const params = (envelope.params ?? {}) as Record<string, unknown>;
       const text = typeof params.text === "string" ? params.text.trim() : "";
-      await this.handleChatPrompt(runId, text);
+      this.interactiveQueue = this.interactiveQueue.then(
+        () => this.handleChatPrompt(runId, text),
+        () => this.handleChatPrompt(runId, text),
+      );
+      await this.interactiveQueue;
       return;
     }
 
@@ -727,7 +736,9 @@ export class GrannyDurableRuntime {
       if (targetId) {
         this.abortedRunIds.add(targetId);
       }
-      await this.lanes.interactive.abort(this.ctx, { background: false });
+      if (!targetId || this.activeInteractiveRunId === targetId) {
+        await this.lanes.interactive.abort(this.ctx, { background: false });
+      }
       return;
     }
 
@@ -787,6 +798,10 @@ export class GrannyDurableRuntime {
   }
 
   private async handleChatPrompt(runId: string, text: string): Promise<void> {
+    if (this.closed || this.abortedRunIds.has(runId)) {
+      this.abortedRunIds.delete(runId);
+      return;
+    }
     if (!text) {
       this.transport.sendEnvelope({
         v: ENGINE_PROTOCOL_VERSION,

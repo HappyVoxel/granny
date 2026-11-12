@@ -77,6 +77,36 @@ public enum EngineKernel {
         return "granny/\(defaultVersion)"
     }
 
+    /// Resolves which `granny-engine` sidecar executable `EngineServer` should
+    /// supervise: `GRANNY_ENGINE_PATH` wins (empty disables supervision), then
+    /// `GRANNY_ENGINE_RESOURCES_DIR/engine/granny-engine` (the test seam), then
+    /// the packaged app's `Contents/Resources/engine/granny-engine` outside CLI
+    /// `--serve` runs.
+    public static func resolveEnginePath(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        arguments: [String] = CommandLine.arguments,
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        resourceURL: URL? = Bundle.main.resourceURL,
+        isExecutable: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)
+    ) -> String? {
+        if let explicit = environment[GrannyEnv.enginePath] {
+            return explicit.isEmpty ? nil : explicit
+        }
+        if let overrideResources = environment[GrannyEnv.engineResourcesDir],
+           !overrideResources.isEmpty
+        {
+            let candidate = URL(fileURLWithPath: overrideResources)
+                .appendingPathComponent("engine/granny-engine").path
+            return isExecutable(candidate) ? candidate : nil
+        }
+        guard !arguments.contains("--serve"),
+              bundleIdentifier == "io.github.happyvoxel.granny",
+              let resourceURL
+        else { return nil }
+        let candidate = resourceURL.appendingPathComponent("engine/granny-engine").path
+        return isExecutable(candidate) ? candidate : nil
+    }
+
     /// Quiet hours may cross midnight (22 -> 7) or sit inside one day (1 -> 6).
     /// When start == end the window is empty.
     public static func isQuietHour(hour: Int, quietStart: Int, quietEnd: Int) -> Bool {

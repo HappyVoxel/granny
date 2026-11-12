@@ -63,7 +63,7 @@ export interface KernelTransport {
   callCapability(
     method: string,
     params: JsonObject,
-    options?: { key?: string; signal?: AbortSignal },
+    options?: { key?: string; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<JsonValue>;
 
   streamModel(
@@ -74,6 +74,7 @@ export interface KernelTransport {
     },
     onDelta: (text: string) => void,
     signal?: AbortSignal,
+    timeoutMs?: number,
   ): Promise<ModelStreamDoneWire>;
 
   sendEnvelope(envelope: EngineEnvelope): void;
@@ -89,10 +90,14 @@ interface PendingRpc {
 
 interface PendingStream {
   onDelta: (text: string) => void;
+  touch?: () => void;
   resolve: (done: ModelStreamDoneWire) => void;
   reject: (err: Error) => void;
   cleanup?: () => void;
 }
+
+const DEFAULT_RPC_TIMEOUT_MS = 30_000;
+const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 45_000;
 
 export class SocketKernelTransport implements KernelTransport {
   private readonly socket: net.Socket;
@@ -121,23 +126,24 @@ export class SocketKernelTransport implements KernelTransport {
         this.handleLine(msg);
       }
     });
-    const failAll = (reason: string) => {
-      if (this.closed) return;
-      this.closed = true;
-      const err = new Error(reason);
-      for (const p of this.pendingRpcs.values()) {
-        p.cleanup?.();
-        p.reject(err);
-      }
-      this.pendingRpcs.clear();
-      for (const s of this.pendingStreams.values()) {
-        s.cleanup?.();
-        s.reject(err);
-      }
-      this.pendingStreams.clear();
-    };
-    socket.on("close", () => failAll("kernel socket closed"));
-    socket.on("error", (e) => failAll(`kernel socket error: ${e.message}`));
+    socket.on("close", () => this.failAll("kernel socket closed"));
+    socket.on("error", (e) => this.failAll(`kernel socket error: ${e.message}`));
+  }
+
+  private failAll(reason: string): void {
+    this.closed = true;
+    if (this.pendingRpcs.size === 0 && this.pendingStreams.size === 0) return;
+    const err = new Error(reason);
+    for (const p of this.pendingRpcs.values()) {
+      p.cleanup?.();
+      p.reject(err);
+    }
+    this.pendingRpcs.clear();
+    for (const s of this.pendingStreams.values()) {
+      s.cleanup?.();
+      s.reject(err);
+    }
+    this.pendingStreams.clear();
   }
 
   static async connect(
@@ -178,6 +184,10 @@ export class SocketKernelTransport implements KernelTransport {
   }
 
   onDisconnect(cb: () => void): void {
+    if (this.closed || this.socket.destroyed) {
+      queueMicrotask(cb);
+      return;
+    }
     this.socket.once("close", cb);
   }
 
@@ -194,7 +204,7 @@ export class SocketKernelTransport implements KernelTransport {
   callCapability(
     method: string,
     params: JsonObject,
-    options?: { key?: string; signal?: AbortSignal },
+    options?: { key?: string; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<JsonValue> {
     if (this.closed) {
       return Promise.reject(new Error("kernel socket closed"));
@@ -203,8 +213,24 @@ export class SocketKernelTransport implements KernelTransport {
       return Promise.reject(new Error("aborted"));
     }
     const id = `e-${this.nextSeq++}`;
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_RPC_TIMEOUT_MS;
     return new Promise<JsonValue>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const entry = this.pendingRpcs.get(id);
+        if (!entry) return;
+        this.pendingRpcs.delete(id);
+        entry.cleanup?.();
+        reject(
+          new KernelRpcError({
+            code: "internal",
+            reason: `capability ${method} timed out after ${timeoutMs}ms`,
+            retryable: true,
+          }),
+        );
+      }, timeoutMs);
+      timer.unref();
       const onAbort = () => {
+        clearTimeout(timer);
         this.pendingRpcs.delete(id);
         reject(new Error("aborted"));
       };
@@ -212,7 +238,10 @@ export class SocketKernelTransport implements KernelTransport {
       this.pendingRpcs.set(id, {
         resolve,
         reject,
-        cleanup: () => options?.signal?.removeEventListener("abort", onAbort),
+        cleanup: () => {
+          clearTimeout(timer);
+          options?.signal?.removeEventListener("abort", onAbort);
+        },
       });
       this.sendEnvelope({
         v: ENGINE_PROTOCOL_VERSION,
@@ -232,6 +261,7 @@ export class SocketKernelTransport implements KernelTransport {
     },
     onDelta: (text: string) => void,
     signal?: AbortSignal,
+    timeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   ): Promise<ModelStreamDoneWire> {
     if (this.closed) {
       return Promise.reject(new Error("kernel socket closed"));
@@ -241,16 +271,41 @@ export class SocketKernelTransport implements KernelTransport {
     }
     const id = `ms-${this.nextSeq++}`;
     return new Promise<ModelStreamDoneWire>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const armIdleTimer = () => {
+        if (timer !== undefined) clearTimeout(timer);
+        timer = setTimeout(() => {
+          const entry = this.pendingStreams.get(id);
+          if (!entry) return;
+          this.pendingStreams.delete(id);
+          entry.cleanup?.();
+          reject(
+            new KernelRpcError({
+              code: "internal",
+              reason: `model.stream timed out after ${timeoutMs}ms`,
+              retryable: true,
+            }),
+          );
+        }, timeoutMs);
+        timer.unref();
+      };
+      armIdleTimer();
+
       const onAbort = () => {
+        if (timer !== undefined) clearTimeout(timer);
         this.pendingStreams.delete(id);
         reject(new Error("aborted"));
       };
       signal?.addEventListener("abort", onAbort, { once: true });
       this.pendingStreams.set(id, {
         onDelta,
+        touch: armIdleTimer,
         resolve,
         reject,
-        cleanup: () => signal?.removeEventListener("abort", onAbort),
+        cleanup: () => {
+          if (timer !== undefined) clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
+        },
       });
       const wireParams: JsonObject = {
         messages: params.messages,
@@ -267,7 +322,7 @@ export class SocketKernelTransport implements KernelTransport {
   }
 
   close(): void {
-    this.closed = true;
+    this.failAll("kernel socket closed");
     this.socket.destroy();
   }
 
@@ -275,6 +330,7 @@ export class SocketKernelTransport implements KernelTransport {
     if (msg.id && this.pendingStreams.has(msg.id)) {
       const pending = this.pendingStreams.get(msg.id)!;
       if (msg.event === "model.delta") {
+        pending.touch?.();
         const params = msg.params as JsonObject | undefined;
         if (params && typeof params.text === "string") {
           pending.onDelta(params.text);

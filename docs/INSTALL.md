@@ -18,6 +18,7 @@ notarized). Already installed without it? Right-click the app -> Open once, or
 
 Grab [granny-macos.dmg](https://github.com/HappyVoxel/granny/releases/latest/download/granny-macos.dmg),
 drag granny into Applications, and right-click -> Open the first time.
+For the "Talk to Granny" proactive coaching tab, install Node.js 22.19+ (`brew install node` or [nodejs.org](https://nodejs.org)); the Homebrew cask installs it automatically, and core site blocking + `/decide` work even without Node.
 
 ## After install
 
@@ -49,7 +50,7 @@ cd granny
 ./scripts/install.sh --dry-run    # show what it would do
 ```
 
-Requirements: macOS 14+ and full Xcode. Two consent toggles remain, because
+Requirements: macOS 14+, full Xcode, and Node.js 22.19+ (`brew install node`). Two consent toggles remain, because
 Apple and Google require a human:
 
 - **Safari**: Settings > Extensions > tick "granny"

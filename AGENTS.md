@@ -14,6 +14,7 @@ Run before claiming any change works:
 
 ```
 (cd GrannyAgent && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test)
+(cd engine && npm test)       # Pi Durable crash-recovery, sleep-resume, wait probes
 bash tests/e2e-helper.sh      # helper binary against a sandbox hosts file
 bash tests/e2e-agent.sh       # agent CLI + HTTP decision server
 bash tests/e2e-engine.sh      # kernel <-> engine AF_UNIX socket contract
@@ -67,7 +68,7 @@ engine/
   bin/granny-engine           PID-preserving launcher (`exec` for LOCAL_PEERPID)
   build/                      bundled ESM output (gitignored; scripts/build-engine.sh)
 scripts/                      install entrypoint, build/icon/app/helper/extension
-                              installers, package-chrome, make-safari,
+                              installers, build-engine, package-chrome, make-safari,
                               build-release, sync-env, proto.sh (legacy)
 tests/                        e2e shell suites + legacy Phase 0 suite
 docs/                         ARCHITECTURE.md (design), ENGINE.md (the
@@ -106,6 +107,7 @@ packaging/homebrew/Casks/     granny.rb for the HappyVoxel/homebrew-tap repo
   `GRANNY_KILLALL` (the Private Relay proxy killed when the block returns
   after a break - the e2e suites point it at a sentinel),
   `GRANNY_POMODORO_AUTOSTART`, `GRANNY_ENGINE_PATH`, `GRANNY_ENGINE_SOCKET`,
+  `GRANNY_ENGINE_RESOURCES_DIR`, `GRANNY_ENGINE_STORAGE_DIR`, `GRANNY_NODE`,
   `GRANNY_OPENROUTER_URL`, `GRANNY_DEVICE_CONTEXT`,
   and the updater's tool paths `GRANNY_BREW`, `GRANNY_DITTO`, `GRANNY_SWAP_SHELL`). New
   system calls must get an override or the e2e suites cannot reach them.

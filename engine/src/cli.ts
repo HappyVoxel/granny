@@ -12,10 +12,44 @@ async function main(): Promise<void> {
 
   const stateDir = process.env.GRANNY_ENGINE_STORAGE_DIR || path.dirname(socketPath);
   const { transport } = await SocketKernelTransport.connect(socketPath);
-  const runtime = await GrannyDurableRuntime.open({
+
+  let runtime: GrannyDurableRuntime | null = null;
+  let wakeSweep: ReturnType<typeof setInterval> | null = null;
+  let shuttingDown = false;
+
+  const shutdown = async (code = 0) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (wakeSweep) clearInterval(wakeSweep);
+    // Reject any pending socket RPC/stream first so `runtime.close()` cannot hang.
+    transport.close();
+    try {
+      await runtime?.close();
+    } catch {
+      // Ignore close errors during exit.
+    }
+    process.exit(code);
+  };
+
+  transport.onDisconnect(() => {
+    void shutdown(0);
+  });
+  process.on("SIGINT", () => {
+    void shutdown(0);
+  });
+  process.on("SIGTERM", () => {
+    void shutdown(0);
+  });
+
+  runtime = await GrannyDurableRuntime.open({
     transport,
     stateDir,
   });
+
+  if (shuttingDown) {
+    await runtime.close();
+    return;
+  }
 
   if (process.env.GRANNY_TEST_ENGINE_PID) {
     fs.writeFileSync(process.env.GRANNY_TEST_ENGINE_PID, String(process.pid));
@@ -30,34 +64,10 @@ async function main(): Promise<void> {
     },
   });
 
-  const wakeSweep = setInterval(() => {
-    runtime.nudgeClock();
+  wakeSweep = setInterval(() => {
+    runtime?.nudgeClock();
   }, 15_000);
   wakeSweep.unref();
-
-  let shuttingDown = false;
-  const shutdown = async (code = 0) => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    clearInterval(wakeSweep);
-    try {
-      await runtime.close();
-    } catch {
-      // Ignore close errors during exit.
-    }
-    transport.close();
-    process.exit(code);
-  };
-
-  transport.onDisconnect(() => {
-    void shutdown(0);
-  });
-  process.on("SIGINT", () => {
-    void shutdown(0);
-  });
-  process.on("SIGTERM", () => {
-    void shutdown(0);
-  });
 }
 
 main().catch((err) => {

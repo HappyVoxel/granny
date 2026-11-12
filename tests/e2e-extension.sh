@@ -171,4 +171,13 @@ if grep -Eq 'codesign[^#]*--deep' scripts/install-extension.sh; then
 fi
 CHECKS=$((CHECKS + 1))
 
+# Bundled Pi Durable sidecar packaging & Node cask dependency checks.
+has packaging/homebrew/Casks/granny.rb 'depends_on formula: "node"'
+has scripts/build-app.sh 'Contents/Resources/engine'
+has scripts/build-app.sh 'chmod +x "$ENG_DIR/granny-engine"'
+bash scripts/build-engine.sh >/dev/null || fail "engine bundle build failed"
+[ -x engine/bin/granny-engine ] || fail "engine/bin/granny-engine is not executable"
+[ -s engine/build/granny-engine.mjs ] || fail "engine/build/granny-engine.mjs missing"
+CHECKS=$((CHECKS + 2))
+
 echo "e2e-extension OK ($CHECKS checks)"

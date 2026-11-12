@@ -12,8 +12,17 @@ else
   exit 2
 fi
 
+node_ok() {
+  local bin="$1"
+  [ -n "$bin" ] && [ -x "$bin" ] || return 1
+  "$bin" -e '
+    const [maj, min] = process.versions.node.split(".").map(Number);
+    process.exit(maj > 22 || (maj === 22 && min >= 19) ? 0 : 1);
+  ' >/dev/null 2>&1
+}
+
 find_node() {
-  if [ -n "${GRANNY_NODE:-}" ] && [ -x "$GRANNY_NODE" ]; then
+  if [ -n "${GRANNY_NODE:-}" ] && node_ok "$GRANNY_NODE"; then
     echo "$GRANNY_NODE"
     return 0
   fi
@@ -22,24 +31,22 @@ find_node() {
     /opt/homebrew/bin/node \
     /usr/local/bin/node \
     "$HOME/.volta/bin/node"; do
-    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
-      major="$("$candidate" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-      if [ "${major:-0}" -ge 22 ] 2>/dev/null; then
-        echo "$candidate"
-        return 0
-      fi
+    if node_ok "$candidate"; then
+      echo "$candidate"
+      return 0
     fi
   done
   if [ -d "$HOME/.nvm/versions/node" ]; then
+    local best=""
     for candidate in "$HOME"/.nvm/versions/node/v*/bin/node; do
-      if [ -x "$candidate" ]; then
-        major="$("$candidate" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-        if [ "${major:-0}" -ge 22 ] 2>/dev/null; then
-          echo "$candidate"
-        fi
+      if node_ok "$candidate"; then
+        best="$candidate"
       fi
-    done | tail -n 1
-    return 0
+    done
+    if [ -n "$best" ]; then
+      echo "$best"
+      return 0
+    fi
   fi
   return 1
 }
