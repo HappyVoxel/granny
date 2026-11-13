@@ -481,6 +481,16 @@ final class EngineKernelTests: XCTestCase {
             config: config, state: &state, blocksEnforced: false,
             now: date(hour: 10), calendar: calendar)
         XCTAssertEqual(defaultTier.modelStream?.model, "deepseek/deepseek-v4.1-flash")
+        XCTAssertEqual(defaultTier.modelStream?.reasoning, false)
+
+        let reasoningOn = EngineKernel.handle(
+            .request(
+                id: "ms-3r",
+                method: EngineCapability.modelStream.rawValue,
+                params: .object(["messages": .array(messages), "reasoning": .bool(true)])),
+            config: config, state: &state, blocksEnforced: false,
+            now: date(hour: 10), calendar: calendar)
+        XCTAssertEqual(reasoningOn.modelStream?.reasoning, true)
 
         let fastTier = EngineKernel.handle(
             .request(

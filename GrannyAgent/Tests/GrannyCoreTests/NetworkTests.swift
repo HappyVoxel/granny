@@ -723,10 +723,13 @@ final class NetworkTests: XCTestCase {
     func testOpenRouterStreamChatSSEAndToolCallsAndUsage() async throws {
         MockURLProtocol.handler = { [self] request in
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sk-test")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/event-stream")
             let sent = requestBodyJSON(request)
             XCTAssertEqual(sent?["stream"] as? Bool, true)
             let streamOpts = sent?["stream_options"] as? [String: Any]
             XCTAssertEqual(streamOpts?["include_usage"] as? Bool, true)
+            let reasoning = sent?["reasoning"] as? [String: Any]
+            XCTAssertEqual(reasoning?["enabled"] as? Bool, false)
             let sentTools = sent?["tools"] as? [[String: Any]]
             XCTAssertEqual(sentTools?.first?["type"] as? String, "function")
             let sentFn = sentTools?.first?["function"] as? [String: Any]

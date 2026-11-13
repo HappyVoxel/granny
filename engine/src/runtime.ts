@@ -18,7 +18,6 @@ import {
   defineTool,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
-import { contentText } from "@earendil-works/pi-ai";
 import { int, num, obj, opt, str } from "@earendil-works/pi-schema";
 import { GRANNY_PROVIDER_ID, createGrannyModels } from "./provider.js";
 import {
@@ -205,7 +204,9 @@ export class GrannyDurableRuntime {
   private readonly nudgeTimers?: () => void;
   private readonly disposeTimers?: () => void;
   private interactiveQueue: Promise<void> = Promise.resolve();
+  private readonly queuedInteractiveRunIds = new Set<string>();
   private activeInteractiveRunId: string | null = null;
+  private activeInteractiveReasoning = false;
   private activeInteractiveEmittedText = "";
   private readonly abortedRunIds = new Set<string>();
   private unsubscribeInbound?: () => void;
@@ -586,6 +587,9 @@ export class GrannyDurableRuntime {
       onModelDelta: (modelId, delta) => {
         runtimeRef?.onModelDelta(modelId, delta);
       },
+      shouldEnableReasoning: (modelId) => {
+        return modelId === "interactive" && Boolean(runtimeRef?.activeInteractiveReasoning);
+      },
     });
 
     const harness = await Harness.open(
@@ -721,9 +725,11 @@ export class GrannyDurableRuntime {
       const runId = envelope.id ?? `c-${this.nowFn()}`;
       const params = (envelope.params ?? {}) as Record<string, unknown>;
       const text = typeof params.text === "string" ? params.text.trim() : "";
+      const reasoning = params.reasoning === true;
+      this.queuedInteractiveRunIds.add(runId);
       this.interactiveQueue = this.interactiveQueue.then(
-        () => this.handleChatPrompt(runId, text),
-        () => this.handleChatPrompt(runId, text),
+        () => this.handleChatPrompt(runId, text, reasoning),
+        () => this.handleChatPrompt(runId, text, reasoning),
       );
       await this.interactiveQueue;
       return;
@@ -733,11 +739,12 @@ export class GrannyDurableRuntime {
       const params = (envelope.params ?? {}) as Record<string, unknown>;
       const targetId =
         typeof params.id === "string" && params.id ? params.id : (envelope.id ?? "");
-      if (targetId) {
+      if (!targetId) return;
+      if (this.activeInteractiveRunId === targetId) {
         this.abortedRunIds.add(targetId);
-      }
-      if (!targetId || this.activeInteractiveRunId === targetId) {
         await this.lanes.interactive.abort(this.ctx, { background: false });
+      } else if (this.queuedInteractiveRunIds.has(targetId)) {
+        this.abortedRunIds.add(targetId);
       }
       return;
     }
@@ -779,6 +786,19 @@ export class GrannyDurableRuntime {
       return;
     }
 
+    if (envelope.method) {
+      this.transport.sendEnvelope({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: envelope.id ?? "",
+        error: {
+          code: "invalid",
+          reason: `unsupported method ${envelope.method}`,
+          retryable: false,
+        },
+      });
+      return;
+    }
+
     if (envelope.event) {
       const params = ((envelope.params && typeof envelope.params === "object" && !Array.isArray(envelope.params))
         ? envelope.params
@@ -797,7 +817,8 @@ export class GrannyDurableRuntime {
     }
   }
 
-  private async handleChatPrompt(runId: string, text: string): Promise<void> {
+  private async handleChatPrompt(runId: string, text: string, reasoning = false): Promise<void> {
+    this.queuedInteractiveRunIds.delete(runId);
     if (this.closed || this.abortedRunIds.has(runId)) {
       this.abortedRunIds.delete(runId);
       return;
@@ -817,6 +838,7 @@ export class GrannyDurableRuntime {
       const startIndex = beforeView.messages.length;
 
       this.activeInteractiveRunId = runId;
+      this.activeInteractiveReasoning = reasoning;
       this.activeInteractiveEmittedText = "";
 
       const submission = await this.lanes.interactive.submit(
@@ -855,11 +877,18 @@ export class GrannyDurableRuntime {
       }
 
       if (settled.status === "unanswered" || (assistantError && assistantTexts.length === 0)) {
+        const settledDetail =
+          settled.status === "unanswered" &&
+          "detail" in settled &&
+          typeof settled.detail === "string" &&
+          settled.detail
+            ? settled.detail
+            : undefined;
         this.transport.sendEnvelope({
           v: ENGINE_PROTOCOL_VERSION,
           id: runId,
           event: "chat.error",
-          params: { reason: assistantError ?? "unanswered" },
+          params: { reason: settledDetail ?? assistantError ?? "unanswered" },
         });
         return;
       }
@@ -885,6 +914,7 @@ export class GrannyDurableRuntime {
     } finally {
       if (this.activeInteractiveRunId === runId) {
         this.activeInteractiveRunId = null;
+        this.activeInteractiveReasoning = false;
         this.activeInteractiveEmittedText = "";
       }
     }
@@ -916,8 +946,8 @@ export class GrannyDurableRuntime {
         { type: "input", content: prompt, whenBusy: "followUp" },
         this.ctx,
       );
-    } catch {
-      // Proactive turns are best-effort; never crash the daemon on a background event.
+    } catch (err) {
+      process.stderr.write(`granny-engine: proactive lane failed: ${errorText(err)}\n`);
     }
   }
 
@@ -928,8 +958,8 @@ export class GrannyDurableRuntime {
         { type: "input", content: prompt, whenBusy: "followUp" },
         this.ctx,
       );
-    } catch {
-      // Best-effort background lane.
+    } catch (err) {
+      process.stderr.write(`granny-engine: reflection lane failed: ${errorText(err)}\n`);
     }
   }
 }
@@ -960,7 +990,6 @@ async function ensureThreeLanes(
   };
 
   const resolved: Partial<Record<LaneName, Conversation>> = {};
-  const createdIds: Partial<Record<LaneName, number>> = {};
 
   for (const name of ["interactive", "proactive", "reflection"] as const) {
     const savedId = existing?.lanes[name];
@@ -985,19 +1014,12 @@ async function ensureThreeLanes(
       },
       ctx,
     );
-    resolved[name] = created;
-    createdIds[name] = Number(created.id);
-  }
-
-  if (Object.keys(createdIds).length > 0) {
+    const createdId = Number(created.id);
     await harness.commit(async (tx) => {
       const doc = await tx.doc(GrannySessionDoc);
-      for (const [k, id] of Object.entries(createdIds)) {
-        if (typeof id === "number") {
-          doc.lanes[k as LaneName] = id;
-        }
-      }
+      doc.lanes[name] = createdId;
     }, ctx);
+    resolved[name] = created;
   }
 
   return resolved as Record<LaneName, Conversation>;
@@ -1052,5 +1074,3 @@ function errorText(err: unknown): string {
   }
   return err instanceof Error ? err.message : String(err);
 }
-
-void contentText;

@@ -14,7 +14,7 @@ Run before claiming any change works:
 
 ```
 (cd GrannyAgent && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test)
-(cd engine && npm test)       # Pi Durable crash-recovery, sleep-resume, wait probes
+(cd engine && npm ci && npm test)  # Pi Durable crash-recovery, sleep-resume, wait probes
 bash tests/e2e-helper.sh      # helper binary against a sandbox hosts file
 bash tests/e2e-agent.sh       # agent CLI + HTTP decision server
 bash tests/e2e-engine.sh      # kernel <-> engine AF_UNIX socket contract

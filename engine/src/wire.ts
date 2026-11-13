@@ -71,6 +71,7 @@ export interface KernelTransport {
       messages: JsonValue[];
       tools?: JsonValue[];
       tier?: string;
+      reasoning?: boolean;
     },
     onDelta: (text: string) => void,
     signal?: AbortSignal,
@@ -110,8 +111,9 @@ export class SocketKernelTransport implements KernelTransport {
   private constructor(socket: net.Socket) {
     this.socket = socket;
     let buffer = "";
-    socket.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString("utf8");
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
       let nl: number;
       while ((nl = buffer.indexOf("\n")) !== -1) {
         const line = buffer.slice(0, nl).trim();
@@ -258,6 +260,7 @@ export class SocketKernelTransport implements KernelTransport {
       messages: JsonValue[];
       tools?: JsonValue[];
       tier?: string;
+      reasoning?: boolean;
     },
     onDelta: (text: string) => void,
     signal?: AbortSignal,
@@ -311,6 +314,7 @@ export class SocketKernelTransport implements KernelTransport {
         messages: params.messages,
         ...(params.tools && params.tools.length > 0 ? { tools: params.tools } : {}),
         ...(params.tier ? { tier: params.tier } : {}),
+        ...(params.reasoning !== undefined ? { reasoning: params.reasoning } : {}),
       };
       this.sendEnvelope({
         v: ENGINE_PROTOCOL_VERSION,

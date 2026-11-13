@@ -482,7 +482,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
 
     if (last.role === "user" && String(last.content || "").includes("Hẹn nhắc")) {
-      const argsStr = JSON.stringify({ kind: "crash.survive", fireAtMs: Date.now() + 900, note: "Survive kill -9" });
+      const argsStr = JSON.stringify({ kind: "crash.survive", fireAtMs: Date.now() + 2500, note: "Survive kill -9" });
       res.write("data: " + JSON.stringify({
         choices: [{ delta: { tool_calls: [{ index: 0, id: "call_s4_sched", type: "function", function: { name: "intent_schedule", arguments: argsStr } }] } }],
         usage: { prompt_tokens: 20, completion_tokens: 8 },
@@ -577,7 +577,10 @@ sched_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
   '{"v":1,"id":"c-durable-sched","method":"chat.prompt","params":{"text":"Hẹn nhắc cháu","stream":true}}')"
 contains "$sched_out" '"event":"chat.done"' "Scheduled sleeping intent before kill -9"
 
-# Kill -9 the Pi Durable process BEFORE the +900ms intent fires, and verify respawn + intent recovery!
+# Kill -9 the Pi Durable process BEFORE the +2500ms intent fires, and verify respawn + intent recovery!
+nudges_pre_kill="$(node "$SANDBOX/schedule-via-prompt.mjs" "$SANDBOX/state/state.json")"
+[ "$nudges_pre_kill" = "0" ] || fail "intent fired before kill -9; widen fireAtMs in mock-durable-llm.mjs"
+CHECKS=$((CHECKS + 1))
 durable_first_pid="$(cat "$SANDBOX/durable.pid")"
 rm -f "$SANDBOX/durable.pid"
 kill -9 "$durable_first_pid" 2>/dev/null || true
@@ -595,7 +598,7 @@ contains "$durable_after_crash" '"text":"Đã ghi vào sổ rồi cháu!"' "Resp
 
 # Wait for the sleeping intent from before kill -9 to fire on the respawned engine and call notify.speak!
 nudges_after="0"
-for _ in $(seq 1 40); do
+for _ in $(seq 1 60); do
   nudges_after="$(node "$SANDBOX/schedule-via-prompt.mjs" "$SANDBOX/state/state.json")"
   [ "$nudges_after" = "1" ] && break
   sleep 0.1

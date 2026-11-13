@@ -115,6 +115,7 @@ function convertTranscriptToWireMessages(context: TranscriptContext): JsonValue[
 export interface GrannyModelsOptions {
   transport: KernelTransport;
   onModelDelta?: (modelId: string, delta: string) => void;
+  shouldEnableReasoning?: (modelId: string) => boolean;
 }
 
 export function createGrannyModels(options: GrannyModelsOptions): Models {
@@ -172,11 +173,13 @@ export function createGrannyModels(options: GrannyModelsOptions): Models {
         let textStarted = false;
         let textContent = "";
 
+        const reasoning = options.shouldEnableReasoning?.(requestModel.id) ?? false;
         const done = await options.transport.streamModel(
           {
             messages: wireMessages,
             ...(activeTools.length > 0 ? { tools: activeTools } : {}),
             tier: tierForModelId(requestModel.id),
+            reasoning,
           },
           (delta) => {
             if (!delta) return;

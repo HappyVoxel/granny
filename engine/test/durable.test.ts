@@ -5,7 +5,6 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { JsonObject } from "@earendil-works/pi-durable";
 import { GrannyDurableRuntime, createWallClockTimer } from "../src/runtime.js";
@@ -197,6 +196,7 @@ test("sleep-resume: durable intent fires immediately after a wall-clock Mac slee
 
 test("crash recovery: hard SIGKILL mid-turn preserves lane IDs and recovers sleeping SQLite WAL intent", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "granny-durable-crash-"));
+  let child: ReturnType<typeof spawn> | undefined;
   try {
     const startClock = Date.parse("2026-11-11T10:00:00Z");
     const readyFile = path.join(dir, "child-ready.json");
@@ -251,11 +251,12 @@ setInterval(() => {}, 10_000);
 `,
     );
 
-    const child = spawn(
+    const spawned = spawn(
       process.execPath,
       ["--no-warnings", workerScript, dir, readyFile, String(startClock)],
       { stdio: "ignore" },
     );
+    child = spawned;
 
     await waitUntil(() => fs.existsSync(readyFile));
     const childMeta = JSON.parse(fs.readFileSync(readyFile, "utf8")) as {
@@ -265,9 +266,9 @@ setInterval(() => {}, 10_000);
 
     // Hard crash with SIGKILL (no close(), dirty WAL on disk).
     const exited = new Promise<NodeJS.Signals | null>((resolve) => {
-      child.once("exit", (_code, signal) => resolve(signal));
+      spawned.once("exit", (_code, signal) => resolve(signal));
     });
-    child.kill("SIGKILL");
+    spawned.kill("SIGKILL");
     assert.equal(await exited, "SIGKILL");
 
     // Reopen on the dirty SQLite database 25 minutes later with a live ticking clock.
@@ -298,6 +299,9 @@ setInterval(() => {}, 10_000);
       await runtime2.close();
     }
   } finally {
+    if (child && child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGKILL");
+    }
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -570,7 +574,6 @@ test("AF_UNIX socket transport: interactive tool loop recovers duplicate key & c
 });
 
 test("overlapping prompts stay isolated, wall-clock nudges do not duplicate chains, and socket timeouts/close reject cleanly", async () => {
-  void fileURLToPath;
   // 1. Repeated `nudgeAll()` calls before `targetAt` fire the callback once, not N times.
   let fakeNow = 1_000;
   const wall = createWallClockTimer(() => fakeNow, 50);
@@ -670,6 +673,17 @@ test("overlapping prompts stay isolated, wall-clock nudges do not duplicate chai
         (e) => e.id === "p-2" && e.event === "chat.done",
       )!;
       assert.equal((p2Done.params as Record<string, unknown>).text, "SECOND-A SECOND-B");
+
+      // Unknown inbound RPC method returns an explicit `invalid` error instead of hanging.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "u-1",
+        method: "invented.method",
+        params: {},
+      });
+      await waitUntil(() =>
+        transport.sentEnvelopes.some((e) => e.id === "u-1" && e.error?.code === "invalid"),
+      );
     } finally {
       await runtime.close();
     }

@@ -396,7 +396,7 @@ flowchart LR
    zero-LLM `wait.probe` checks, and `continuitySummary` carry, bundled into
    `Granny.app` and overridable via `GRANNY_ENGINE_PATH`.
 5. Remaining proactive domain events (`slot.entered`, `round.idle`,
-   `warn.continued`) and durable scheduled intents; rituals ride on them.
+   `warn.continued`); rituals ride on them.
    Reflection writes `lessons.jsonl`; accepting a lesson is a repo diff.
 6. `tests/portability/*.json` generated from the Swift rules, so a phone port
    has something to prove itself against.

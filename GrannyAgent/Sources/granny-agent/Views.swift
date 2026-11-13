@@ -409,6 +409,7 @@ final class GrannyViewModel: ObservableObject {
     @Published var tags: [SlotTag] = []
     @Published var chatTurns: [ChatTurn] = []
     @Published var activeChatRunID: String?
+    @Published var chatReasoning = false
     @Published var engineReady = false
 
     func refresh(from context: GrannyContext) {

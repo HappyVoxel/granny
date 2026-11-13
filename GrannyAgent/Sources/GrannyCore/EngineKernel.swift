@@ -7,6 +7,7 @@ public struct ValidatedModelStream: Equatable, Sendable {
     public var model: String
     public var tier: String
     public var language: String
+    public var reasoning: Bool
     public var messages: [EngineJSON]
     public var tools: [EngineJSON]?
 
@@ -16,6 +17,7 @@ public struct ValidatedModelStream: Equatable, Sendable {
         model: String,
         tier: String,
         language: String,
+        reasoning: Bool = false,
         messages: [EngineJSON],
         tools: [EngineJSON]? = nil
     ) {
@@ -24,6 +26,7 @@ public struct ValidatedModelStream: Equatable, Sendable {
         self.model = model
         self.tier = tier
         self.language = language
+        self.reasoning = reasoning
         self.messages = messages
         self.tools = tools
     }
@@ -320,12 +323,14 @@ public enum EngineKernel {
                 tier = "default"
             }
             let resolvedModel = OpenRouterClient.resolveModel(tier: tier, config: config)
+            let reasoning = fields["reasoning"] == .bool(true)
             let stream = ValidatedModelStream(
                 id: id,
                 apiKey: rawKey,
                 model: resolvedModel,
                 tier: tier,
                 language: config.language,
+                reasoning: reasoning,
                 messages: messages,
                 tools: tools)
             return EngineOutcome(reply: .reply(id: id, result: .object([:])), modelStream: stream)

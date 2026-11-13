@@ -115,6 +115,8 @@ public protocol GrannyStrings: Sendable {
     var chatDegraded: String { get }
     var chatSpeakerYou: String { get }
     var chatSpeakerGranny: String { get }
+    var chatReasoningToggle: String { get }
+    var chatReasoningHelp: String { get }
     var tagsTitle: String { get }
     var tagAdd: String { get }
     var tagNamePlaceholder: String { get }
@@ -422,6 +424,8 @@ public struct EnglishStrings: GrannyStrings {
     public var chatDegraded: String { "Granny's engine is not answering right now - the day's blocks and your notebook are still on duty." }
     public var chatSpeakerYou: String { "YOU" }
     public var chatSpeakerGranny: String { "GRANNY" }
+    public var chatReasoningToggle: String { "Reasoning" }
+    public var chatReasoningHelp: String { "Let the model think step by step before answering" }
     public var tagsTitle: String { "TAGS" }
     public var tagAdd: String { "New tag" }
     public var tagNamePlaceholder: String { "Tag name" }
@@ -775,6 +779,8 @@ public struct VietnameseStrings: GrannyStrings {
     public var chatDegraded: String { "Bộ não hội thoại của Ngoại đang nghỉ - sổ việc và lệnh chặn vẫn giữ nguyên." }
     public var chatSpeakerYou: String { "CHÁU" }
     public var chatSpeakerGranny: String { "NGOẠI" }
+    public var chatReasoningToggle: String { "Suy luận" }
+    public var chatReasoningHelp: String { "Cho model suy nghĩ từng bước trước khi trả lời" }
     public var tagsTitle: String { "THẺ" }
     public var tagAdd: String { "Thẻ mới" }
     public var tagNamePlaceholder: String { "Tên thẻ" }
@@ -1127,6 +1133,8 @@ public struct FinnishStrings: GrannyStrings {
     public var chatDegraded: String { "Mummon moottori ei vastaa juuri nyt - päivän estot ja vihko ovat silti voimassa." }
     public var chatSpeakerYou: String { "SINÄ" }
     public var chatSpeakerGranny: String { "MUMMO" }
+    public var chatReasoningToggle: String { "Päättely" }
+    public var chatReasoningHelp: String { "Anna mallin miettiä vaiheittain ennen vastausta" }
     public var tagsTitle: String { "TAGIT" }
     public var tagAdd: String { "Uusi tagi" }
     public var tagNamePlaceholder: String { "Tagin nimi" }

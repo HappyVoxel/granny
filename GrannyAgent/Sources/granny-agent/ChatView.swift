@@ -31,14 +31,38 @@ struct ChatView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(GrannyLines.chatTitle)
-                .font(.system(size: 22, weight: .semibold, design: .serif))
-                .foregroundStyle(GrannyTheme.text)
-            Text(GrannyLines.chatSubtitle)
-                .font(.system(size: 13, design: .serif))
-                .foregroundStyle(GrannyTheme.text.opacity(0.68))
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(GrannyLines.chatTitle)
+                    .font(.system(size: 22, weight: .semibold, design: .serif))
+                    .foregroundStyle(GrannyTheme.text)
+                Text(GrannyLines.chatSubtitle)
+                    .font(.system(size: 13, design: .serif))
+                    .foregroundStyle(GrannyTheme.text.opacity(0.68))
+            }
+            Spacer(minLength: 0)
+            reasoningToggle
         }
+    }
+
+    private var reasoningToggle: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 12))
+                .foregroundStyle(
+                    viewModel.chatReasoning ? GrannyTheme.gold : GrannyTheme.text.opacity(0.58))
+            Text(GrannyLines.chatReasoningToggle)
+                .font(.system(size: 12, design: .serif))
+                .foregroundStyle(
+                    viewModel.chatReasoning ? GrannyTheme.text : GrannyTheme.text.opacity(0.68))
+            Toggle("", isOn: $viewModel.chatReasoning)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .tint(GrannyTheme.gold)
+        }
+        .help(GrannyLines.chatReasoningHelp)
+        .pointingHandOnHover()
     }
 
     private var degradedBanner: some View {
