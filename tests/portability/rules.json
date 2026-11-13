@@ -1,0 +1,357 @@
+{
+  "cases" : [
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "allow",
+          "reason" : "loopback host",
+          "source" : "rules"
+        }
+      },
+      "id" : "loopback-allowed",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "http://127.0.0.1:8080/health"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "allow",
+          "reason" : "phase rewarded",
+          "source" : "rules"
+        }
+      },
+      "id" : "rewarded-allows-blocked",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "rewarded",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://www.reddit.com/r/all"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "block",
+          "reason" : "blocked domain",
+          "source" : "rules"
+        }
+      },
+      "id" : "always-allowed-prefix",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+          "instagram.com/direct"
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://www.instagram.com/direct/inbox/"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "allow",
+          "reason" : "task surface facebook.com/adsmanager",
+          "source" : "rules"
+        }
+      },
+      "id" : "task-surface-allows-host",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+          "facebook.com/adsmanager"
+        ],
+        "url" : "https://www.facebook.com/adsmanager/manage"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "block",
+          "reason" : "blocked domain",
+          "source" : "rules"
+        }
+      },
+      "id" : "done-task-revokes-surface",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : true,
+        "taskSurfaces" : [
+          "facebook.com/adsmanager"
+        ],
+        "url" : "https://www.facebook.com/adsmanager/manage"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "block",
+          "reason" : "blocked domain",
+          "source" : "rules"
+        }
+      },
+      "id" : "blocked-domain-subdomain",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://m.tiktok.com/foryou"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "block",
+          "reason" : "youtube shorts",
+          "source" : "rules"
+        }
+      },
+      "id" : "youtube-shorts-blocked",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://www.youtube.com/shorts/abc123"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "allow",
+          "reason" : "search results",
+          "source" : "rules"
+        }
+      },
+      "id" : "search-results-allowed",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://www.google.com/search?q=swift+actors"
+      }
+    },
+    {
+      "expected" : {
+
+      },
+      "id" : "research-docs-allowed",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://developer.apple.com/documentation/swift"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "warn",
+          "reason" : "outside surface facebook.com/adsmanager*",
+          "source" : "rules"
+        }
+      },
+      "id" : "work-host-outside-surface-warns",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+          "facebook.com/adsmanager*"
+        ],
+        "url" : "https://www.facebook.com/"
+      }
+    },
+    {
+      "expected" : {
+        "verdict" : {
+          "action" : "warn",
+          "reason" : "outside surface linkedin.com/jobs*",
+          "source" : "rules"
+        }
+      },
+      "id" : "linkedin-feed-warns",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+          "linkedin.com/jobs*"
+        ],
+        "url" : "https://www.linkedin.com/feed/"
+      }
+    },
+    {
+      "expected" : {
+
+      },
+      "id" : "unknown-url-returns-nil",
+      "input" : {
+        "alwaysAllowedURLPrefixes" : [
+
+        ],
+        "blockedDomains" : [
+          "facebook.com",
+          "www.facebook.com",
+          "m.facebook.com",
+          "instagram.com",
+          "www.instagram.com",
+          "tiktok.com",
+          "www.tiktok.com"
+        ],
+        "phase" : "working",
+        "taskDone" : false,
+        "taskSurfaces" : [
+
+        ],
+        "url" : "https://example.org/article/focus"
+      }
+    }
+  ],
+  "version" : 1
+}
