@@ -27,6 +27,9 @@ final class Scheduler {
     /// Fired when the clock crosses wake, bedtime, or the day's payment, so a
     /// window that has been open for hours stops showing the old phase.
     var onPhaseChanged: ((Phase) -> Void)?
+    var pomodoroRunning: (() -> Bool)?
+    var onSlotEntered: ((EngineJSON) -> Void)?
+    var onRoundIdle: ((EngineJSON) -> Void)?
 
     /// Tick cadence, and how long a failed apply/clear waits before the
     /// next attempt (a cancelled authorization dialog must not re-prompt
@@ -44,6 +47,7 @@ final class Scheduler {
     /// every 15 s and a slot lasts an hour, so without this it would repeat.
     private var announcedSlot: String?
     private var announcedDay: String?
+    private var idleNudgedDay: String?
     /// The timetable, swapped when the user saves a new one while granny
     /// runs. A slot is a name for an hour; rewriting the day must not wait
     /// for a relaunch.
@@ -121,6 +125,7 @@ final class Scheduler {
             postNotification(body: GrannyLines.sleepNag)
         }
         announceSlotIfDue()
+        announceIdleIfDue()
     }
 
     /// The timetable speaks only for a slot that has work pinned to it, and
@@ -128,22 +133,33 @@ final class Scheduler {
     /// makes people silence granny for good.
     private func announceSlotIfDue() {
         let state = store.state
-        guard !state.dayOff else { return }
-        let phase = computePhase(config: config, state: state)
-        guard phase == .awaitingTasks || phase == .working else { return }
-        guard let slot = schedule.current(),
-              let task = state.tasks.first(where: { $0.slotID == slot.id && !$0.done }),
-              announcedSlot != slot.id || announcedDay != state.date
+        guard let due = EngineKernel.slotEnteredPayload(
+            schedule: schedule,
+            config: config,
+            state: state,
+            announcedSlot: announcedSlot,
+            announcedDay: announcedDay,
+            calendar: store.calendar)
         else { return }
-        // "It's 15:00" has to be true: launching at 21:00 still finds the
-        // 15:00 slot current, and granny must not claim an hour she missed.
-        let now = Schedule.minute(of: clockString(Date())) ?? 0
-        guard now - (slot.minute ?? 0) < minutesPerHour else { return }
-        announcedSlot = slot.id
+        announcedSlot = due.slot.id
         announcedDay = state.date
-        let line = GrannyLines.slotCue(time: slot.time, task: task.title)
+        let line = GrannyLines.slotCue(time: due.slot.time, task: due.firstTask.title)
         speaker.say(line)
         postNotification(body: line)
+        onSlotEntered?(due.params)
+    }
+
+    private func announceIdleIfDue() {
+        let state = store.state
+        guard let params = EngineKernel.roundIdlePayload(
+            config: config,
+            state: state,
+            pomodoroRunning: pomodoroRunning?() ?? false,
+            idleNudgedDay: idleNudgedDay,
+            calendar: store.calendar)
+        else { return }
+        idleNudgedDay = state.date
+        onRoundIdle?(params)
     }
 
     private func applyBlocks(_ enforced: Bool) {

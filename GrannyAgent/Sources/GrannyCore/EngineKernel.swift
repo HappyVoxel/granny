@@ -588,7 +588,7 @@ public enum EngineKernel {
             case .number(let n):
                 out[key] = (n.rounded() == n && abs(n) < 1e15) ? String(Int(n)) : String(n)
             case .null: out[key] = ""
-            case .array, .object:
+                case .array, .object:
                 if let data = try? JSONEncoder.engine.encode(value),
                    let text = String(data: data, encoding: .utf8)
                 {
@@ -597,5 +597,83 @@ public enum EngineKernel {
             }
         }
         return out
+    }
+
+    // MARK: - Proactive domain-event predicates
+
+    public static let defaultIdleThresholdMinutes = 30
+
+    /// Pure predicate for `slot.entered`: fires at most once per slot per day
+    /// when the clock is within the slot's hour and at least one open task is
+    /// pinned to that slot.
+    public static func slotEnteredPayload(
+        schedule: Schedule,
+        config: GrannyConfig,
+        state: DayState,
+        announcedSlot: String?,
+        announcedDay: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> (slot: ScheduleSlot, firstTask: TaskItem, params: EngineJSON)? {
+        guard !state.dayOff else { return nil }
+        let phase = computePhase(now: now, config: config, state: state, calendar: calendar)
+        guard phase == .awaitingTasks || phase == .working else { return nil }
+        guard let slot = schedule.current(at: now, calendar: calendar),
+              announcedSlot != slot.id || announcedDay != state.date
+        else { return nil }
+        let pinned = state.tasks.filter { $0.slotID == slot.id && !$0.done }
+        guard let firstTask = pinned.first else { return nil }
+        let nowMinute = Schedule.minute(of: clockString(now, calendar: calendar)) ?? 0
+        guard nowMinute - (slot.minute ?? 0) < minutesPerHour else { return nil }
+        let params: EngineJSON = .object([
+            "slotID": .string(slot.id),
+            "taskIDs": .array(pinned.map { .string($0.id) }),
+            "rounds": .number(Double(state.pomodoro.finished)),
+        ])
+        return (slot, firstTask, params)
+    }
+
+    /// Pure predicate for `round.idle`: fires once per day when work mode has
+    /// been open past `idleThresholdMinutes` since `wakeHour` with `rounds == 0`
+    /// and no Pomodoro round currently running.
+    public static func roundIdlePayload(
+        config: GrannyConfig,
+        state: DayState,
+        pomodoroRunning: Bool,
+        idleNudgedDay: String?,
+        idleThresholdMinutes: Int = defaultIdleThresholdMinutes,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> EngineJSON? {
+        guard !state.dayOff,
+              idleNudgedDay != state.date,
+              state.pomodoro.finished == 0,
+              !pomodoroRunning,
+              computePhase(now: now, config: config, state: state, calendar: calendar) == .working
+        else { return nil }
+        let openTasks = state.tasks.filter { !$0.done }.count
+        guard openTasks > 0 else { return nil }
+        let nowMinute = Schedule.minute(of: clockString(now, calendar: calendar)) ?? 0
+        let wakeMinute = config.wakeHour * minutesPerHour
+        let minutesSinceWake = nowMinute - wakeMinute
+        guard minutesSinceWake >= max(1, idleThresholdMinutes) else { return nil }
+        return .object([
+            "minutesSinceWake": .number(Double(minutesSinceWake)),
+            "openTasks": .number(Double(openTasks)),
+        ])
+    }
+
+    /// Payload for `day.rollover { date, done, open, rounds }`.
+    public static func dayRolloverPayload(
+        today: String,
+        carriedOpenCount: Int,
+        lastLoggedDay: RhythmDay?
+    ) -> EngineJSON {
+        .object([
+            "date": .string(lastLoggedDay?.date ?? today),
+            "done": .number(Double(lastLoggedDay?.tasksDone ?? 0)),
+            "open": .number(Double(lastLoggedDay?.tasksOpen ?? carriedOpenCount)),
+            "rounds": .number(Double(lastLoggedDay?.rounds ?? 0)),
+        ])
     }
 }

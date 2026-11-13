@@ -562,4 +562,109 @@ final class EngineKernelTests: XCTestCase {
                 resourceURL: bundleResources,
                 isExecutable: { _ in true }))
     }
+
+    func testSlotEnteredRoundIdleAndDayRolloverPayloads() {
+        let slots = [
+            ScheduleSlot(id: "morning", time: "09:00", label: "Deep work", tag: "deepWork"),
+            ScheduleSlot(id: "afternoon", time: "15:00", label: "Admin", tag: "admin"),
+        ]
+        let schedule = Schedule(slots: slots)
+        let config = GrannyConfig(wakeHour: 7, bedtimeHour: 23, schedule: slots)
+        let t1 = TaskItem(title: "Ship Slice 5", slotID: "morning")
+        let t2 = TaskItem(title: "Write tests", slotID: "morning")
+        let state = DayState(date: "2026-11-10", greeted: true, tasks: [t1, t2])
+        let nineFifteen = calendar.date(
+            from: DateComponents(year: 2026, month: 11, day: 10, hour: 9, minute: 15))!
+
+        // 1. slot.entered fires during the slot's hour with all open pinned task IDs.
+        let due = EngineKernel.slotEnteredPayload(
+            schedule: schedule,
+            config: config,
+            state: state,
+            announcedSlot: nil,
+            announcedDay: nil,
+            now: nineFifteen,
+            calendar: calendar)
+        XCTAssertEqual(due?.slot.id, "morning")
+        XCTAssertEqual(
+            due?.params,
+            .object([
+                "slotID": .string("morning"),
+                "taskIDs": .array([.string(t1.id), .string(t2.id)]),
+                "rounds": .number(0),
+            ]))
+
+        // Repeat on same slot & day is suppressed.
+        XCTAssertNil(
+            EngineKernel.slotEnteredPayload(
+                schedule: schedule,
+                config: config,
+                state: state,
+                announcedSlot: "morning",
+                announcedDay: "2026-11-10",
+                now: nineFifteen,
+                calendar: calendar))
+
+        // More than 60m after slot start (10:30 for 09:00 slot) is suppressed.
+        let tenThirty = calendar.date(
+            from: DateComponents(year: 2026, month: 11, day: 10, hour: 10, minute: 30))!
+        XCTAssertNil(
+            EngineKernel.slotEnteredPayload(
+                schedule: schedule,
+                config: config,
+                state: state,
+                announcedSlot: nil,
+                announcedDay: nil,
+                now: tenThirty,
+                calendar: calendar))
+
+        // 2. round.idle fires once rounds == 0 past threshold and is suppressed while running or paid.
+        let sevenTwenty = calendar.date(
+            from: DateComponents(year: 2026, month: 11, day: 10, hour: 7, minute: 20))!
+        XCTAssertNil(
+            EngineKernel.roundIdlePayload(
+                config: config,
+                state: state,
+                pomodoroRunning: false,
+                idleNudgedDay: nil,
+                now: sevenTwenty,
+                calendar: calendar))
+
+        let eightClock = date(hour: 8)
+        let idleParams = EngineKernel.roundIdlePayload(
+            config: config,
+            state: state,
+            pomodoroRunning: false,
+            idleNudgedDay: nil,
+            now: eightClock,
+            calendar: calendar)
+        XCTAssertEqual(
+            idleParams,
+            .object([
+                "minutesSinceWake": .number(60),
+                "openTasks": .number(2),
+            ]))
+
+        XCTAssertNil(
+            EngineKernel.roundIdlePayload(
+                config: config,
+                state: state,
+                pomodoroRunning: true,
+                idleNudgedDay: nil,
+                now: eightClock,
+                calendar: calendar))
+
+        // 3. day.rollover payload includes done, open, and rounds from RhythmDay.
+        let logged = RhythmDay(
+            date: "2026-11-09", firstRound: "09:25", rounds: 3, tasksDone: 4, tasksOpen: 1)
+        XCTAssertEqual(
+            EngineKernel.dayRolloverPayload(
+                today: "2026-11-10", carriedOpenCount: 1, lastLoggedDay: logged),
+            .object([
+                "date": .string("2026-11-09"),
+                "done": .number(4),
+                "open": .number(1),
+                "rounds": .number(3),
+            ]))
+    }
 }

@@ -252,6 +252,11 @@
           at: Date.now(),
         };
         sessionStorage.setItem(ALLOW_PREFIX + location.href, '1');
+        void send({
+          type: 'granny-warn-continued',
+          url: location.href,
+          title: (document.title || '').trim(),
+        });
         removeLayer();
       });
       card.appendChild(button);

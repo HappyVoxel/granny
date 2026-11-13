@@ -12,6 +12,31 @@ chrome.runtime.onMessage.addListener((message: GrannyMessage | undefined, sender
     if (sender.tab && sender.tab.id !== undefined) chrome.tabs.remove(sender.tab.id);
     return undefined;
   }
+  if (message.type === 'granny-warn-continued') {
+    (async () => {
+      let settings: GrannySettings = await chrome.storage.local.get({
+        decidePort: DEFAULT_PORT,
+        token: '',
+      });
+      if (!settings.token) {
+        settings = (await pair(settings.decidePort)) || settings;
+      }
+      try {
+        const params = new URLSearchParams({
+          url: message.url || '',
+          title: message.title || '',
+        });
+        await fetch(
+          'http://127.0.0.1:' + settings.decidePort + '/warn-continued?' + params.toString(),
+          { headers: { 'X-Granny-Token': settings.token } },
+        );
+      } catch (error) {
+        /* best-effort domain event */
+      }
+      sendResponse({ action: 'allow' });
+    })();
+    return true;
+  }
   if (message.type !== 'granny-check') return undefined;
   (async () => {
     let settings: GrannySettings = await chrome.storage.local.get({

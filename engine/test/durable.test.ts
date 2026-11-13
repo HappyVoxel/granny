@@ -711,3 +711,183 @@ test("overlapping prompts stay isolated, wall-clock nudges do not duplicate chai
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflection.run / lesson.list / lesson.accept manage lessons.jsonl", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "granny-durable-s5-"));
+  try {
+    // Seed `state.json.log` with 4 finished days (carried frogs + late starts + zero round day).
+    const logPath = path.join(dir, "state.json.log");
+    const logLines = [
+      JSON.stringify({ date: "2026-11-08", firstRound: "11:45", rounds: 2, tasksDone: 2, tasksOpen: 1, dayOff: false }),
+      JSON.stringify({ date: "2026-11-09", rounds: 0, tasksDone: 0, tasksOpen: 2, dayOff: false }),
+      JSON.stringify({ date: "2026-11-10", firstRound: "09:10", rounds: 3, tasksDone: 3, tasksOpen: 0, dayOff: false }),
+      JSON.stringify({ date: "2026-11-11", firstRound: "12:15", rounds: 2, tasksDone: 2, tasksOpen: 0, dayOff: false }),
+    ].join("\n") + "\n";
+    fs.writeFileSync(logPath, logLines, "utf8");
+
+    let clock = Date.parse("2026-11-12T10:00:00Z");
+    const transport = new FakeKernelTransport();
+    const runtime = await GrannyDurableRuntime.open({
+      transport,
+      stateDir: dir,
+      now: () => clock,
+      warnFollowupDelayMs: 60_000,
+    });
+
+    try {
+      // 1. Push `warn.continued` twice inside `warnFollowupDelayMs` for the same host
+      // while YouTube tab is open: only ONE follow-up intent should be scheduled.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        event: "warn.continued",
+        params: {
+          url: "https://www.youtube.com/watch?v=abc",
+          title: "Deep work lecture",
+          taskIDs: ["t-1"],
+        },
+      });
+      await runtime.waitForIdle();
+
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        event: "warn.continued",
+        params: {
+          url: "https://www.youtube.com/watch?v=xyz",
+          title: "Another video",
+          taskIDs: ["t-1"],
+        },
+      });
+      await runtime.waitForIdle();
+
+      // A `warn.continued` during night phase must neither schedule nor call model.stream.
+      const prevPhase = transport.stateSnapshot.phase ?? "working";
+      transport.stateSnapshot.phase = "night";
+      const callsBeforeNight = transport.modelStreamCalls.length;
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        event: "warn.continued",
+        params: {
+          url: "https://reddit.com/r/swift",
+          title: "Reddit",
+          taskIDs: ["t-1"],
+        },
+      });
+      await runtime.waitForIdle();
+      assert.equal(transport.modelStreamCalls.length, callsBeforeNight);
+      transport.stateSnapshot.phase = prevPhase;
+
+      // Advance clock past `warnFollowupDelayMs` (60s): exactly ONE auto-scheduled intent fires!
+      clock += 90_000;
+      runtime.nudgeClock();
+      await waitUntil(() =>
+        transport.sentEnvelopes.some(
+          (e) =>
+            e.event === "intent.fired" &&
+            (e.params as Record<string, unknown>)?.kind === "warn.continued",
+        ),
+      );
+      await runtime.waitForIdle();
+      const warnFiredCount = transport.sentEnvelopes.filter(
+        (e) =>
+          e.event === "intent.fired" &&
+          (e.params as Record<string, unknown>)?.kind === "warn.continued",
+      ).length;
+      assert.equal(warnFiredCount, 1);
+
+      // 2. Run reflection over `state.json.log` via `reflection.run`.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "refl-s5",
+        method: "reflection.run",
+        params: { windowDays: 7 },
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "refl-s5"));
+
+      // Verify `state.json.log` was never modified.
+      assert.equal(fs.readFileSync(logPath, "utf8"), logLines);
+      assert.ok(fs.existsSync(path.join(dir, "lessons.jsonl")));
+
+      // 3. List lessons via `lesson.list`.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "ll-s5",
+        method: "lesson.list",
+        params: {},
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "ll-s5"));
+      const listReply = transport.sentEnvelopes.find((e) => e.id === "ll-s5")!;
+      const lessons = (listReply.result as Record<string, unknown>).lessons as Array<
+        Record<string, unknown>
+      >;
+      assert.ok(lessons.some((l) => l.id === "lesson-carried_frogs" && l.count === 2));
+      assert.ok(lessons.some((l) => l.id === "lesson-zero_round_days" && l.count === 1));
+      assert.ok(lessons.some((l) => l.id === "lesson-late_first_round" && l.count === 2));
+      assert.ok(lessons.some((l) => l.id === "lesson-steady_paid_days" && l.count === 2));
+
+      // 4. Accept `lesson-carried_frogs` and verify re-running reflection over clean days
+      // drops unaccepted unmatched patterns while keeping the accepted lesson.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "la-s5",
+        method: "lesson.accept",
+        params: { lessonID: "lesson-carried_frogs" },
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "la-s5"));
+      const acceptReply = transport.sentEnvelopes.find((e) => e.id === "la-s5")!;
+      const acceptedObj = acceptReply.result as Record<string, unknown>;
+      assert.equal(
+        (acceptedObj.lesson as Record<string, unknown>).accepted,
+        true,
+      );
+      assert.ok(String(acceptedObj.repoDiffHint).includes("lesson-carried_frogs"));
+
+      // Rewrite `state.json.log` to a single clean early round day and re-run reflection.
+      const cleanLog =
+        JSON.stringify({ date: "2026-11-12", firstRound: "08:30", rounds: 2, tasksDone: 2, tasksOpen: 0, dayOff: false }) +
+        "\n";
+      fs.writeFileSync(logPath, cleanLog, "utf8");
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "refl-clean",
+        method: "reflection.run",
+        params: { windowDays: 7 },
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "refl-clean"));
+      const cleanLessons = (
+        transport.sentEnvelopes.find((e) => e.id === "refl-clean")!.result as Record<string, unknown>
+      ).lessons as Array<Record<string, unknown>>;
+      assert.ok(
+        cleanLessons.some((l) => l.id === "lesson-carried_frogs" && l.accepted === true),
+        "accepted lesson should stay",
+      );
+      assert.ok(
+        !cleanLessons.some((l) => l.id === "lesson-zero_round_days"),
+        "unaccepted unmatched pattern should be dropped",
+      );
+      assert.ok(
+        !cleanLessons.some((l) => l.id === "lesson-late_first_round"),
+        "unaccepted unmatched late_first_round should be dropped",
+      );
+
+      // 5. Read-only stateDir during `lesson.accept` returns internal error instead of crashing.
+      fs.chmodSync(dir, 0o500);
+      try {
+        transport.pushInbound({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: "la-readonly",
+          method: "lesson.accept",
+          params: { lessonID: "lesson-carried_frogs" },
+        });
+        await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "la-readonly"));
+        const errReply = transport.sentEnvelopes.find((e) => e.id === "la-readonly")!;
+        assert.equal(errReply.error?.code, "internal");
+      } finally {
+        fs.chmodSync(dir, 0o700);
+      }
+    } finally {
+      await runtime.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
