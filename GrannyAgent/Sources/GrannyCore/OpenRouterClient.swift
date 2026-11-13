@@ -60,10 +60,11 @@ public struct OpenRouterClient: Sendable {
     public func streamChat(
         messages: [EngineJSON],
         tools: [EngineJSON]? = nil,
+        reasoning: Bool = false,
         onDelta: @Sendable (String) -> Void
     ) async -> Result<ModelStreamDone, EngineError> {
         guard let body = Self.modelStreamRequestBody(
-            model: settings.model, messages: messages, tools: tools)
+            model: settings.model, messages: messages, tools: tools, reasoning: reasoning)
         else {
             return .failure(.invalid("invalid model.stream messages or tools"))
         }
@@ -108,6 +109,7 @@ public struct OpenRouterClient: Sendable {
         request.timeoutInterval = timeout
         request.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
 
         var emittedAnyDelta = false
         do {
@@ -268,7 +270,8 @@ public struct OpenRouterClient: Sendable {
     public static func modelStreamRequestBody(
         model: String,
         messages: [EngineJSON],
-        tools: [EngineJSON]? = nil
+        tools: [EngineJSON]? = nil,
+        reasoning: Bool = false
     ) -> Data? {
         guard !messages.isEmpty else { return nil }
         var wireMessages: [[String: Any]] = []
@@ -339,6 +342,7 @@ public struct OpenRouterClient: Sendable {
             "model": model,
             "stream": true,
             "stream_options": ["include_usage": true],
+            "reasoning": ["enabled": reasoning],
             "messages": wireMessages,
         ]
         if let tools, !tools.isEmpty {

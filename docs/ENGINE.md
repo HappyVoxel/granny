@@ -6,11 +6,14 @@ Status: wire types (`EngineProtocol.swift`), the full kernel capability table
 `notify.speak`, `trace.emit`, and `model.stream` wired to `OpenRouterClient`),
 the local socket + child supervisor (`EngineServer.swift`,
 `GRANNY_ENGINE_PATH`, `day.woke`/`round.finished`/`day.rollover` pushes,
-`tests/e2e-engine.sh`), and the native chat tab (`ChatView.swift`: streaming
-deltas, `chat.abort`, degraded state) are implemented. The Pi Durable runtime
-and remaining proactive events remain. `docs/ARCHITECTURE.md` carries the
-decision ("The engine, and other platforms" plus the last two decision-log
-entries).
+`tests/e2e-engine.sh`), the native chat tab (`ChatView.swift`: streaming
+deltas, `chat.abort`, degraded state), and the Pi Durable sidecar
+(`engine/`: `@earendil-works/pi-durable`, three lanes, `model.stream` provider,
+SQLite durable intents, zero-LLM wait probes, and crash/sleep-resume suites)
+are implemented. Remaining proactive domain events (`slot.entered`,
+`round.idle`, `warn.continued`) and `lessons.jsonl` reflection remain.
+`docs/ARCHITECTURE.md` carries the decision ("The engine, and other platforms"
+plus the last two decision-log entries).
 
 Why a contract and not a framework choice: the harness is the only part of
 granny that can be wrong, experimental, or dead, and it must never be able to
@@ -362,7 +365,7 @@ flowchart LR
     S0["0 · contract as fixtures<br/>types + jsonl cases (done)"] --> S1["1 · kernel socket + rule table<br/>hello · read · task.add/tick · speak<br/>child supervisor (done)"]
     S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state (done)"]
     S2 --> S3["3 · remaining capabilities<br/>round.start · slot.move · device.context · model.stream (done)"]
-    S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH"]
+    S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH (done)"]
     S4 --> S5["5 · proactive events · reflection<br/>slot.entered · round.idle · warn.continued"]
     S5 --> S6["6 · portability corpus<br/>a phone port can prove itself"]
 ```
@@ -385,12 +388,15 @@ flowchart LR
    `slot.move`, `device.context`, `trace.emit` and `model.stream` (SSE
    streaming, tool-call assembly, tier resolution, retry before first delta,
    and Langfuse generation spans).
-4. Engine #1: Pi Durable (`@earendil-works/pi-durable`, pinned), three lanes
-   (`interactive`, `proactive`, `reflection`), model calls routed through
-   `model.stream`, started by the app behind `GRANNY_ENGINE_PATH`. Crash and
-   sleep-resume tests first, features second.
+4. Engine #1 (done, `engine/` + `scripts/build-engine.sh`): Pi Durable
+   (`@earendil-works/pi-durable@1.5.2`, pinned), three isolated ownerless
+   conversations (`interactive`, `proactive`, `reflection`) persisted in
+   `durable.sqlite`, zero-key `granny` provider routed through `model.stream`,
+   durable scheduled intents (`sleepUntil`) with wall-clock sleep-resume,
+   zero-LLM `wait.probe` checks, and `continuitySummary` carry, bundled into
+   `Granny.app` and overridable via `GRANNY_ENGINE_PATH`.
 5. Remaining proactive domain events (`slot.entered`, `round.idle`,
-   `warn.continued`) and durable scheduled intents; rituals ride on them.
+   `warn.continued`); rituals ride on them.
    Reflection writes `lessons.jsonl`; accepting a lesson is a repo diff.
 6. `tests/portability/*.json` generated from the Swift rules, so a phone port
    has something to prove itself against.

@@ -7,6 +7,7 @@ public struct ValidatedModelStream: Equatable, Sendable {
     public var model: String
     public var tier: String
     public var language: String
+    public var reasoning: Bool
     public var messages: [EngineJSON]
     public var tools: [EngineJSON]?
 
@@ -16,6 +17,7 @@ public struct ValidatedModelStream: Equatable, Sendable {
         model: String,
         tier: String,
         language: String,
+        reasoning: Bool = false,
         messages: [EngineJSON],
         tools: [EngineJSON]? = nil
     ) {
@@ -24,6 +26,7 @@ public struct ValidatedModelStream: Equatable, Sendable {
         self.model = model
         self.tier = tier
         self.language = language
+        self.reasoning = reasoning
         self.messages = messages
         self.tools = tools
     }
@@ -75,6 +78,36 @@ public enum EngineKernel {
             return "granny/\(short)"
         }
         return "granny/\(defaultVersion)"
+    }
+
+    /// Resolves which `granny-engine` sidecar executable `EngineServer` should
+    /// supervise: `GRANNY_ENGINE_PATH` wins (empty disables supervision), then
+    /// `GRANNY_ENGINE_RESOURCES_DIR/engine/granny-engine` (the test seam), then
+    /// the packaged app's `Contents/Resources/engine/granny-engine` outside CLI
+    /// `--serve` runs.
+    public static func resolveEnginePath(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        arguments: [String] = CommandLine.arguments,
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        resourceURL: URL? = Bundle.main.resourceURL,
+        isExecutable: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)
+    ) -> String? {
+        if let explicit = environment[GrannyEnv.enginePath] {
+            return explicit.isEmpty ? nil : explicit
+        }
+        if let overrideResources = environment[GrannyEnv.engineResourcesDir],
+           !overrideResources.isEmpty
+        {
+            let candidate = URL(fileURLWithPath: overrideResources)
+                .appendingPathComponent("engine/granny-engine").path
+            return isExecutable(candidate) ? candidate : nil
+        }
+        guard !arguments.contains("--serve"),
+              bundleIdentifier == "io.github.happyvoxel.granny",
+              let resourceURL
+        else { return nil }
+        let candidate = resourceURL.appendingPathComponent("engine/granny-engine").path
+        return isExecutable(candidate) ? candidate : nil
     }
 
     /// Quiet hours may cross midnight (22 -> 7) or sit inside one day (1 -> 6).
@@ -290,12 +323,14 @@ public enum EngineKernel {
                 tier = "default"
             }
             let resolvedModel = OpenRouterClient.resolveModel(tier: tier, config: config)
+            let reasoning = fields["reasoning"] == .bool(true)
             let stream = ValidatedModelStream(
                 id: id,
                 apiKey: rawKey,
                 model: resolvedModel,
                 tier: tier,
                 language: config.language,
+                reasoning: reasoning,
                 messages: messages,
                 tools: tools)
             return EngineOutcome(reply: .reply(id: id, result: .object([:])), modelStream: stream)

@@ -32,6 +32,13 @@ public enum GrannyEnv {
     public static let enginePath = "GRANNY_ENGINE_PATH"
     /// Path to `<state dir>/engine.sock` passed to the spawned engine child.
     public static let engineSocket = "GRANNY_ENGINE_SOCKET"
+    /// Directory override for bundled `Resources/` when resolving
+    /// `engine/granny-engine` in tests without building a full `.app` bundle.
+    public static let engineResourcesDir = "GRANNY_ENGINE_RESOURCES_DIR"
+    /// Directory override for the Pi Durable SQLite store inside `granny-engine`.
+    public static let engineStorageDir = "GRANNY_ENGINE_STORAGE_DIR"
+    /// Explicit Node.js (>=22.19) executable override forwarded to `granny-engine`.
+    public static let node = "GRANNY_NODE"
     /// Endpoint override for OpenRouter chat completions so the e2e engine
     /// suite can stream against a local SSE stub without hitting the network.
     public static let openRouterURL = "GRANNY_OPENROUTER_URL"

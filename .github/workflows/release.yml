@@ -18,6 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
 
@@ -42,6 +46,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -76,7 +84,9 @@ jobs:
           sed -i '' -E "s/(GRANNY_VERSION:-)[0-9][0-9.]*/\1$VERSION/" \
             scripts/build-app.sh scripts/build-release.sh
           sed -i '' -E "s/(\"version\": \")[0-9][0-9.]*/\1$VERSION/" \
-            extension/chrome/manifest.json extension/safari/manifest.json
+            extension/chrome/manifest.json extension/safari/manifest.json engine/package.json
+          sed -i '' -E "s/(ENGINE_VERSION = \")[0-9][0-9.]*/\1$VERSION/" \
+            engine/src/wire.ts
           sed -i '' -E "s/(public static let version = \")[0-9][0-9.]*/\1$VERSION/" \
             GrannyAgent/Sources/GrannyCore/TraceClient.swift
           sed -i '' -E "s/(\"impl\":\"granny\/)[0-9][0-9.]*/\1$VERSION/" \

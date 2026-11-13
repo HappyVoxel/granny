@@ -106,6 +106,8 @@ public enum GrannyLines {
     public static var chatDegraded: String { strings.chatDegraded }
     public static var chatSpeakerYou: String { strings.chatSpeakerYou }
     public static var chatSpeakerGranny: String { strings.chatSpeakerGranny }
+    public static var chatReasoningToggle: String { strings.chatReasoningToggle }
+    public static var chatReasoningHelp: String { strings.chatReasoningHelp }
     public static var tagsTitle: String { strings.tagsTitle }
     public static var tagAdd: String { strings.tagAdd }
     public static var tagNamePlaceholder: String { strings.tagNamePlaceholder }

@@ -87,6 +87,8 @@ versions = {
     "packaging/homebrew/Casks/granny.rb": version_of("packaging/homebrew/Casks/granny.rb", r'version "([^"]+)"'),
     "extension/chrome/manifest.json": version_of("extension/chrome/manifest.json", r'"version": "([^"]+)"'),
     "extension/safari/manifest.json": version_of("extension/safari/manifest.json", r'"version": "([^"]+)"'),
+    "engine/package.json": version_of("engine/package.json", r'"version": "([^"]+)"'),
+    "engine/src/wire.ts": version_of("engine/src/wire.ts", r'ENGINE_VERSION = "([^"]+)"'),
     "GrannyAgent/Sources/GrannyCore/TraceClient.swift": version_of("GrannyAgent/Sources/GrannyCore/TraceClient.swift", r'public static let version = "([^"]+)"'),
     "tests/engine/contract.jsonl": version_of("tests/engine/contract.jsonl", r'"impl":"granny/([^"]+)"'),
 }
@@ -168,5 +170,14 @@ if grep -Eq 'codesign[^#]*--deep' scripts/install-extension.sh; then
   fail "install-extension.sh re-signs with --deep, which strips the appex entitlements"
 fi
 CHECKS=$((CHECKS + 1))
+
+# Bundled Pi Durable sidecar packaging & Node cask dependency checks.
+has packaging/homebrew/Casks/granny.rb 'depends_on formula: "node"'
+has scripts/build-app.sh 'Contents/Resources/engine'
+has scripts/build-app.sh 'chmod +x "$ENG_DIR/granny-engine"'
+bash scripts/build-engine.sh >/dev/null || fail "engine bundle build failed"
+[ -x engine/bin/granny-engine ] || fail "engine/bin/granny-engine is not executable"
+[ -s engine/build/granny-engine.mjs ] || fail "engine/build/granny-engine.mjs missing"
+CHECKS=$((CHECKS + 2))
 
 echo "e2e-extension OK ($CHECKS checks)"

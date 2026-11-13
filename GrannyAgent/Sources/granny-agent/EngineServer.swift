@@ -17,6 +17,7 @@ final class EngineServer: @unchecked Sendable {
 
     private static let promptTimeout: TimeInterval = 30
     private static let maxRestartAttempts = 6
+    private static let maxEngineLogBytes: UInt64 = 5 * 1024 * 1024
 
     private let socketURL: URL
     private let configProvider: () -> GrannyConfig
@@ -64,6 +65,7 @@ final class EngineServer: @unchecked Sendable {
 
     init(
         socketURL: URL = GrannyPaths.engineSocketURL,
+        resourceURL: URL? = Bundle.main.resourceURL,
         configProvider: @escaping () -> GrannyConfig,
         stateStore: StateStore,
         enforcementProvider: @escaping () -> Bool,
@@ -86,8 +88,7 @@ final class EngineServer: @unchecked Sendable {
         self.onSpeak = onSpeak
         self.onMutated = onMutated
         self.onStatusChange = onStatusChange
-        let rawPath = ProcessInfo.processInfo.environment[GrannyEnv.enginePath] ?? ""
-        self.supervisedEnginePath = rawPath.isEmpty ? nil : rawPath
+        self.supervisedEnginePath = EngineKernel.resolveEnginePath(resourceURL: resourceURL)
     }
 
     deinit {
@@ -271,6 +272,7 @@ final class EngineServer: @unchecked Sendable {
     func prompt(
         id: String = "c-\(UUID().uuidString.prefix(8))",
         text: String,
+        reasoning: Bool = false,
         onEvent: @escaping (EngineEnvelope) -> Void
     ) {
         ioQueue.async { [weak self] in
@@ -289,6 +291,7 @@ final class EngineServer: @unchecked Sendable {
                 params: .object([
                     "text": .string(text),
                     "stream": .bool(true),
+                    "reasoning": .bool(reasoning),
                 ]))
             if !self.writeLine(request, to: self.engineFD) {
                 self.activePromptWaiters.removeValue(forKey: id)
@@ -340,19 +343,34 @@ final class EngineServer: @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         let hostEnv = ProcessInfo.processInfo.environment
+        let basePath = hostEnv["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         var env: [String: String] = [
             GrannyEnv.engineSocket: socketURL.path,
+            "PATH": "\(basePath):/opt/homebrew/bin:/usr/local/bin",
         ]
-        for key in ["PATH", "HOME", "TMPDIR", "LANG"] {
+        for key in ["HOME", "TMPDIR", "LANG", GrannyEnv.node, GrannyEnv.engineStorageDir] {
             if let value = hostEnv[key] { env[key] = value }
         }
         for (key, value) in hostEnv where key.hasPrefix("GRANNY_TEST_") {
             env[key] = value
         }
         process.environment = env
-        process.terminationHandler = { [weak self] _ in
+        let logURL = socketURL.deletingLastPathComponent().appendingPathComponent("engine.log")
+        if !FileManager.default.fileExists(atPath: logURL.path) {
+            FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        }
+        let logHandle = try? FileHandle(forWritingTo: logURL)
+        defer { try? logHandle?.close() }
+        if let logHandle {
+            if ((try? logHandle.seekToEnd()) ?? 0) > Self.maxEngineLogBytes {
+                try? logHandle.truncate(atOffset: 0)
+            }
+            process.standardError = logHandle
+        }
+        process.terminationHandler = { [weak self] terminated in
+            let code = terminated.terminationStatus
             self?.ioQueue.async { [weak self] in
-                self?.scheduleRestart(at: path)
+                self?.scheduleRestart(at: path, exitStatus: code)
             }
         }
         do {
@@ -360,12 +378,23 @@ final class EngineServer: @unchecked Sendable {
             self.childProcess = process
         } catch {
             self.setStatus(.degraded(reason: "failed to launch engine: \(error.localizedDescription)"))
-            scheduleRestart(at: path)
+            scheduleRestart(at: path, exitStatus: nil)
         }
     }
 
-    private func scheduleRestart(at path: String) {
-        guard !stopped, restartAttempt < Self.maxRestartAttempts else { return }
+    private func scheduleRestart(at path: String, exitStatus: Int32?) {
+        guard !stopped else { return }
+        let logURL = socketURL.deletingLastPathComponent().appendingPathComponent("engine.log")
+        if let exitStatus, currentStatus == .absent {
+            setStatus(.degraded(reason: "engine exited (\(exitStatus)); see \(logURL.path)"))
+        }
+        guard restartAttempt < Self.maxRestartAttempts else {
+            let suffix = exitStatus.map { " (exit \($0))" } ?? ""
+            let reason = "engine failed after \(Self.maxRestartAttempts) attempts\(suffix); see \(logURL.path)"
+            setStatus(.degraded(reason: reason))
+            appendEngineLog(reason)
+            return
+        }
         let delay = min(10.0, 0.25 * pow(2.0, Double(min(restartAttempt, 5))))
         restartAttempt += 1
         ioQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
@@ -433,16 +462,21 @@ final class EngineServer: @unchecked Sendable {
     func recordStartupFailure(_ error: Error) {
         let reason = error.localizedDescription
         setStatus(.degraded(reason: reason))
+        appendEngineLog("engine socket failed: \(reason)")
+    }
+
+    private func appendEngineLog(_ message: String) {
         let logURL = socketURL.deletingLastPathComponent().appendingPathComponent("engine.log")
-        let line = "\(ISO8601DateFormatter().string(from: Date())) engine socket failed: \(reason)\n"
-        if let data = line.data(using: .utf8) {
-            if let handle = try? FileHandle(forWritingTo: logURL) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: data)
-            } else {
-                try? data.write(to: logURL, options: .atomic)
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: logURL) {
+            defer { try? handle.close() }
+            if ((try? handle.seekToEnd()) ?? 0) > Self.maxEngineLogBytes {
+                try? handle.truncate(atOffset: 0)
             }
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: logURL, options: .atomic)
         }
     }
 
@@ -659,7 +693,11 @@ final class EngineServer: @unchecked Sendable {
             let startedAt = Date()
             let client = OpenRouterClient(
                 settings: .init(apiKey: req.apiKey, model: req.model, language: req.language))
-            let result = await client.streamChat(messages: req.messages, tools: req.tools) { [weak self] chunk in
+            let result = await client.streamChat(
+                messages: req.messages,
+                tools: req.tools,
+                reasoning: req.reasoning
+            ) { [weak self] chunk in
                 let deltaCancelled = Task.isCancelled
                 guard !deltaCancelled, let self else { return }
                 self.ioQueue.sync {
@@ -750,11 +788,13 @@ final class EngineServer: @unchecked Sendable {
     private func handleClientPromptOverSocket(envelope: EngineEnvelope, clientFD: Int32) {
         let id = envelope.id ?? "c-1"
         var promptText = ""
-        if case .object(let fields) = envelope.params, case .string(let text) = fields["text"] {
-            promptText = text
+        var reasoning = false
+        if case .object(let fields) = envelope.params {
+            if case .string(let text) = fields["text"] { promptText = text }
+            if case .bool(let flag) = fields["reasoning"] { reasoning = flag }
         }
         let done = DispatchSemaphore(value: 0)
-        prompt(id: id, text: promptText) { [weak self] event in
+        prompt(id: id, text: promptText, reasoning: reasoning) { [weak self] event in
             guard let self else {
                 done.signal()
                 return

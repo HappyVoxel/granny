@@ -122,7 +122,7 @@ final class GrannyContext {
             finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
             return
         }
-        server.prompt(id: runID, text: text) { [weak self] envelope in
+        server.prompt(id: runID, text: text, reasoning: viewModel.chatReasoning) { [weak self] envelope in
             DispatchQueue.main.async {
                 self?.handleChatEnvelope(envelope, runID: runID)
             }
@@ -157,17 +157,36 @@ final class GrannyContext {
             finishChatTurn(id: runID, error: nil)
             return
         }
-        if envelope.error != nil {
-            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
+        if let err = envelope.error {
+            finishChatTurn(id: runID, error: Self.chatErrorMessage(for: err.reason))
             return
         }
         if envelope.event == "chat.error" {
-            finishChatTurn(id: runID, error: GrannyLines.chatDegraded)
+            var reason = ""
+            if case .object(let fields) = envelope.params,
+               case .string(let detail) = fields["reason"]
+            {
+                reason = detail
+            }
+            finishChatTurn(id: runID, error: Self.chatErrorMessage(for: reason))
             return
         }
         if envelope.isReply {
             finishChatTurn(id: runID, error: nil)
         }
+    }
+
+    private static func chatErrorMessage(for reason: String) -> String {
+        let lower = reason.lowercased()
+        if lower.contains("openrouter key is not configured") {
+            return GrannyLines.setupKeyReminder
+        }
+        if lower.contains("http 401") || lower.contains("http 403")
+            || lower.contains("invalid_token") || lower.contains("api key")
+        {
+            return GrannyLines.keyCheckInvalid
+        }
+        return GrannyLines.chatDegraded
     }
 
     private func finishChatTurn(id: String, error: String?) {
@@ -893,7 +912,7 @@ final class GrannyContext {
 
     private func startEngineServer() {
         let server = EngineServer(
-            configProvider: { [unowned self] in self.config },
+            configProvider: { GrannyConfig.load() },
             stateStore: store,
             enforcementProvider: { [unowned self] in self.blocksEnforced() },
             pomodoroProvider: { [unowned self] in (self.pomodoroRunning, self.pomodoroRemaining) },
