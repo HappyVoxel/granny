@@ -152,7 +152,12 @@ export function runReflection(stateDir: string, windowDays = 7): LessonRecord[] 
     },
   ];
 
-  const updated = new Map<string, LessonRecord>(existing);
+  const updated = new Map<string, LessonRecord>();
+  for (const [id, lesson] of existing) {
+    if (lesson.accepted) {
+      updated.set(id, lesson);
+    }
+  }
 
   for (const candidate of candidates) {
     if (candidate.matched.length === 0) continue;

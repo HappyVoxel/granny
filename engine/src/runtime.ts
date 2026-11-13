@@ -68,6 +68,7 @@ export type GrannySessionState = {
   };
   continuitySummary: string;
   firedIntents: FiredIntentRecord[];
+  lastWarnContinue?: { host: string; at: number } | null;
 };
 
 export const GrannySessionDoc = defineDoc<GrannySessionState>({
@@ -82,6 +83,7 @@ export const GrannySessionDoc = defineDoc<GrannySessionState>({
     },
     continuitySummary: "",
     firedIntents: [],
+    lastWarnContinue: null,
   }),
   checkpointWhen: (_value, _ops, info) => info.deltasSinceBase >= 16,
 });
@@ -208,6 +210,7 @@ export class GrannyDurableRuntime {
   private readonly nudgeTimers?: () => void;
   private readonly disposeTimers?: () => void;
   private interactiveQueue: Promise<void> = Promise.resolve();
+  private proactiveQueue: Promise<void> = Promise.resolve();
   private readonly queuedInteractiveRunIds = new Set<string>();
   private activeInteractiveRunId: string | null = null;
   private activeInteractiveReasoning = false;
@@ -692,6 +695,7 @@ export class GrannyDurableRuntime {
   }
 
   async waitForIdle(): Promise<void> {
+    await this.proactiveQueue;
     await this.harness.waitForIdle(this.ctx);
   }
 
@@ -865,28 +869,40 @@ export class GrannyDurableRuntime {
         });
         return;
       }
-      const accepted = acceptLesson(
-        this.stateDir,
-        lessonID,
-        new Date(this.nowFn()).toISOString(),
-      );
-      if (!accepted) {
+      try {
+        const accepted = acceptLesson(
+          this.stateDir,
+          lessonID,
+          new Date(this.nowFn()).toISOString(),
+        );
+        if (!accepted) {
+          this.transport.sendEnvelope({
+            v: ENGINE_PROTOCOL_VERSION,
+            id: reqId,
+            error: {
+              code: "refused",
+              reason: `unknown lesson ${lessonID}`,
+              retryable: false,
+            },
+          });
+          return;
+        }
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          result: accepted,
+        });
+      } catch (err) {
         this.transport.sendEnvelope({
           v: ENGINE_PROTOCOL_VERSION,
           id: reqId,
           error: {
-            code: "refused",
-            reason: `unknown lesson ${lessonID}`,
+            code: "internal",
+            reason: errorText(err),
             retryable: false,
           },
         });
-        return;
       }
-      this.transport.sendEnvelope({
-        v: ENGINE_PROTOCOL_VERSION,
-        id: reqId,
-        result: accepted,
-      });
       return;
     }
 
@@ -916,7 +932,12 @@ export class GrannyDurableRuntime {
         envelope.event === "round.finished" ||
         envelope.event === "warn.continued"
       ) {
-        await this.handleProactiveEvent(envelope.event, params);
+        const eventName = envelope.event;
+        this.proactiveQueue = this.proactiveQueue.then(
+          () => this.handleProactiveEvent(eventName, params),
+          () => this.handleProactiveEvent(eventName, params),
+        );
+        await this.proactiveQueue;
       }
     }
   }
@@ -1025,26 +1046,7 @@ export class GrannyDurableRuntime {
   }
 
   private async handleProactiveEvent(event: string, params: JsonObject): Promise<void> {
-    if (event === "warn.continued" && typeof params.url === "string" && params.url) {
-      let probeTarget = params.url;
-      try {
-        probeTarget = new URL(params.url).hostname || params.url;
-      } catch {
-        probeTarget = params.url;
-      }
-      try {
-        await this.scheduleIntent({
-          kind: "warn.continued",
-          fireAt: this.nowFn() + this.warnFollowupDelayMs,
-          note: `Check if grandchild is still browsing ${probeTarget} (${typeof params.title === "string" ? params.title : ""})`,
-          probe: { kind: "tabOpen", urlSubstring: probeTarget },
-        });
-      } catch (err) {
-        process.stderr.write(`granny-engine: failed to schedule warn.continued intent: ${errorText(err)}\n`);
-      }
-    }
-
-    // Cheap zero-LLM pre-gate: check state.read before waking the proactive model lane.
+    // Cheap zero-LLM pre-gate: check state.read before scheduling intents or waking the proactive model lane.
     try {
       const stateRaw = await this.transport.callCapability("state.read", {});
       const state = (stateRaw && typeof stateRaw === "object" && !Array.isArray(stateRaw))
@@ -1056,7 +1058,44 @@ export class GrannyDurableRuntime {
       if (event === "day.woke" && typeof params.frogs === "number" && params.frogs <= 0) {
         return;
       }
+
       const snap = await this.sessionSnapshot();
+
+      if (event === "warn.continued" && typeof params.url === "string" && params.url) {
+        let probeTarget = params.url;
+        try {
+          probeTarget = new URL(params.url).hostname || params.url;
+        } catch {
+          probeTarget = params.url;
+        }
+        const now = this.nowFn();
+        const last = snap?.lastWarnContinue ?? null;
+        if (last && last.host === probeTarget && now - last.at < this.warnFollowupDelayMs) {
+          return;
+        }
+        const fireAt = now + this.warnFollowupDelayMs;
+        const note = `Check if grandchild is still browsing ${probeTarget} (${typeof params.title === "string" ? params.title : ""})`;
+        await this.harness.commit(async (tx) => {
+          const doc = await tx.doc(GrannySessionDoc);
+          doc.lastWarnContinue = { host: probeTarget, at: now };
+          await tx.createTask(
+            this.intentTaskDef,
+            {
+              kind: "warn.continued",
+              fireAt,
+              note,
+              probe: { kind: "tabOpen", urlSubstring: probeTarget },
+            },
+            {
+              ownership: { kind: "conversation" },
+              conversationId: this.lanes.proactive.id,
+              background: true,
+            },
+          );
+        }, this.ctx);
+        this.harness.resume();
+      }
+
       const continuity = snap?.continuitySummary ?? "";
       const prompt = [
         `Domain event: ${event}`,

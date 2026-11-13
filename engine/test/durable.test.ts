@@ -735,7 +735,8 @@ test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflecti
     });
 
     try {
-      // 1. Push `warn.continued` while YouTube tab is open in `device.context`.
+      // 1. Push `warn.continued` twice inside `warnFollowupDelayMs` for the same host
+      // while YouTube tab is open: only ONE follow-up intent should be scheduled.
       transport.pushInbound({
         v: ENGINE_PROTOCOL_VERSION,
         event: "warn.continued",
@@ -747,7 +748,35 @@ test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflecti
       });
       await runtime.waitForIdle();
 
-      // Advance clock past `warnFollowupDelayMs` (60s): the auto-scheduled intent fires!
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        event: "warn.continued",
+        params: {
+          url: "https://www.youtube.com/watch?v=xyz",
+          title: "Another video",
+          taskIDs: ["t-1"],
+        },
+      });
+      await runtime.waitForIdle();
+
+      // A `warn.continued` during night phase must neither schedule nor call model.stream.
+      const prevPhase = transport.stateSnapshot.phase ?? "working";
+      transport.stateSnapshot.phase = "night";
+      const callsBeforeNight = transport.modelStreamCalls.length;
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        event: "warn.continued",
+        params: {
+          url: "https://reddit.com/r/swift",
+          title: "Reddit",
+          taskIDs: ["t-1"],
+        },
+      });
+      await runtime.waitForIdle();
+      assert.equal(transport.modelStreamCalls.length, callsBeforeNight);
+      transport.stateSnapshot.phase = prevPhase;
+
+      // Advance clock past `warnFollowupDelayMs` (60s): exactly ONE auto-scheduled intent fires!
       clock += 90_000;
       runtime.nudgeClock();
       await waitUntil(() =>
@@ -758,6 +787,12 @@ test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflecti
         ),
       );
       await runtime.waitForIdle();
+      const warnFiredCount = transport.sentEnvelopes.filter(
+        (e) =>
+          e.event === "intent.fired" &&
+          (e.params as Record<string, unknown>)?.kind === "warn.continued",
+      ).length;
+      assert.equal(warnFiredCount, 1);
 
       // 2. Run reflection over `state.json.log` via `reflection.run`.
       transport.pushInbound({
@@ -789,7 +824,8 @@ test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflecti
       assert.ok(lessons.some((l) => l.id === "lesson-late_first_round" && l.count === 2));
       assert.ok(lessons.some((l) => l.id === "lesson-steady_paid_days" && l.count === 2));
 
-      // 4. Accept a lesson via `lesson.accept` and verify `accepted: true` persists across re-runs.
+      // 4. Accept `lesson-carried_frogs` and verify re-running reflection over clean days
+      // drops unaccepted unmatched patterns while keeping the accepted lesson.
       transport.pushInbound({
         v: ENGINE_PROTOCOL_VERSION,
         id: "la-s5",
@@ -804,6 +840,50 @@ test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflecti
         true,
       );
       assert.ok(String(acceptedObj.repoDiffHint).includes("lesson-carried_frogs"));
+
+      // Rewrite `state.json.log` to a single clean early round day and re-run reflection.
+      const cleanLog =
+        JSON.stringify({ date: "2026-11-12", firstRound: "08:30", rounds: 2, tasksDone: 2, tasksOpen: 0, dayOff: false }) +
+        "\n";
+      fs.writeFileSync(logPath, cleanLog, "utf8");
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "refl-clean",
+        method: "reflection.run",
+        params: { windowDays: 7 },
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "refl-clean"));
+      const cleanLessons = (
+        transport.sentEnvelopes.find((e) => e.id === "refl-clean")!.result as Record<string, unknown>
+      ).lessons as Array<Record<string, unknown>>;
+      assert.ok(
+        cleanLessons.some((l) => l.id === "lesson-carried_frogs" && l.accepted === true),
+        "accepted lesson should stay",
+      );
+      assert.ok(
+        !cleanLessons.some((l) => l.id === "lesson-zero_round_days"),
+        "unaccepted unmatched pattern should be dropped",
+      );
+      assert.ok(
+        !cleanLessons.some((l) => l.id === "lesson-late_first_round"),
+        "unaccepted unmatched late_first_round should be dropped",
+      );
+
+      // 5. Read-only stateDir during `lesson.accept` returns internal error instead of crashing.
+      fs.chmodSync(dir, 0o500);
+      try {
+        transport.pushInbound({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: "la-readonly",
+          method: "lesson.accept",
+          params: { lessonID: "lesson-carried_frogs" },
+        });
+        await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "la-readonly"));
+        const errReply = transport.sentEnvelopes.find((e) => e.id === "la-readonly")!;
+        assert.equal(errReply.error?.code, "internal");
+      } finally {
+        fs.chmodSync(dir, 0o700);
+      }
     } finally {
       await runtime.close();
     }

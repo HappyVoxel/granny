@@ -46,6 +46,7 @@ final class EngineServer: @unchecked Sendable {
     private let supervisedEnginePath: String?
     private var restartAttempt = 0
     private var lastDayWokeDate: String?
+    private var pendingEvents: [EngineEnvelope] = []
 
     var currentStatus: Status {
         statusLock.lock()
@@ -198,6 +199,7 @@ final class EngineServer: @unchecked Sendable {
             stopped = true
             for entry in activeModelStreams.values { entry.task.cancel() }
             activeModelStreams.removeAll()
+            pendingEvents.removeAll()
             if engineFD >= 0 {
                 _ = Darwin.shutdown(engineFD, SHUT_RDWR)
                 engineFD = -1
@@ -237,16 +239,31 @@ final class EngineServer: @unchecked Sendable {
 
     /// Pushes a kernel domain event (`day.woke`, `slot.entered`, `round.idle`,
     /// `round.finished`, `warn.continued`, `day.rollover`) to the connected
-    /// engine, if one is present.
+    /// engine, or queues it until the `hello` handshake completes.
     func push(domainEvent: EngineDomainEvent, params: EngineJSON) {
         let envelope = EngineEnvelope.push(domainEvent: domainEvent, params: params)
         ioQueue.async { [weak self] in
-            guard let self, self.engineFD >= 0 else { return }
-            if !self.writeLine(envelope, to: self.engineFD) {
-                _ = Darwin.shutdown(self.engineFD, SHUT_RDWR)
-                self.engineFD = -1
-                self.setStatus(.degraded(reason: "engine write timed out"))
+            guard let self, !self.stopped else { return }
+            self.sendOrQueueDomainEventLocked(envelope)
+        }
+    }
+
+    private func sendOrQueueDomainEventLocked(_ envelope: EngineEnvelope) {
+        if engineFD < 0 {
+            if pendingEvents.count >= 16 {
+                pendingEvents.removeFirst()
             }
+            pendingEvents.append(envelope)
+            return
+        }
+        if !writeLine(envelope, to: engineFD) {
+            _ = Darwin.shutdown(engineFD, SHUT_RDWR)
+            engineFD = -1
+            setStatus(.degraded(reason: "engine write timed out"))
+            if pendingEvents.count >= 16 {
+                pendingEvents.removeFirst()
+            }
+            pendingEvents.append(envelope)
         }
     }
 
@@ -578,6 +595,11 @@ final class EngineServer: @unchecked Sendable {
                             self.engineFD = fd
                             self.restartAttempt = 0
                             self.setStatus(.ready(impl: peer.impl))
+                            let events = self.pendingEvents
+                            self.pendingEvents.removeAll()
+                            for queued in events {
+                                self.sendOrQueueDomainEventLocked(queued)
+                            }
                         }
                         DispatchQueue.main.async { [weak self] in
                             self?.pushDayWokeIfNeeded()

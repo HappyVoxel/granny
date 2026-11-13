@@ -106,6 +106,7 @@ export class SocketKernelTransport implements KernelTransport {
   private readonly pendingRpcs = new Map<string, PendingRpc>();
   private readonly pendingStreams = new Map<string, PendingStream>();
   private readonly inboundListeners = new Set<(envelope: EngineEnvelope) => void>();
+  private readonly bufferedInbound: EngineEnvelope[] = [];
   private closed = false;
 
   private constructor(socket: net.Socket) {
@@ -200,6 +201,15 @@ export class SocketKernelTransport implements KernelTransport {
 
   onInbound(handler: (envelope: EngineEnvelope) => void): () => void {
     this.inboundListeners.add(handler);
+    if (this.bufferedInbound.length > 0) {
+      const queued = this.bufferedInbound.splice(0, this.bufferedInbound.length);
+      queueMicrotask(() => {
+        if (!this.inboundListeners.has(handler)) return;
+        for (const msg of queued) {
+          handler(msg);
+        }
+      });
+    }
     return () => this.inboundListeners.delete(handler);
   }
 
@@ -385,6 +395,13 @@ export class SocketKernelTransport implements KernelTransport {
         return;
       }
       pending.resolve(msg.result ?? null);
+      return;
+    }
+
+    if (this.inboundListeners.size === 0) {
+      if (this.bufferedInbound.length < 32) {
+        this.bufferedInbound.push(msg);
+      }
       return;
     }
 

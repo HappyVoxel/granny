@@ -606,9 +606,37 @@ done
 [ "$nudges_after" = "1" ] || { cat "$SANDBOX/serve4.log" "$SANDBOX/state/engine.log" 2>/dev/null >&2; fail "expected sleeping intent to survive kill -9 and increment nudgesSent to 1, got $nudges_after"; }
 CHECKS=$((CHECKS + 1))
 
-# 10. Slice 5: /warn-continued domain event + reflection.run / lesson.list / lesson.accept over engine.sock.
+# 10. Slice 5: pre-hello event buffering + /warn-continued domain event + reflection.run / lesson.list / lesson.accept.
+# Kill the engine briefly, send /warn-continued while engineFD < 0, and verify the respawned engine still schedules the intent!
+warn_pre_pid="$(cat "$SANDBOX/durable.pid")"
+rm -f "$SANDBOX/durable.pid"
+kill -9 "$warn_pre_pid" 2>/dev/null || true
+sleep 0.1
+
 warn_cont_out="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/warn-continued?url=https%3A%2F%2Fswift.org%2Fblog&title=Swift")"
 contains "$warn_cont_out" '"ok":true' "/warn-continued endpoint ack"
+
+for _ in $(seq 1 60); do
+  [ -f "$SANDBOX/durable.pid" ] && break
+  sleep 0.1
+done
+[ -f "$SANDBOX/durable.pid" ] || fail "Pi Durable granny-engine did not respawn after pre-hello warn.continued"
+CHECKS=$((CHECKS + 1))
+
+# Verify the buffered warn.continued event flushed after hello and persisted a sleeping warn.continued task in durable.sqlite!
+warn_task_found=""
+for _ in $(seq 1 40); do
+  warn_task_found="$(node --input-type=module -e '
+import { DatabaseSync } from "node:sqlite";
+const db = new DatabaseSync(process.argv[1]);
+const rows = db.prepare("SELECT kind, record FROM tasks").all();
+console.log(rows.some(r => String(r.kind).includes("granny.intent") && String(r.record).includes("swift.org")) ? "yes" : "");
+' "$SANDBOX/state/engine/durable.sqlite" 2>/dev/null || true)"
+  [ "$warn_task_found" = "yes" ] && break
+  sleep 0.1
+done
+[ "$warn_task_found" = "yes" ] || fail "buffered warn.continued did not reach engine and schedule swift.org intent"
+CHECKS=$((CHECKS + 1))
 
 cat >"$SANDBOX/state/state.json.log" <<'JSONL'
 {"date":"2026-11-09","dayOff":false,"firstRound":"11:40","rounds":1,"tasksDone":1,"tasksOpen":2}
