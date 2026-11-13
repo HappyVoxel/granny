@@ -49,7 +49,13 @@ interface GrannyCloseTabMessage {
   type: 'granny-close-tab';
 }
 
-type GrannyMessage = GrannyCheckMessage | GrannyCloseTabMessage;
+interface GrannyWarnContinuedMessage {
+  type: 'granny-warn-continued';
+  url: string;
+  title: string;
+}
+
+type GrannyMessage = GrannyCheckMessage | GrannyCloseTabMessage | GrannyWarnContinuedMessage;
 
 /** Port + token, as stored in chrome.storage.local. */
 interface GrannySettings {

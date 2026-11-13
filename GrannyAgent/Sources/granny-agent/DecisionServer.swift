@@ -20,6 +20,7 @@ final class DecisionServer {
     /// a break that clears the hosts but leaves Facebook blocked by the
     /// extension would be incoherent.
     private let enforcementProvider: () -> Bool
+    private let onWarnContinued: ((String, String, [String]) -> Void)?
     private var listener: NWListener?
 
     init(
@@ -27,13 +28,15 @@ final class DecisionServer {
         token: String,
         port: UInt16,
         stateProvider: @escaping () -> (DayState, Phase),
-        enforcementProvider: @escaping () -> Bool
+        enforcementProvider: @escaping () -> Bool,
+        onWarnContinued: ((String, String, [String]) -> Void)? = nil
     ) {
         self.engine = engine
         self.token = token
         self.port = port
         self.stateProvider = stateProvider
         self.enforcementProvider = enforcementProvider
+        self.onWarnContinued = onWarnContinued
     }
 
     func start() throws {
@@ -169,6 +172,14 @@ final class DecisionServer {
                 "reason": decision.reason,
                 "source": decision.source,
             ])
+        case ("GET", "/warn-continued"), ("POST", "/warn-continued"):
+            let query = parseQuery(target)
+            let url = query["url"] ?? ""
+            let title = query["title"] ?? ""
+            let (state, _) = stateProvider()
+            let openTaskIDs = state.tasks.filter { !$0.done }.map(\.id)
+            onWarnContinued?(url, title, openTaskIDs)
+            send(connection, status: 200, json: ["ok": true])
         default:
             send(connection, status: 404, json: ["error": "not found"])
         }

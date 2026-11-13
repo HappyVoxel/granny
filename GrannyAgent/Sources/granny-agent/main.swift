@@ -139,12 +139,6 @@ if arguments.contains("--serve") {
     let engine = DecisionEngine(config: config)
     let pomodoro = ServePomodoro(config: config, store: store)
     do {
-        let server = DecisionServer(
-            engine: engine,
-            token: config.token,
-            port: config.decidePortNumber,
-            stateProvider: { onMain { (store.state, computePhase(config: config, state: store.state)) } },
-            enforcementProvider: { onMain { pomodoro.enforced } })
         let engineServer = EngineServer(
             configProvider: { GrannyConfig.load() },
             stateStore: store,
@@ -153,6 +147,21 @@ if arguments.contains("--serve") {
             deviceContextProvider: { DeviceContextCollector.snapshot(calendar: store.calendar) },
             traceProvider: { TraceClient(config: GrannyConfig.load().langfuse) },
             onStartRound: { onMain { pomodoro.startRound() } })
+        let server = DecisionServer(
+            engine: engine,
+            token: config.token,
+            port: config.decidePortNumber,
+            stateProvider: { onMain { (store.state, computePhase(config: config, state: store.state)) } },
+            enforcementProvider: { onMain { pomodoro.enforced } },
+            onWarnContinued: { url, title, taskIDs in
+                engineServer.push(
+                    domainEvent: .warnContinued,
+                    params: .object([
+                        "url": .string(url),
+                        "title": .string(title),
+                        "taskIDs": .array(taskIDs.map(EngineJSON.string)),
+                    ]))
+            })
         try server.start()
         do {
             try engineServer.start()

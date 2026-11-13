@@ -711,3 +711,103 @@ test("overlapping prompts stay isolated, wall-clock nudges do not duplicate chai
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("Slice 5: warn.continued schedules a tabOpen follow-up intent, and reflection.run / lesson.list / lesson.accept manage lessons.jsonl", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "granny-durable-s5-"));
+  try {
+    // Seed `state.json.log` with 4 finished days (carried frogs + late starts + zero round day).
+    const logPath = path.join(dir, "state.json.log");
+    const logLines = [
+      JSON.stringify({ date: "2026-11-08", firstRound: "11:45", rounds: 2, tasksDone: 2, tasksOpen: 1, dayOff: false }),
+      JSON.stringify({ date: "2026-11-09", rounds: 0, tasksDone: 0, tasksOpen: 2, dayOff: false }),
+      JSON.stringify({ date: "2026-11-10", firstRound: "09:10", rounds: 3, tasksDone: 3, tasksOpen: 0, dayOff: false }),
+      JSON.stringify({ date: "2026-11-11", firstRound: "12:15", rounds: 2, tasksDone: 2, tasksOpen: 0, dayOff: false }),
+    ].join("\n") + "\n";
+    fs.writeFileSync(logPath, logLines, "utf8");
+
+    let clock = Date.parse("2026-11-12T10:00:00Z");
+    const transport = new FakeKernelTransport();
+    const runtime = await GrannyDurableRuntime.open({
+      transport,
+      stateDir: dir,
+      now: () => clock,
+      warnFollowupDelayMs: 60_000,
+    });
+
+    try {
+      // 1. Push `warn.continued` while YouTube tab is open in `device.context`.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        event: "warn.continued",
+        params: {
+          url: "https://www.youtube.com/watch?v=abc",
+          title: "Deep work lecture",
+          taskIDs: ["t-1"],
+        },
+      });
+      await runtime.waitForIdle();
+
+      // Advance clock past `warnFollowupDelayMs` (60s): the auto-scheduled intent fires!
+      clock += 90_000;
+      runtime.nudgeClock();
+      await waitUntil(() =>
+        transport.sentEnvelopes.some(
+          (e) =>
+            e.event === "intent.fired" &&
+            (e.params as Record<string, unknown>)?.kind === "warn.continued",
+        ),
+      );
+      await runtime.waitForIdle();
+
+      // 2. Run reflection over `state.json.log` via `reflection.run`.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "refl-s5",
+        method: "reflection.run",
+        params: { windowDays: 7 },
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "refl-s5"));
+
+      // Verify `state.json.log` was never modified.
+      assert.equal(fs.readFileSync(logPath, "utf8"), logLines);
+      assert.ok(fs.existsSync(path.join(dir, "lessons.jsonl")));
+
+      // 3. List lessons via `lesson.list`.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "ll-s5",
+        method: "lesson.list",
+        params: {},
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "ll-s5"));
+      const listReply = transport.sentEnvelopes.find((e) => e.id === "ll-s5")!;
+      const lessons = (listReply.result as Record<string, unknown>).lessons as Array<
+        Record<string, unknown>
+      >;
+      assert.ok(lessons.some((l) => l.id === "lesson-carried_frogs" && l.count === 2));
+      assert.ok(lessons.some((l) => l.id === "lesson-zero_round_days" && l.count === 1));
+      assert.ok(lessons.some((l) => l.id === "lesson-late_first_round" && l.count === 2));
+      assert.ok(lessons.some((l) => l.id === "lesson-steady_paid_days" && l.count === 2));
+
+      // 4. Accept a lesson via `lesson.accept` and verify `accepted: true` persists across re-runs.
+      transport.pushInbound({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: "la-s5",
+        method: "lesson.accept",
+        params: { lessonID: "lesson-carried_frogs" },
+      });
+      await waitUntil(() => transport.sentEnvelopes.some((e) => e.id === "la-s5"));
+      const acceptReply = transport.sentEnvelopes.find((e) => e.id === "la-s5")!;
+      const acceptedObj = acceptReply.result as Record<string, unknown>;
+      assert.equal(
+        (acceptedObj.lesson as Record<string, unknown>).accepted,
+        true,
+      );
+      assert.ok(String(acceptedObj.repoDiffHint).includes("lesson-carried_frogs"));
+    } finally {
+      await runtime.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

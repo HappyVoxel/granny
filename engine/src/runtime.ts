@@ -20,6 +20,7 @@ import {
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { int, num, obj, opt, str } from "@earendil-works/pi-schema";
 import { GRANNY_PROVIDER_ID, createGrannyModels } from "./provider.js";
+import { acceptLesson, listLessons, runReflection } from "./lessons.js";
 import {
   ENGINE_PROTOCOL_VERSION,
   KernelRpcError,
@@ -188,6 +189,7 @@ export interface GrannyDurableOptions {
   now?: () => number;
   setTimer?: SetTimer;
   context?: Context;
+  warnFollowupDelayMs?: number;
 }
 
 type ScheduledIntentTaskType = ReturnType<
@@ -198,6 +200,8 @@ export class GrannyDurableRuntime {
   readonly harness: Harness;
   readonly lanes: Record<LaneName, Conversation>;
   private readonly transport: KernelTransport;
+  private readonly stateDir: string;
+  private readonly warnFollowupDelayMs: number;
   private readonly ctx: Context;
   private readonly nowFn: () => number;
   private readonly intentTaskDef: ScheduledIntentTaskType;
@@ -216,6 +220,8 @@ export class GrannyDurableRuntime {
     harness: Harness,
     lanes: Record<LaneName, Conversation>,
     transport: KernelTransport,
+    stateDir: string,
+    warnFollowupDelayMs: number,
     ctx: Context,
     nowFn: () => number,
     intentTaskDef: ScheduledIntentTaskType,
@@ -225,6 +231,8 @@ export class GrannyDurableRuntime {
     this.harness = harness;
     this.lanes = lanes;
     this.transport = transport;
+    this.stateDir = stateDir;
+    this.warnFollowupDelayMs = warnFollowupDelayMs;
     this.ctx = ctx;
     this.nowFn = nowFn;
     this.intentTaskDef = intentTaskDef;
@@ -235,10 +243,12 @@ export class GrannyDurableRuntime {
   static async open(options: GrannyDurableOptions): Promise<GrannyDurableRuntime> {
     const ctx = options.context ?? BACKGROUND_CONTEXT;
     const nowFn = options.now ?? (() => Date.now());
+    const stateDir = options.stateDir ?? ".";
+    const warnFollowupDelayMs = options.warnFollowupDelayMs ?? 20 * 60_000;
     const storage =
       options.storage ??
       (await openNodeSqliteStorage(
-        path.join(options.stateDir ?? ".", "engine", "durable.sqlite"),
+        path.join(stateDir, "engine", "durable.sqlite"),
       ));
 
     let runtimeRef: GrannyDurableRuntime | null = null;
@@ -627,6 +637,8 @@ export class GrannyDurableRuntime {
       harness,
       lanes,
       options.transport,
+      stateDir,
+      warnFollowupDelayMs,
       ctx,
       nowFn,
       scheduledIntentTask,
@@ -786,6 +798,98 @@ export class GrannyDurableRuntime {
       return;
     }
 
+    if (envelope.method === "reflection.run") {
+      const reqId = envelope.id ?? "refl-1";
+      const params = (envelope.params ?? {}) as Record<string, unknown>;
+      const windowDays =
+        typeof params.windowDays === "number" && params.windowDays > 0
+          ? params.windowDays
+          : 7;
+      try {
+        const lessons = runReflection(this.stateDir, windowDays);
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          result: { lessons },
+        });
+      } catch (err) {
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          error: {
+            code: "internal",
+            reason: errorText(err),
+            retryable: false,
+          },
+        });
+      }
+      return;
+    }
+
+    if (envelope.method === "lesson.list") {
+      const reqId = envelope.id ?? "ll-1";
+      try {
+        const lessons = listLessons(this.stateDir);
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          result: { lessons },
+        });
+      } catch (err) {
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          error: {
+            code: "internal",
+            reason: errorText(err),
+            retryable: false,
+          },
+        });
+      }
+      return;
+    }
+
+    if (envelope.method === "lesson.accept") {
+      const reqId = envelope.id ?? "la-1";
+      const params = (envelope.params ?? {}) as Record<string, unknown>;
+      const lessonID = typeof params.lessonID === "string" ? params.lessonID.trim() : "";
+      if (!lessonID) {
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          error: {
+            code: "invalid",
+            reason: "lesson.accept requires lessonID",
+            retryable: false,
+          },
+        });
+        return;
+      }
+      const accepted = acceptLesson(
+        this.stateDir,
+        lessonID,
+        new Date(this.nowFn()).toISOString(),
+      );
+      if (!accepted) {
+        this.transport.sendEnvelope({
+          v: ENGINE_PROTOCOL_VERSION,
+          id: reqId,
+          error: {
+            code: "refused",
+            reason: `unknown lesson ${lessonID}`,
+            retryable: false,
+          },
+        });
+        return;
+      }
+      this.transport.sendEnvelope({
+        v: ENGINE_PROTOCOL_VERSION,
+        id: reqId,
+        result: accepted,
+      });
+      return;
+    }
+
     if (envelope.method) {
       this.transport.sendEnvelope({
         v: ENGINE_PROTOCOL_VERSION,
@@ -921,6 +1025,25 @@ export class GrannyDurableRuntime {
   }
 
   private async handleProactiveEvent(event: string, params: JsonObject): Promise<void> {
+    if (event === "warn.continued" && typeof params.url === "string" && params.url) {
+      let probeTarget = params.url;
+      try {
+        probeTarget = new URL(params.url).hostname || params.url;
+      } catch {
+        probeTarget = params.url;
+      }
+      try {
+        await this.scheduleIntent({
+          kind: "warn.continued",
+          fireAt: this.nowFn() + this.warnFollowupDelayMs,
+          note: `Check if grandchild is still browsing ${probeTarget} (${typeof params.title === "string" ? params.title : ""})`,
+          probe: { kind: "tabOpen", urlSubstring: probeTarget },
+        });
+      } catch (err) {
+        process.stderr.write(`granny-engine: failed to schedule warn.continued intent: ${errorText(err)}\n`);
+      }
+    }
+
     // Cheap zero-LLM pre-gate: check state.read before waking the proactive model lane.
     try {
       const stateRaw = await this.transport.callCapability("state.read", {});
@@ -953,7 +1076,8 @@ export class GrannyDurableRuntime {
 
   private async handleReflectionEvent(params: JsonObject): Promise<void> {
     try {
-      const prompt = `Day rollover summary event: ${JSON.stringify(params)}. Read state_read if needed and summarize patterns briefly.`;
+      const lessons = runReflection(this.stateDir, 7);
+      const prompt = `Day rollover summary event: ${JSON.stringify(params)}. Counted lessons written to lessons.jsonl: ${JSON.stringify(lessons)}. Read state_read if needed and summarize patterns briefly.`;
       await this.lanes.reflection.submit(
         { type: "input", content: prompt, whenBusy: "followUp" },
         this.ctx,

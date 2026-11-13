@@ -86,6 +86,13 @@ final class GrannyContext {
         // like, and why the clock is reset here instead of by comparing
         // stages.
         scheduler.onDayRollover = { [weak self] in self?.startPomodoroDay() }
+        scheduler.pomodoroRunning = { [unowned self] in self.pomodoroRunning }
+        scheduler.onSlotEntered = { [weak self] params in
+            self?.engineServer?.push(domainEvent: .slotEntered, params: params)
+        }
+        scheduler.onRoundIdle = { [weak self] params in
+            self?.engineServer?.push(domainEvent: .roundIdle, params: params)
+        }
         startEngineServer()
         scheduler.start()
         startDecisionServer()
@@ -855,12 +862,13 @@ final class GrannyContext {
         let today = store.state.date
         guard lastRolloverDate != today else { return }
         lastRolloverDate = today
+        let lastLogged = RhythmLog.read(store.logURL, limit: 1).last
         engineServer?.push(
             domainEvent: .dayRollover,
-            params: .object([
-                "date": .string(today),
-                "open": .number(Double(store.state.carried.count)),
-            ]))
+            params: EngineKernel.dayRolloverPayload(
+                today: today,
+                carriedOpenCount: store.state.carried.count,
+                lastLoggedDay: lastLogged))
     }
 
     private func stageName(_ stage: PomodoroStage) -> String {
@@ -902,7 +910,16 @@ final class GrannyContext {
                     if Thread.isMainThread { return self.snapshot() }
                     return DispatchQueue.main.sync { self.snapshot() }
                 },
-                enforcementProvider: { [unowned self] in self.blocksEnforced() })
+                enforcementProvider: { [unowned self] in self.blocksEnforced() },
+                onWarnContinued: { [weak self] url, title, taskIDs in
+                    self?.engineServer?.push(
+                        domainEvent: .warnContinued,
+                        params: .object([
+                            "url": .string(url),
+                            "title": .string(title),
+                            "taskIDs": .array(taskIDs.map(EngineJSON.string)),
+                        ]))
+                })
             try server.start()
             self.server = server
         } catch {

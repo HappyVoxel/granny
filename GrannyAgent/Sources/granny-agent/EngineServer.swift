@@ -608,6 +608,13 @@ final class EngineServer: @unchecked Sendable {
                                 to: fd)
                         }
                         return
+                    } else if envelope.method == "intent.schedule"
+                        || envelope.method == "reflection.run"
+                        || envelope.method == "lesson.list"
+                        || envelope.method == "lesson.accept"
+                    {
+                        handleClientEngineRpcOverSocket(envelope: envelope, clientFD: fd)
+                        return
                     } else if envelope.method == EngineCapability.stateRead.rawValue {
                         // Reads are replay-safe and serve the app's own status
                         // path; a mutation waits for the handshake.
@@ -814,6 +821,66 @@ final class EngineServer: @unchecked Sendable {
                         error: EngineError(
                             code: .internal,
                             reason: "engine prompt timed out",
+                            retryable: false)),
+                    to: clientFD)
+            }
+        }
+    }
+
+    private func handleClientEngineRpcOverSocket(envelope: EngineEnvelope, clientFD: Int32) {
+        let id = envelope.id ?? "rpc-\(UUID().uuidString.prefix(8))"
+        let method = envelope.method ?? ""
+        let done = DispatchSemaphore(value: 0)
+        ioQueue.async { [weak self] in
+            guard let self else {
+                done.signal()
+                return
+            }
+            guard self.engineFD >= 0 else {
+                _ = self.writeLine(
+                    .failure(id: id, error: .unavailable("engine is not connected")),
+                    to: clientFD)
+                done.signal()
+                return
+            }
+            self.activePromptWaiters[id] = { [weak self] reply in
+                guard let self else {
+                    done.signal()
+                    return
+                }
+                _ = self.writeLine(reply, to: clientFD)
+                if reply.isReply {
+                    done.signal()
+                }
+            }
+            let forwarded = EngineEnvelope(
+                v: envelope.v,
+                id: id,
+                key: envelope.key,
+                method: method,
+                params: envelope.params)
+            if !self.writeLine(forwarded, to: self.engineFD) {
+                self.activePromptWaiters.removeValue(forKey: id)
+                _ = self.writeLine(
+                    .failure(
+                        id: id,
+                        error: EngineError(
+                            code: .internal,
+                            reason: "engine disconnected",
+                            retryable: false)),
+                    to: clientFD)
+                done.signal()
+            }
+        }
+        if done.wait(timeout: .now() + Self.promptTimeout) == .timedOut {
+            ioQueue.sync {
+                self.activePromptWaiters.removeValue(forKey: id)
+                _ = self.writeLine(
+                    .failure(
+                        id: id,
+                        error: EngineError(
+                            code: .internal,
+                            reason: "engine request timed out",
                             retryable: false)),
                     to: clientFD)
             }

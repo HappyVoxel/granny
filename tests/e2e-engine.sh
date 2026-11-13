@@ -606,4 +606,30 @@ done
 [ "$nudges_after" = "1" ] || { cat "$SANDBOX/serve4.log" "$SANDBOX/state/engine.log" 2>/dev/null >&2; fail "expected sleeping intent to survive kill -9 and increment nudgesSent to 1, got $nudges_after"; }
 CHECKS=$((CHECKS + 1))
 
+# 10. Slice 5: /warn-continued domain event + reflection.run / lesson.list / lesson.accept over engine.sock.
+warn_cont_out="$(curl -s -H "X-Granny-Token: $TOKEN" "http://127.0.0.1:$PORT/warn-continued?url=https%3A%2F%2Fswift.org%2Fblog&title=Swift")"
+contains "$warn_cont_out" '"ok":true' "/warn-continued endpoint ack"
+
+cat >"$SANDBOX/state/state.json.log" <<'JSONL'
+{"date":"2026-11-09","dayOff":false,"firstRound":"11:40","rounds":1,"tasksDone":1,"tasksOpen":2}
+{"date":"2026-11-10","dayOff":false,"rounds":0,"tasksDone":0,"tasksOpen":1}
+{"date":"2026-11-11","dayOff":false,"firstRound":"09:15","rounds":2,"tasksDone":3,"tasksOpen":0}
+JSONL
+
+refl_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"refl-1","method":"reflection.run","params":{"windowDays":7}}')"
+contains "$refl_out" '"id":"lesson-carried_frogs"' "reflection.run computes carried_frogs lesson"
+contains "$refl_out" '"id":"lesson-zero_round_days"' "reflection.run computes zero_round_days lesson"
+[ -f "$SANDBOX/state/lessons.jsonl" ] || fail "lessons.jsonl was not written"
+CHECKS=$((CHECKS + 1))
+
+list_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"ll-1","method":"lesson.list","params":{}}')"
+contains "$list_out" '"id":"lesson-late_first_round"' "lesson.list returns persisted lessons"
+
+accept_out="$(node "$SANDBOX/rpc.mjs" "$SOCK" \
+  '{"v":1,"id":"la-1","method":"lesson.accept","params":{"lessonID":"lesson-carried_frogs"}}')"
+contains "$accept_out" '"accepted":true' "lesson.accept marks lesson accepted"
+contains "$accept_out" '"repoDiffHint"' "lesson.accept returns repo diff hint"
+
 echo "e2e-engine OK ($CHECKS checks)"

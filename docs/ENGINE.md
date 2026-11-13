@@ -5,13 +5,14 @@ Status: wire types (`EngineProtocol.swift`), the full kernel capability table
 `state.task.add`, `state.task.tick`, `slot.move`, `round.start`,
 `notify.speak`, `trace.emit`, and `model.stream` wired to `OpenRouterClient`),
 the local socket + child supervisor (`EngineServer.swift`,
-`GRANNY_ENGINE_PATH`, `day.woke`/`round.finished`/`day.rollover` pushes,
+`GRANNY_ENGINE_PATH`, all six domain events `day.woke`/`slot.entered`/
+`round.idle`/`round.finished`/`warn.continued`/`day.rollover`,
 `tests/e2e-engine.sh`), the native chat tab (`ChatView.swift`: streaming
-deltas, `chat.abort`, degraded state), and the Pi Durable sidecar
-(`engine/`: `@earendil-works/pi-durable`, three lanes, `model.stream` provider,
-SQLite durable intents, zero-LLM wait probes, and crash/sleep-resume suites)
-are implemented. Remaining proactive domain events (`slot.entered`,
-`round.idle`, `warn.continued`) and `lessons.jsonl` reflection remain.
+deltas, reasoning toggle, `chat.abort`, degraded state), and the Pi Durable
+sidecar (`engine/`: `@earendil-works/pi-durable`, three lanes, `model.stream`
+provider, SQLite durable intents, zero-LLM wait probes, `lessons.jsonl`
+reflection, and crash/sleep-resume suites) are implemented. Only the
+portability corpus (`tests/portability/*.json`) remains.
 `docs/ARCHITECTURE.md` carries the decision ("The engine, and other platforms"
 plus the last two decision-log entries).
 
@@ -366,7 +367,7 @@ flowchart LR
     S1 --> S2["2 · chat tab on the stub<br/>streaming · abort · degraded state (done)"]
     S2 --> S3["3 · remaining capabilities<br/>round.start · slot.move · device.context · model.stream (done)"]
     S3 --> S4["4 · engine #1 on Pi Durable<br/>lanes · durable intents · model.stream,<br/>behind GRANNY_ENGINE_PATH (done)"]
-    S4 --> S5["5 · proactive events · reflection<br/>slot.entered · round.idle · warn.continued"]
+    S4 --> S5["5 · proactive events · reflection<br/>slot.entered · round.idle · warn.continued (done)"]
     S5 --> S6["6 · portability corpus<br/>a phone port can prove itself"]
 ```
 
@@ -395,8 +396,12 @@ flowchart LR
    durable scheduled intents (`sleepUntil`) with wall-clock sleep-resume,
    zero-LLM `wait.probe` checks, and `continuitySummary` carry, bundled into
    `Granny.app` and overridable via `GRANNY_ENGINE_PATH`.
-5. Remaining proactive domain events (`slot.entered`, `round.idle`,
-   `warn.continued`); rituals ride on them.
-   Reflection writes `lessons.jsonl`; accepting a lesson is a repo diff.
+5. Remaining proactive domain events and reflection (done, `Scheduler.swift` +
+   `DecisionServer.swift` + `extension/` + `engine/src/lessons.ts`):
+   `slot.entered`, `round.idle`, `warn.continued` (with automatic zero-LLM
+   `tabOpen` follow-up intent), and `reflection.run` / `lesson.list` /
+   `lesson.accept` writing counted patterns from `state.json.log` to
+   `lessons.jsonl` (accepting a lesson emits a repo diff hint, never mutating
+   prompts at runtime).
 6. `tests/portability/*.json` generated from the Swift rules, so a phone port
    has something to prove itself against.
