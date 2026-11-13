@@ -86,6 +86,7 @@ final class PortabilityCorpusTests: XCTestCase {
 
     private struct CorpusFile<Case: Codable>: Codable {
         var version: Int
+        var wildcards: [String]?
         var cases: [Case]
     }
 
@@ -131,11 +132,16 @@ final class PortabilityCorpusTests: XCTestCase {
 
         let rules: CorpusFile<RuleCase> = try loadCorpus("rules.json")
         XCTAssertGreaterThanOrEqual(rules.cases.count, 10)
+        XCTAssertTrue(rules.cases.contains { $0.expected.verdict?.action == "allow" })
+        XCTAssertTrue(rules.cases.contains { $0.expected.verdict?.action == "warn" })
+        XCTAssertTrue(rules.cases.contains { $0.expected.verdict?.action == "block" })
+        XCTAssertTrue(rules.cases.contains { $0.expected.verdict == nil })
         for c in rules.cases {
             XCTAssertEqual(evalRule(c.input), c.expected, "rule case \(c.id)")
         }
 
         let kernel: CorpusFile<KernelCase> = try loadCorpus("kernel.json")
+        XCTAssertEqual(kernel.wildcards, ["generated-*"])
         XCTAssertGreaterThanOrEqual(kernel.cases.count, 10)
         for c in kernel.cases {
             let actual = evalKernel(c.input)
@@ -285,8 +291,8 @@ final class PortabilityCorpusTests: XCTestCase {
             ("youtube-shorts-blocked", .init(phase: "working", url: "https://www.youtube.com/shorts/abc123", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: [], taskDone: false)),
             ("search-results-allowed", .init(phase: "working", url: "https://www.google.com/search?q=swift+actors", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: [], taskDone: false)),
             ("research-docs-allowed", .init(phase: "working", url: "https://developer.apple.com/documentation/swift", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: [], taskDone: false)),
-            ("work-host-outside-surface-warns", .init(phase: "working", url: "https://github.com/trending", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: ["docs.python.org"], taskDone: false)),
-            ("linkedin-feed-warns", .init(phase: "working", url: "https://www.linkedin.com/feed/", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: [], taskDone: false)),
+            ("work-host-outside-surface-warns", .init(phase: "working", url: "https://www.facebook.com/", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: ["facebook.com/adsmanager*"], taskDone: false)),
+            ("linkedin-feed-warns", .init(phase: "working", url: "https://www.linkedin.com/feed/", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: ["linkedin.com/jobs*"], taskDone: false)),
             ("unknown-url-returns-nil", .init(phase: "working", url: "https://example.org/article/focus", blockedDomains: defaults.blockedDomains, alwaysAllowedURLPrefixes: [], taskSurfaces: [], taskDone: false)),
         ]
         try writeCorpus(
@@ -410,6 +416,7 @@ final class PortabilityCorpusTests: XCTestCase {
             "kernel.json",
             CorpusFile(
                 version: 1,
+                wildcards: ["generated-*"],
                 cases: kernelInputs.map { id, input in
                     KernelCase(id: id, input: input, expected: evalKernel(input))
                 }))

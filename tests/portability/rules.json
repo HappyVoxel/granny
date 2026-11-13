@@ -268,7 +268,11 @@
     },
     {
       "expected" : {
-
+        "verdict" : {
+          "action" : "warn",
+          "reason" : "outside surface facebook.com/adsmanager*",
+          "source" : "rules"
+        }
       },
       "id" : "work-host-outside-surface-warns",
       "input" : {
@@ -287,14 +291,18 @@
         "phase" : "working",
         "taskDone" : false,
         "taskSurfaces" : [
-          "docs.python.org"
+          "facebook.com/adsmanager*"
         ],
-        "url" : "https://github.com/trending"
+        "url" : "https://www.facebook.com/"
       }
     },
     {
       "expected" : {
-
+        "verdict" : {
+          "action" : "warn",
+          "reason" : "outside surface linkedin.com/jobs*",
+          "source" : "rules"
+        }
       },
       "id" : "linkedin-feed-warns",
       "input" : {
@@ -313,7 +321,7 @@
         "phase" : "working",
         "taskDone" : false,
         "taskSurfaces" : [
-
+          "linkedin.com/jobs*"
         ],
         "url" : "https://www.linkedin.com/feed/"
       }
