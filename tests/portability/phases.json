@@ -1,0 +1,197 @@
+{
+  "cases" : [
+    {
+      "expected" : {
+        "blocksEnforced" : true,
+        "phase" : "awaitingTasks"
+      },
+      "id" : "awaiting-tasks-day",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T09:00:00Z",
+        "pomodoroFinished" : 0,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : true,
+        "phase" : "night"
+      },
+      "id" : "before-wake-night",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T06:59:00Z",
+        "pomodoroFinished" : 0,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : true,
+        "phase" : "night"
+      },
+      "id" : "at-bedtime-night",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T23:00:00Z",
+        "pomodoroFinished" : 1,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+          {
+            "done" : true,
+            "title" : "Ship PR"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : true,
+        "phase" : "working"
+      },
+      "id" : "working-open-tasks",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T10:00:00Z",
+        "pomodoroFinished" : 0,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+          {
+            "done" : false,
+            "title" : "Apply"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : true,
+        "phase" : "working"
+      },
+      "id" : "unpaid-ticks-still-working",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T10:00:00Z",
+        "pomodoroFinished" : 0,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+          {
+            "done" : true,
+            "title" : "Apply"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : false,
+        "phase" : "rewarded"
+      },
+      "id" : "paid-all-done-rewarded",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T10:00:00Z",
+        "pomodoroFinished" : 1,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+          {
+            "done" : true,
+            "title" : "Apply"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : false,
+        "phase" : "dayOff"
+      },
+      "id" : "day-off-beats-night",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : true,
+        "now" : "2026-11-10T23:30:00Z",
+        "pomodoroFinished" : 0,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "deepWork",
+        "tasks" : [
+          {
+            "done" : false,
+            "title" : "Apply"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : false,
+        "phase" : "working"
+      },
+      "id" : "running-short-break-lifts-block",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T10:30:00Z",
+        "pomodoroFinished" : 1,
+        "pomodoroRunning" : true,
+        "pomodoroStage" : "shortBreak",
+        "tasks" : [
+          {
+            "done" : false,
+            "title" : "Apply"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    },
+    {
+      "expected" : {
+        "blocksEnforced" : true,
+        "phase" : "working"
+      },
+      "id" : "paused-short-break-reblocks",
+      "input" : {
+        "bedtimeHour" : 23,
+        "dayOff" : false,
+        "now" : "2026-11-10T10:30:00Z",
+        "pomodoroFinished" : 1,
+        "pomodoroRunning" : false,
+        "pomodoroStage" : "shortBreak",
+        "tasks" : [
+          {
+            "done" : false,
+            "title" : "Apply"
+          }
+        ],
+        "wakeHour" : 7
+      }
+    }
+  ],
+  "version" : 1
+}

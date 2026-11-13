@@ -1,0 +1,1382 @@
+{
+  "cases" : [
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "id" : "k-1",
+          "result" : {
+            "blocksEnforced" : true,
+            "date" : "2026-11-10",
+            "dayOff" : false,
+            "nudgesRemaining" : 2,
+            "phase" : "working",
+            "rounds" : 0,
+            "slots" : [
+              {
+                "id" : "morning",
+                "label" : "Deep work",
+                "tag" : "deepWork",
+                "time" : "09:00"
+              }
+            ],
+            "streak" : 0,
+            "tasks" : [
+              {
+                "done" : false,
+                "id" : "t-1",
+                "slotID" : "morning",
+                "title" : "Apply job"
+              }
+            ]
+          },
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "state-read",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T09:15:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-1",
+          "method" : "state.read",
+          "params" : {
+
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : true,
+        "reply" : {
+          "id" : "k-2",
+          "result" : {
+            "taskID" : "generated-1"
+          },
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "add-1",
+              "result" : {
+                "taskID" : "generated-1"
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            },
+            {
+              "allowedSurfaces" : [
+                "arxiv.org/*",
+                "medium.com/*",
+                "news.ycombinator.com/*"
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "generated-1",
+              "slotID" : "morning",
+              "title" : "Read paper"
+            }
+          ]
+        }
+      },
+      "id" : "task-add-success",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T09:15:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-2",
+          "key" : "add-1",
+          "method" : "state.task.add",
+          "params" : {
+            "slotID" : "morning",
+            "title" : "Read paper"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : true,
+        "reply" : {
+          "id" : "k-3",
+          "result" : {
+            "taskID" : "generated-1"
+          },
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "add-relock",
+              "result" : {
+                "taskID" : "generated-1"
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 1,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : true,
+              "id" : "t-1",
+              "title" : "Write CV"
+            },
+            {
+              "allowedSurfaces" : [
+                "mail.google.com/*"
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "generated-1",
+              "title" : "One more email"
+            }
+          ]
+        }
+      },
+      "id" : "task-add-relocks-rewarded-day",
+      "input" : {
+        "blocksEnforced" : false,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T16:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-3",
+          "key" : "add-relock",
+          "method" : "state.task.add",
+          "params" : {
+            "title" : "One more email"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 1,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : true,
+              "id" : "t-1",
+              "title" : "Write CV"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "error" : {
+            "code" : "refused",
+            "reason" : "day off",
+            "retryable" : false
+          },
+          "id" : "k-4",
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : true,
+          "greeted" : false,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+
+          ]
+        }
+      },
+      "id" : "task-add-refuses-day-off",
+      "input" : {
+        "blocksEnforced" : false,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T10:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-4",
+          "key" : "add-off",
+          "method" : "state.task.add",
+          "params" : {
+            "title" : "Sneak work"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : true,
+          "greeted" : false,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "error" : {
+            "code" : "refused",
+            "reason" : "finish one deep-work round first",
+            "retryable" : false
+          },
+          "id" : "k-5",
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "task-tick-refuses-unpaid-last",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T09:30:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-5",
+          "key" : "tick-unpaid",
+          "method" : "state.task.tick",
+          "params" : {
+            "done" : true,
+            "taskID" : "t-1"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : true,
+        "reply" : {
+          "id" : "k-6",
+          "result" : {
+            "phase" : "rewarded"
+          },
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "tick-paid",
+              "result" : {
+                "phase" : "rewarded"
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 1,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : true,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "task-tick-paid-rewards-day",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T10:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-6",
+          "key" : "tick-paid",
+          "method" : "state.task.tick",
+          "params" : {
+            "done" : true,
+            "taskID" : "t-1"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 1,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "error" : {
+            "code" : "refused",
+            "reason" : "unknown slot nonexistent",
+            "retryable" : false
+          },
+          "id" : "k-7",
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "slot-move-refuses-unknown-slot",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T10:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-7",
+          "key" : "slot-bad",
+          "method" : "slot.move",
+          "params" : {
+            "slotID" : "nonexistent",
+            "taskID" : "t-1"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : true,
+        "reply" : {
+          "id" : "k-8",
+          "result" : {
+            "endsAt" : "2026-11-10T09:25:00Z",
+            "stage" : "deepWork"
+          },
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : true,
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "round-1",
+              "result" : {
+                "endsAt" : "2026-11-10T09:25:00Z",
+                "stage" : "deepWork"
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "round-start-success",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T09:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-8",
+          "key" : "round-1",
+          "method" : "round.start",
+          "params" : {
+
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "error" : {
+            "code" : "refused",
+            "reason" : "after quiet hours",
+            "retryable" : false
+          },
+          "id" : "k-9",
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "notify-speak-refuses-quiet-hours",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T22:15:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-9",
+          "key" : "sp-quiet",
+          "method" : "notify.speak",
+          "params" : {
+            "reason" : "slot",
+            "text" : "Time for work"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "error" : {
+            "code" : "refused",
+            "reason" : "nudge budget spent",
+            "retryable" : false
+          },
+          "id" : "k-10",
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 2,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "notify-speak-refuses-over-budget",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T11:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-10",
+          "key" : "sp-budget",
+          "method" : "notify.speak",
+          "params" : {
+            "reason" : "idle",
+            "text" : "Third nudge"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 2,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : true,
+        "reply" : {
+          "id" : "k-11",
+          "result" : {
+            "delivered" : true
+          },
+          "v" : 1
+        },
+        "spoken" : true,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "sp-ok",
+              "result" : {
+                "delivered" : true
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 1,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "notify-speak-delivers-in-budget",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T11:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-11",
+          "key" : "sp-ok",
+          "method" : "notify.speak",
+          "params" : {
+            "reason" : "idle",
+            "text" : "Start one round"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expected" : {
+        "mutated" : false,
+        "reply" : {
+          "error" : {
+            "code" : "duplicate",
+            "reason" : "key already applied",
+            "result" : {
+              "taskID" : "t-existing"
+            },
+            "retryable" : false
+          },
+          "id" : "k-12",
+          "v" : 1
+        },
+        "spoken" : false,
+        "startedRound" : false,
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "k-dup",
+              "result" : {
+                "taskID" : "t-existing"
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      },
+      "id" : "duplicate-key-replays-original",
+      "input" : {
+        "blocksEnforced" : true,
+        "config" : {
+          "bedtimeHour" : 23,
+          "nudgesPerDayMax" : 2,
+          "quietEnd" : 7,
+          "quietStart" : 22,
+          "slots" : [
+            {
+              "id" : "morning",
+              "label" : "Deep work",
+              "tag" : "deepWork",
+              "time" : "09:00"
+            }
+          ],
+          "wakeHour" : 7
+        },
+        "now" : "2026-11-10T11:00:00Z",
+        "pomodoroRunning" : false,
+        "request" : {
+          "id" : "k-12",
+          "key" : "k-dup",
+          "method" : "state.task.add",
+          "params" : {
+            "title" : "Apply job"
+          },
+          "v" : 1
+        },
+        "state" : {
+          "appliedKeys" : [
+            {
+              "key" : "k-dup",
+              "result" : {
+                "taskID" : "t-existing"
+              }
+            }
+          ],
+          "carried" : [
+
+          ],
+          "date" : "2026-11-10",
+          "dayOff" : false,
+          "greeted" : true,
+          "nudgedOffSlot" : [
+
+          ],
+          "nudgesSent" : 0,
+          "pomodoro" : {
+            "finished" : 0,
+            "stage" : "deepWork"
+          },
+          "streak" : 0,
+          "tasks" : [
+            {
+              "allowedSurfaces" : [
+
+              ],
+              "carriedOver" : false,
+              "done" : false,
+              "id" : "t-1",
+              "slotID" : "morning",
+              "title" : "Apply job"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "version" : 1
+}
